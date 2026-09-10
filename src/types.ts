@@ -180,6 +180,14 @@ export interface AirSettings {
   company_id?: string;
   company_name: string;
   fantasy_name: string;
+  country?: string; // ej: 'Costa Rica', 'Venezuela', 'Perú', 'Chile', etc.
+  country_code?: string; // ej: 'CR', 'VE', 'PE', 'CL', etc.
+  currency_symbol?: string; // ej: '₡', '$', 'S/', 'Bs.'
+  currency_code?: string; // ej: 'CRC', 'USD', 'PEN', 'CLP', 'VES'
+  tax_id_label?: string; // ej: 'Cédula Jurídica', 'RIF', 'RUC', 'RUT', 'NIT', 'RFC'
+  tax_rate?: number; // ej: 0.13, 0.16, 0.18, 0.19
+  tax_name?: string; // ej: 'IVA', 'IGV', 'ITBIS'
+  division_label?: string; // ej: 'Cantón / Provincia', 'Municipio / Estado', 'Distrito / Provincia', 'Comuna / Región'
   rut: string;
   phone: string;
   whatsapp_number: string;
@@ -200,6 +208,8 @@ export interface AirSettings {
     phone?: string;
     email?: string;
     address?: string;
+    country?: string;
+    currency_symbol?: string;
     services?: Array<{ title: string; desc: string; price: number }>;
   };
 }

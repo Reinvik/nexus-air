@@ -1,5 +1,4 @@
-import React, { useState, useMemo } from 'react';
-import { Customer, AirEquipment, EquipmentType, RefrigerantType } from '../types';
+import { Customer, AirEquipment, EquipmentType, RefrigerantType, AirSettings } from '../types';
 import { 
   Users, 
   Search, 
@@ -14,6 +13,7 @@ import { format } from 'date-fns';
 interface CustomersAirProps {
   customers: Customer[];
   equipments: AirEquipment[];
+  settings?: AirSettings;
   onAddCustomer: (customer: Omit<Customer, 'id' | 'created_at'>) => void;
   onAddEquipment: (equipment: Omit<AirEquipment, 'id' | 'next_maintenance_date'>) => void;
   onUpdateCustomer: (id: string, updates: Partial<Customer>) => void;
@@ -22,6 +22,7 @@ interface CustomersAirProps {
 export const CustomersAir: React.FC<CustomersAirProps> = ({
   customers,
   equipments,
+  settings,
   onAddCustomer,
   onAddEquipment,
 }) => {
@@ -286,12 +287,12 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-slate-700 font-medium">RUT</label>
+                  <label className="text-slate-700 font-medium">{settings?.tax_id_label || 'RUT'}</label>
                   <input
                     type="text"
                     value={rut}
                     onChange={(e) => setRut(e.target.value)}
-                    placeholder="12.345.678-9"
+                    placeholder={settings?.tax_id_label || 'RUT / ID'}
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none mt-1"
                   />
                 </div>
@@ -309,6 +310,15 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
                 </div>
               </div>
               <div>
+                <label className="text-slate-700 font-medium">Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none mt-1"
+                />
+              </div>
+              <div>
                 <label className="text-slate-700 font-medium">Teléfono (WhatsApp)</label>
                 <input
                   type="text"
@@ -319,12 +329,12 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
                 />
               </div>
               <div>
-                <label className="text-slate-700 font-medium">Dirección & Comuna</label>
+                <label className="text-slate-700 font-medium">Dirección & {settings?.division_label || 'Comuna'}</label>
                 <div className="grid grid-cols-2 gap-2 mt-1">
                   <input
                     type="text"
                     value={address}
-                    placeholder="Calle y número"
+                    placeholder="Dirección o Calle"
                     onChange={(e) => setAddress(e.target.value)}
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
                     required
@@ -332,7 +342,7 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
                   <input
                     type="text"
                     value={commune}
-                    placeholder="Comuna (ej: Las Condes)"
+                    placeholder={settings?.division_label || 'Comuna / Cantón'}
                     onChange={(e) => setCommune(e.target.value)}
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
                     required

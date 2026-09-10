@@ -142,7 +142,7 @@ export const LandingTenantAir: React.FC<LandingTenantAirProps> = ({
               className="flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition-colors cursor-pointer border border-slate-200"
             >
               <UserCheck className="w-4 h-4 text-cyan-600" />
-              <span>Consultar Estado con RUT</span>
+              <span>Consultar con {settings.tax_id_label || 'RUT'}</span>
             </button>
           </div>
         </div>
@@ -176,7 +176,7 @@ export const LandingTenantAir: React.FC<LandingTenantAirProps> = ({
                 <div>
                   <span className="text-[10px] text-slate-400 block font-medium">Desde</span>
                   <span className="text-lg font-black text-slate-900 font-mono">
-                    ${Number(svc.price).toLocaleString('es-CL')}
+                    {settings.currency_symbol || '$'} {Number(svc.price).toLocaleString()}
                   </span>
                 </div>
                 <button

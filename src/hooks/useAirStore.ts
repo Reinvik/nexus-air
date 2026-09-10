@@ -71,6 +71,14 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
           company_id: dbSettings.company_id,
           company_name: dbSettings.company_name || prev.company_name,
           fantasy_name: dbSettings.company_name || prev.fantasy_name,
+          country: dbSettings.country || prev.country || 'Chile',
+          country_code: dbSettings.country_code || prev.country_code || 'CL',
+          currency_symbol: dbSettings.currency_symbol || prev.currency_symbol || '$',
+          currency_code: dbSettings.currency_code || prev.currency_code || 'CLP',
+          tax_id_label: dbSettings.tax_id_label || prev.tax_id_label || 'RUT',
+          tax_rate: dbSettings.tax_rate !== null && dbSettings.tax_rate !== undefined ? Number(dbSettings.tax_rate) : (prev.tax_rate ?? 0.19),
+          tax_name: dbSettings.tax_name || prev.tax_name || 'IVA',
+          division_label: dbSettings.division_label || prev.division_label || 'Comuna',
           phone: dbSettings.phone || prev.phone,
           whatsapp_number: (dbSettings.phone || prev.whatsapp_number).replace(/[^0-9]/g, ''),
           email: dbSettings.email || prev.email,
@@ -813,16 +821,26 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
 
     try {
       const activeId = companyId || DEFAULT_COMPANY_ID;
+      const dbUpdates: any = {
+        updated_at: new Date().toISOString()
+      };
+      if (updates.company_name !== undefined) dbUpdates.company_name = updates.company_name;
+      if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
+      if (updates.email !== undefined) dbUpdates.email = updates.email;
+      if (updates.address !== undefined) dbUpdates.address = updates.address;
+      if (updates.country !== undefined) dbUpdates.country = updates.country;
+      if (updates.country_code !== undefined) dbUpdates.country_code = updates.country_code;
+      if (updates.currency_symbol !== undefined) dbUpdates.currency_symbol = updates.currency_symbol;
+      if (updates.currency_code !== undefined) dbUpdates.currency_code = updates.currency_code;
+      if (updates.tax_id_label !== undefined) dbUpdates.tax_id_label = updates.tax_id_label;
+      if (updates.tax_rate !== undefined) dbUpdates.tax_rate = updates.tax_rate;
+      if (updates.tax_name !== undefined) dbUpdates.tax_name = updates.tax_name;
+      if (updates.division_label !== undefined) dbUpdates.division_label = updates.division_label;
+      if (updates.landing_config !== undefined) dbUpdates.landing_config = updates.landing_config;
+
       await supabaseAir
         .from('settings')
-        .update({
-          company_name: updates.company_name,
-          phone: updates.phone,
-          email: updates.email,
-          address: updates.address,
-          landing_config: updates.landing_config,
-          updated_at: new Date().toISOString()
-        })
+        .update(dbUpdates)
         .eq('company_id', activeId);
     } catch (e) {
       console.warn('[useAirStore] Error updating settings:', e);

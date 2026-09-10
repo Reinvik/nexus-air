@@ -112,7 +112,7 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
             </span>
             <h2 className="text-2xl font-black text-slate-900">{matchedCustomer?.name}</h2>
             <p className="text-xs text-slate-500">
-              {matchedCustomer?.address}, {matchedCustomer?.commune} • RUT: {matchedCustomer?.rut}
+              {matchedCustomer?.address}, {matchedCustomer?.commune} • {settings.tax_id_label || 'RUT'}: {matchedCustomer?.rut}
             </p>
           </div>
 

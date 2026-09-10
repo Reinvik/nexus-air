@@ -364,6 +364,7 @@ export default function App() {
           <CustomersAir
             customers={customers}
             equipments={equipments}
+            settings={settings}
             onAddCustomer={addCustomer}
             onAddEquipment={addEquipment}
             onUpdateCustomer={updateCustomer}
