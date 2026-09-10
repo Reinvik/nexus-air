@@ -177,6 +177,7 @@ export interface ThermalCalculationResult {
 }
 
 export interface AirSettings {
+  company_id?: string;
   company_name: string;
   fantasy_name: string;
   rut: string;
@@ -192,6 +193,15 @@ export interface AirSettings {
   whatsapp_template_recaptacion: string;
   whatsapp_template_agendamiento: string;
   whatsapp_template_terminado: string;
+  landing_config?: {
+    hero_title?: string;
+    hero_subtitle?: string;
+    hero_badge?: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    services?: Array<{ title: string; desc: string; price: number }>;
+  };
 }
 
 export type ViewTab = 

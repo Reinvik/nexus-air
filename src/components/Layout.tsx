@@ -31,6 +31,8 @@ interface LayoutProps {
   overdueRecaptacionCount: number;
   activeOrdersCount: number;
   settings: AirSettings;
+  currentUserProfile?: any;
+  onLogout?: () => void;
   children: React.ReactNode;
 }
 
@@ -43,6 +45,8 @@ export const Layout: React.FC<LayoutProps> = ({
   overdueRecaptacionCount,
   activeOrdersCount,
   settings,
+  currentUserProfile,
+  onLogout,
   children,
 }) => {
   const mainNav: { id: ViewTab; label: string; icon: React.ElementType; badge?: number; badgeColor?: string }[] = [
@@ -173,7 +177,7 @@ export const Layout: React.FC<LayoutProps> = ({
           <div className="flex items-center gap-3">
             <div className="relative group/avatar cursor-pointer">
               <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-[#00d2ff] shrink-0 font-bold">
-                NA
+                {currentUserProfile?.full_name ? currentUserProfile.full_name.substring(0, 2).toUpperCase() : 'NA'}
               </div>
               <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#090f1e] border border-cyan-500/40 flex items-center justify-center text-cyan-400 group-hover/avatar:scale-110 group-hover/avatar:bg-[#00d2ff] group-hover/avatar:text-slate-950 transition-all">
                 <Camera className="w-2.5 h-2.5" />
@@ -182,13 +186,13 @@ export const Layout: React.FC<LayoutProps> = ({
 
             <div className="flex-1 min-w-0">
               <div className="text-xs font-bold text-white truncate">
-                Admin Climatización
+                {currentUserProfile?.full_name || 'Admin Climatización'}
               </div>
               <div className="text-[10px] text-slate-500 truncate">
-                contacto@nexusair.cl
+                {currentUserProfile?.email || settings.email || 'contacto@nexusair.cl'}
               </div>
               <div className="text-[10px] font-bold text-[#00d2ff]">
-                Técnico Certificado SEC
+                {currentUserProfile?.role === 'admin' ? 'Administrador HVAC' : 'Técnico Certificado SEC'}
               </div>
             </div>
           </div>
@@ -211,7 +215,10 @@ export const Layout: React.FC<LayoutProps> = ({
             </button>
 
             <button
-              onClick={onOpenLanding}
+              onClick={() => {
+                if (onLogout) onLogout();
+                else onOpenLanding();
+              }}
               className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-[11px] font-bold text-slate-400 hover:text-[#f87171] hover:bg-rose-500/15 hover:border-rose-500/40 border border-transparent transition-all cursor-pointer"
             >
               <LogOut className="w-3 h-3" />

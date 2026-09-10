@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from './hooks/useAuth';
 import { useAirStore } from './hooks/useAirStore';
 import { Layout } from './components/Layout';
 import { KanbanBoardAir } from './components/KanbanBoardAir';
@@ -15,15 +16,17 @@ import { EditServiceOrderModal } from './components/EditServiceOrderModal';
 import { InspeccionHVACModal } from './components/InspeccionHVACModal';
 import { PublicBookingModal } from './components/PublicBookingModal';
 import { LandingNexusAir } from './components/LandingNexusAir';
+import { LandingTenantAir } from './components/LandingTenantAir';
+import { LoginAir } from './components/LoginAir';
 import { CustomerPortalAir } from './components/CustomerPortalAir';
-import { ViewTab, ServiceOrder } from './types';
+import { ViewTab, ServiceOrder, AirSettings } from './types';
 import { Toaster, toast } from 'react-hot-toast';
 
-type MainView = 'landing' | 'customer' | 'dashboard';
+type MainView = 'landing' | 'tenant_landing' | 'login' | 'customer' | 'dashboard';
 
 export default function App() {
+  const { user, profile, loadingAuth, effectiveCompanyId, login, logout } = useAuth();
   const {
-    isLoaded,
     customers,
     equipments,
     technicians,
@@ -49,12 +52,45 @@ export default function App() {
     deletePart,
     updateSettings,
     resetToDefaults,
-  } = useAirStore();
+    fetchPublicCompanyBySlug
+  } = useAirStore(effectiveCompanyId);
+
+  // Tenant slug detection (ej: ?t=nexus-air)
+  const [tenantSlug] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('t');
+    }
+    return null;
+  });
+
+  const [tenantSettings, setTenantSettings] = useState<AirSettings | null>(null);
+
+  useEffect(() => {
+    if (tenantSlug) {
+      fetchPublicCompanyBySlug(tenantSlug).then((data) => {
+        if (data) {
+          setTenantSettings({
+            ...settings,
+            company_id: data.company_id,
+            company_name: data.company_name,
+            fantasy_name: data.company_name,
+            phone: data.phone || settings.phone,
+            email: data.email || settings.email,
+            address: data.address || settings.address,
+            landing_config: data.landing_config || settings.landing_config
+          });
+        }
+      });
+    }
+  }, [tenantSlug, fetchPublicCompanyBySlug, settings]);
 
   const [view, setView] = useState<MainView>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('view') === 'customer') return 'customer';
+      if (params.get('t')) return 'tenant_landing';
+      if (params.get('rut') || params.get('p') || params.get('view') === 'customer') return 'customer';
+      if (params.get('view') === 'login') return 'login';
       if (params.get('view') === 'dashboard') return 'dashboard';
     }
     const saved = localStorage.getItem('nexus_air_view');
@@ -73,6 +109,13 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('nexus_air_tab', activeTab);
   }, [activeTab]);
+
+  // Si el usuario inicia sesión y estaba en login, ir automáticamente a dashboard
+  useEffect(() => {
+    if (!loadingAuth && user && view === 'login') {
+      setView('dashboard');
+    }
+  }, [user, loadingAuth, view]);
 
   // Modal States
   const [isAddOrderModalOpen, setIsAddOrderModalOpen] = useState(false);
@@ -98,11 +141,10 @@ export default function App() {
   };
 
   // Handler for booking from public modal
-  const handleConfirmPublicBooking = (bookingData: any) => {
-    // Buscar si el cliente ya existe o registrarlo
+  const handleConfirmPublicBooking = async (bookingData: any) => {
     let cust = customers.find(c => c.phone.includes(bookingData.phone.replace(/[^0-9]/g, '')));
     if (!cust) {
-      cust = addCustomer({
+      cust = await addCustomer({
         name: bookingData.name,
         rut: 'S/RUT',
         phone: bookingData.phone,
@@ -115,7 +157,11 @@ export default function App() {
       });
     }
 
-    const newOrder = addOrder({
+    const price = bookingData.service_type === 'instalacion' 
+      ? settings.standard_installation_price 
+      : settings.standard_maintenance_price;
+
+    const newOrder = await addOrder({
       customer_id: cust.id,
       service_type: bookingData.service_type,
       status: 'ingresado',
@@ -127,14 +173,14 @@ export default function App() {
           id: `it-${Date.now()}`,
           description: `Servicio ${bookingData.service_type.replace('_', ' ')}`,
           quantity: 1,
-          unit_price: bookingData.service_type === 'instalacion' ? settings.standard_installation_price : settings.standard_maintenance_price,
-          total: bookingData.service_type === 'instalacion' ? settings.standard_installation_price : settings.standard_maintenance_price,
+          unit_price: price,
+          total: price,
           type: 'servicio',
         }
       ],
-      subtotal: settings.standard_maintenance_price,
-      tax: Math.round(settings.standard_maintenance_price * 0.19),
-      total: Math.round(settings.standard_maintenance_price * 1.19),
+      subtotal: price,
+      tax: Math.round(price * 0.19),
+      total: Math.round(price * 1.19),
       payment_status: 'pendiente',
     });
 
@@ -142,18 +188,40 @@ export default function App() {
   };
 
   // Convert quote to order and open tab
-  const handleCreateOrderFromQuote = (orderData: Partial<ServiceOrder>) => {
+  const handleCreateOrderFromQuote = async (orderData: Partial<ServiceOrder>) => {
     const cust = customers[0];
-    const newOrder = addOrder({
+    await addOrder({
       ...orderData,
-      customer_id: cust.id,
+      customer_id: cust?.id || '',
       scheduled_date: new Date().toISOString().split('T')[0],
       scheduled_time_slot: '11:30 - 13:30',
     });
     setActiveTab('dashboard');
   };
 
-  // 1. Vista Landing Pública
+  // 1. Vista Landing de Empresa / Tenant (?t=slug)
+  if (view === 'tenant_landing') {
+    const currentSettings = tenantSettings || settings;
+    return (
+      <>
+        <Toaster position="top-right" />
+        <LandingTenantAir
+          settings={currentSettings}
+          onOpenBooking={() => setIsBookingModalOpen(true)}
+          onOpenPortal={() => setView('customer')}
+          onAdminAccess={() => setView('login')}
+        />
+        <PublicBookingModal
+          isOpen={isBookingModalOpen}
+          onClose={() => setIsBookingModalOpen(false)}
+          settings={currentSettings}
+          onConfirmBooking={handleConfirmPublicBooking}
+        />
+      </>
+    );
+  }
+
+  // 2. Vista Landing Institucional SaaS Nexus Air
   if (view === 'landing') {
     return (
       <>
@@ -162,7 +230,7 @@ export default function App() {
           settings={settings}
           onOpenBooking={() => setIsBookingModalOpen(true)}
           onOpenPortal={() => setView('customer')}
-          onAdminAccess={() => setView('dashboard')}
+          onAdminAccess={() => setView('login')}
         />
         <PublicBookingModal
           isOpen={isBookingModalOpen}
@@ -174,7 +242,29 @@ export default function App() {
     );
   }
 
-  // 2. Vista Portal de Cliente
+  // 3. Vista Login Oficial Smartlean
+  if (view === 'login') {
+    return (
+      <>
+        <Toaster position="top-right" />
+        <LoginAir
+          onLogin={login}
+          onQuickDemoAccess={() => setView('dashboard')}
+          onBackToLanding={() => setView(tenantSlug ? 'tenant_landing' : 'landing')}
+          onOpenCustomerPortal={() => setView('customer')}
+          onOpenBooking={() => setIsBookingModalOpen(true)}
+        />
+        <PublicBookingModal
+          isOpen={isBookingModalOpen}
+          onClose={() => setIsBookingModalOpen(false)}
+          settings={tenantSettings || settings}
+          onConfirmBooking={handleConfirmPublicBooking}
+        />
+      </>
+    );
+  }
+
+  // 4. Vista Portal de Cliente ("Mi Climatización")
   if (view === 'customer') {
     return (
       <>
@@ -183,21 +273,28 @@ export default function App() {
           customers={customers}
           equipments={equipments}
           orders={orders}
-          settings={settings}
-          onBackToApp={() => setView('dashboard')}
+          settings={tenantSettings || settings}
+          onBackToApp={() => setView(user ? 'dashboard' : (tenantSlug ? 'tenant_landing' : 'landing'))}
           onOpenBooking={() => setIsBookingModalOpen(true)}
         />
         <PublicBookingModal
           isOpen={isBookingModalOpen}
           onClose={() => setIsBookingModalOpen(false)}
-          settings={settings}
+          settings={tenantSettings || settings}
           onConfirmBooking={handleConfirmPublicBooking}
         />
       </>
     );
   }
 
-  // 3. Vista Panel Operativo (Dashboard)
+  // 5. Vista Panel Operativo (Dashboard)
+  const currentProfile = profile || {
+    email: user?.email || 'admin@nexusair.cl',
+    full_name: profile?.full_name || user?.email?.split('@')[0] || 'Administrador HVAC',
+    role: profile?.role || 'admin',
+    company_id: effectiveCompanyId
+  };
+
   return (
     <>
       <Toaster position="top-right" />
@@ -205,11 +302,17 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onOpenNewOrder={() => setIsAddOrderModalOpen(true)}
-        onOpenLanding={() => setView('landing')}
+        onOpenLanding={() => setView(tenantSlug ? 'tenant_landing' : 'landing')}
         onOpenPortal={() => setView('customer')}
         overdueRecaptacionCount={overdueCount}
         activeOrdersCount={activeOrdersCount}
         settings={settings}
+        currentUserProfile={currentProfile}
+        onLogout={async () => {
+          await logout();
+          setView('landing');
+          toast.success('Sesión cerrada correctamente');
+        }}
       >
         {activeTab === 'dashboard' && (
           <KanbanBoardAir
@@ -288,7 +391,7 @@ export default function App() {
         )}
       </Layout>
 
-      {/* Modals */}
+      {/* Modales Globales */}
       <AddServiceOrderModal
         isOpen={isAddOrderModalOpen}
         onClose={() => setIsAddOrderModalOpen(false)}
@@ -323,7 +426,7 @@ export default function App() {
       <PublicBookingModal
         isOpen={isBookingModalOpen}
         onClose={() => setIsBookingModalOpen(false)}
-        settings={settings}
+        settings={tenantSettings || settings}
         onConfirmBooking={handleConfirmPublicBooking}
       />
     </>

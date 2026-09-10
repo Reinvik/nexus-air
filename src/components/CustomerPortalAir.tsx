@@ -35,15 +35,33 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
   onBackToApp,
   onOpenBooking,
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>(customers[0]?.id || '');
+  const [searchQuery, setSearchQuery] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('rut') || params.get('p') || '';
+    }
+    return '';
+  });
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const rutParam = params.get('rut') || params.get('p');
+      if (rutParam) {
+        const found = customers.find(c => c.rut.toLowerCase() === rutParam.toLowerCase() || c.id === rutParam);
+        if (found) return found.id;
+      }
+    }
+    return customers[0]?.id || '';
+  });
 
   // Buscar cliente por RUT o Teléfono o Nombre
   const matchedCustomer = customers.find(c => 
-    c.id === selectedCustomerId ||
-    c.rut.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.phone.includes(searchQuery) ||
-    c.name.toLowerCase().includes(searchQuery.toLowerCase())
+    (selectedCustomerId && c.id === selectedCustomerId) ||
+    (searchQuery && (
+      c.rut.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.phone.includes(searchQuery) ||
+      c.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ))
   ) || customers[0];
 
   const clientEquipments = equipments.filter(e => e.customer_id === matchedCustomer?.id);

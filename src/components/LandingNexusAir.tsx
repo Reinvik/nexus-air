@@ -82,10 +82,10 @@ export const LandingNexusAir: React.FC<LandingNexusAirProps> = ({
           <div className="flex items-center gap-3">
             <button
               onClick={onAdminAccess}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] text-slate-300 hover:text-white text-xs font-semibold border border-white/[0.06] transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 hover:text-white text-xs font-bold border border-cyan-500/30 transition-colors cursor-pointer"
             >
               <Lock className="w-3.5 h-3.5 text-[#00d2ff]" />
-              <span>Panel Operativo</span>
+              <span>Acceso Empresa</span>
             </button>
 
             <button
