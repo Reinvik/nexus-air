@@ -1,0 +1,213 @@
+import React, { useState } from 'react';
+import { AirSettings } from '../types';
+import { Settings, Save, RotateCcw, MessageSquare, DollarSign, Building, Check } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+
+interface SettingsAirProps {
+  settings: AirSettings;
+  onUpdateSettings: (settings: Partial<AirSettings>) => void;
+  onResetDefaults: () => void;
+}
+
+export const SettingsAir: React.FC<SettingsAirProps> = ({
+  settings,
+  onUpdateSettings,
+  onResetDefaults,
+}) => {
+  const [formData, setFormData] = useState<AirSettings>(settings);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onUpdateSettings(formData);
+  };
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-3xl bg-slate-900 border border-slate-800">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center border border-cyan-500/30">
+            <Settings className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-white">Configuración de Nexus Air</h2>
+            <p className="text-xs text-slate-400">
+              Datos comerciales, valores base y plantillas automatizadas de WhatsApp para recaptación
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => {
+            if (confirm('¿Restaurar todos los datos iniciales de demostración de Nexus Air?')) {
+              onResetDefaults();
+            }
+          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-xs transition-colors cursor-pointer border border-slate-700"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          <span>Restablecer Demo</span>
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Company Details */}
+        <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-4">
+          <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+            <Building className="w-4 h-4 text-cyan-400" />
+            Identidad Corporativa
+          </h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div>
+              <label className="text-slate-300 font-medium">Razón Social</label>
+              <input
+                type="text"
+                value={formData.company_name}
+                onChange={(e) => setFormData(prev => ({ ...prev, company_name: e.target.value }))}
+                className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white mt-1"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-slate-300 font-medium">Nombre de Fantasía</label>
+              <input
+                type="text"
+                value={formData.fantasy_name}
+                onChange={(e) => setFormData(prev => ({ ...prev, fantasy_name: e.target.value }))}
+                className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white mt-1"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-slate-300 font-medium">RUT Empresa</label>
+              <input
+                type="text"
+                value={formData.rut}
+                onChange={(e) => setFormData(prev => ({ ...prev, rut: e.target.value }))}
+                className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white mt-1 font-mono"
+              />
+            </div>
+            <div>
+              <label className="text-slate-300 font-medium">WhatsApp Corporativo</label>
+              <input
+                type="text"
+                value={formData.whatsapp_number}
+                onChange={(e) => setFormData(prev => ({ ...prev, whatsapp_number: e.target.value }))}
+                className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white mt-1 font-mono"
+              />
+            </div>
+            <div>
+              <label className="text-slate-300 font-medium">Dirección Comercial</label>
+              <input
+                type="text"
+                value={formData.address}
+                onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-slate-300 font-medium">Comuna Principal</label>
+              <input
+                type="text"
+                value={formData.commune}
+                onChange={(e) => setFormData(prev => ({ ...prev, commune: e.target.value }))}
+                className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white mt-1"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Pricing & Maintenance Interval */}
+        <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-4">
+          <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+            <DollarSign className="w-4 h-4 text-emerald-400" />
+            Tarifas Base & Ciclo Semestral
+          </h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div>
+              <label className="text-slate-300 font-medium">Intervalo Mantención (Meses)</label>
+              <input
+                type="number"
+                value={formData.maintenance_interval_months}
+                onChange={(e) => setFormData(prev => ({ ...prev, maintenance_interval_months: parseInt(e.target.value) || 6 }))}
+                className="w-full p-2.5 bg-slate-950 border border-cyan-500/40 rounded-xl text-cyan-300 font-mono font-bold mt-1"
+              />
+              <span className="text-[10px] text-slate-500">Por defecto: 6 meses (180 días)</span>
+            </div>
+
+            <div>
+              <label className="text-slate-300 font-medium">Precio Base Mantención ($ CLP)</label>
+              <input
+                type="number"
+                value={formData.standard_maintenance_price}
+                onChange={(e) => setFormData(prev => ({ ...prev, standard_maintenance_price: parseInt(e.target.value) || 0 }))}
+                className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono mt-1"
+              />
+            </div>
+
+            <div>
+              <label className="text-slate-300 font-medium">Precio Base Instalación ($ CLP)</label>
+              <input
+                type="number"
+                value={formData.standard_installation_price}
+                onChange={(e) => setFormData(prev => ({ ...prev, standard_installation_price: parseInt(e.target.value) || 0 }))}
+                className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono mt-1"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* WhatsApp Templates */}
+        <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-4">
+          <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-cyan-400" />
+            Plantillas Automáticas de WhatsApp
+          </h3>
+
+          <div className="space-y-4 text-xs">
+            <div>
+              <label className="text-slate-300 font-semibold block">
+                Plantilla de Recaptación Semestral (Cada 6 Meses)
+              </label>
+              <p className="text-[11px] text-slate-500 mb-1">
+                Variables soportadas: {'{cliente}'}, {'{marca}'}, {'{btu}'}, {'{ubicacion}'}, {'{link}'}
+              </p>
+              <textarea
+                rows={4}
+                value={formData.whatsapp_template_recaptacion}
+                onChange={(e) => setFormData(prev => ({ ...prev, whatsapp_template_recaptacion: e.target.value }))}
+                className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white leading-relaxed focus:border-cyan-500 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="text-slate-300 font-semibold block">
+                Plantilla de Confirmación de Agendamiento
+              </label>
+              <p className="text-[11px] text-slate-500 mb-1">
+                Variables soportadas: {'{cliente}'}, {'{tipo_servicio}'}, {'{fecha}'}, {'{hora}'}, {'{tecnico}'}
+              </p>
+              <textarea
+                rows={2}
+                value={formData.whatsapp_template_agendamiento}
+                onChange={(e) => setFormData(prev => ({ ...prev, whatsapp_template_agendamiento: e.target.value }))}
+                className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white leading-relaxed focus:border-cyan-500 focus:outline-none"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-sm shadow-xl shadow-cyan-500/20 transition-all cursor-pointer"
+          >
+            <Save className="w-4 h-4" />
+            Guardar Configuración
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
