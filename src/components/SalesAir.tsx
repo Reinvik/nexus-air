@@ -33,77 +33,81 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders }) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-3xl bg-slate-900 border border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-white border border-slate-200/90 shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center border border-cyan-500/30">
+          <div className="w-10 h-10 rounded-xl bg-cyan-50 border border-cyan-200 text-cyan-600 flex items-center justify-center">
             <TrendingUp className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">Ventas & Métricas Financieras HVAC</h2>
-            <p className="text-xs text-slate-400">
+            <h2 className="text-lg font-bold text-slate-900">Ventas & Métricas Financieras HVAC</h2>
+            <p className="text-xs text-slate-500">
               Rendimiento por venta de equipos e ingresos recurrentes de mantención semestral
             </p>
           </div>
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* Vibrant Colored KPI Cards (Estilo Nexus Lean) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-1">
-          <div className="flex items-center justify-between text-slate-400 text-xs">
+        {/* Facturación Total - Vibrant Purple Card */}
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-md shadow-purple-500/20 space-y-1">
+          <div className="flex items-center justify-between text-white/90 text-xs font-bold uppercase tracking-wider">
             <span>Facturación Total</span>
-            <DollarSign className="w-4 h-4 text-cyan-400" />
+            <DollarSign className="w-4 h-4 text-white" />
           </div>
-          <p className="text-2xl font-black text-white font-mono">
+          <p className="text-3xl font-black font-mono tracking-tight">
             ${stats.totalIngresos.toLocaleString('es-CL')}
           </p>
-          <p className="text-[11px] text-slate-500">Monto total con IVA</p>
+          <p className="text-[11px] text-white/80">Monto total con IVA</p>
         </div>
 
-        <div className="p-5 rounded-3xl bg-slate-900/80 border border-cyan-900/40 space-y-1">
-          <div className="flex items-center justify-between text-slate-400 text-xs">
+        {/* Mantenciones 6M - Vibrant Cyan/Blue Card */}
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-md shadow-blue-500/20 space-y-1">
+          <div className="flex items-center justify-between text-white/90 text-xs font-bold uppercase tracking-wider">
             <span>Mantenciones (6 Meses)</span>
-            <ShieldCheck className="w-4 h-4 text-cyan-400" />
+            <ShieldCheck className="w-4 h-4 text-white" />
           </div>
-          <p className="text-2xl font-black text-cyan-400 font-mono">
+          <p className="text-3xl font-black font-mono tracking-tight">
             ${stats.mantencionesTotal.toLocaleString('es-CL')}
           </p>
-          <p className="text-[11px] text-cyan-400/80">Ingreso recurrente periódico</p>
+          <p className="text-[11px] text-white/80">Ingreso recurrente semestral</p>
         </div>
 
-        <div className="p-5 rounded-3xl bg-slate-900/80 border border-blue-900/40 space-y-1">
-          <div className="flex items-center justify-between text-slate-400 text-xs">
+        {/* Venta & Instalación - Vibrant Emerald Card */}
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/20 space-y-1">
+          <div className="flex items-center justify-between text-white/90 text-xs font-bold uppercase tracking-wider">
             <span>Venta & Instalación</span>
-            <Layers className="w-4 h-4 text-blue-400" />
+            <Layers className="w-4 h-4 text-white" />
           </div>
-          <p className="text-2xl font-black text-blue-400 font-mono">
+          <p className="text-3xl font-black font-mono tracking-tight">
             ${stats.instalacionesTotal.toLocaleString('es-CL')}
           </p>
-          <p className="text-[11px] text-blue-400/80">Equipos nuevos instalados</p>
+          <p className="text-[11px] text-white/80">Equipos nuevos montados</p>
         </div>
 
-        <div className="p-5 rounded-3xl bg-slate-900/80 border border-emerald-900/40 space-y-1">
-          <div className="flex items-center justify-between text-slate-400 text-xs">
+        {/* Ticket Promedio - Vibrant Amber Card */}
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/20 space-y-1">
+          <div className="flex items-center justify-between text-white/90 text-xs font-bold uppercase tracking-wider">
             <span>Ticket Promedio</span>
-            <CreditCard className="w-4 h-4 text-emerald-400" />
+            <CreditCard className="w-4 h-4 text-white" />
           </div>
-          <p className="text-2xl font-black text-emerald-400 font-mono">
+          <p className="text-3xl font-black font-mono tracking-tight">
             ${stats.ticketPromedio.toLocaleString('es-CL')}
           </p>
-          <p className="text-[11px] text-emerald-400/80">Por servicio técnico</p>
+          <p className="text-[11px] text-white/80">Por orden de servicio</p>
         </div>
       </div>
 
-      {/* Orders Table */}
-      <div className="rounded-3xl bg-slate-900/80 border border-slate-800 overflow-hidden shadow-xl">
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
-          <h3 className="font-bold text-sm text-white">Historial de Órdenes & Facturación</h3>
-          <span className="text-xs text-slate-400">{orders.length} órdenes registradas</span>
+      {/* Orders Table in Crisp White */}
+      <div className="rounded-2xl bg-white border border-slate-200/90 overflow-hidden shadow-xs">
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+          <h3 className="font-bold text-sm text-slate-800">Historial de Órdenes & Facturación</h3>
+          <span className="text-xs text-slate-500">{orders.length} órdenes registradas</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="bg-slate-950/80 border-b border-slate-800 text-slate-400 uppercase text-[10px]">
+              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-bold">
                 <th className="py-3 px-4">Folio</th>
                 <th className="py-3 px-4">Cliente</th>
                 <th className="py-3 px-4">Tipo de Trabajo</th>
@@ -112,28 +116,28 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders }) => {
                 <th className="py-3 px-4 text-right">Total Facturado</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-slate-100">
               {orders.map((o) => (
-                <tr key={o.id} className="hover:bg-slate-800/40 transition-colors">
-                  <td className="py-3 px-4 font-mono font-bold text-cyan-400">{o.ticket_number}</td>
+                <tr key={o.id} className="hover:bg-slate-50/80 transition-colors">
+                  <td className="py-3 px-4 font-mono font-bold text-cyan-700">{o.ticket_number}</td>
                   <td className="py-3 px-4">
-                    <div className="font-semibold text-white">{o.customer?.name}</div>
-                    <div className="text-[10px] text-slate-500">{o.customer?.commune}</div>
+                    <div className="font-bold text-slate-900">{o.customer?.name}</div>
+                    <div className="text-[10px] text-slate-400">{o.customer?.commune}</div>
                   </td>
-                  <td className="py-3 px-4 capitalize text-slate-300">
+                  <td className="py-3 px-4 capitalize text-slate-700 font-medium">
                     {o.service_type.replace('_', ' ')}
                   </td>
-                  <td className="py-3 px-4 font-mono text-slate-400">{o.scheduled_date}</td>
+                  <td className="py-3 px-4 font-mono text-slate-500">{o.scheduled_date}</td>
                   <td className="py-3 px-4">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${
-                      o.payment_status === 'pagado' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-                      o.payment_status === 'abono' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
-                      'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold capitalize ${
+                      o.payment_status === 'pagado' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                      o.payment_status === 'abono' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                      'bg-amber-50 text-amber-800 border border-amber-200'
                     }`}>
                       {o.payment_status}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-right font-mono font-bold text-white text-sm">
+                  <td className="py-3 px-4 text-right font-mono font-black text-slate-900 text-sm">
                     ${o.total.toLocaleString('es-CL')}
                   </td>
                 </tr>

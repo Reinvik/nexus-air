@@ -3,15 +3,11 @@ import { AirPart } from '../types';
 import { 
   Boxes, 
   Search, 
-  Filter, 
   Plus, 
   AlertTriangle, 
-  CheckCircle, 
   Edit, 
   Trash2, 
-  TrendingUp, 
   X,
-  Save,
   PackageCheck
 } from 'lucide-react';
 
@@ -136,14 +132,14 @@ export const InventoryAir: React.FC<InventoryAirProps> = ({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-3xl bg-slate-900 border border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-white border border-slate-200/90 shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center border border-cyan-500/30">
+          <div className="w-10 h-10 rounded-xl bg-cyan-50 border border-cyan-200 text-cyan-600 flex items-center justify-center">
             <Boxes className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">Inventario de Equipos & Insumos HVAC</h2>
-            <p className="text-xs text-slate-400">
+            <h2 className="text-lg font-bold text-slate-900">Inventario de Equipos & Insumos HVAC</h2>
+            <p className="text-xs text-slate-500">
               Gestión de stock de splits, gases ecológicos, cobre y químicos
             </p>
           </div>
@@ -151,15 +147,15 @@ export const InventoryAir: React.FC<InventoryAirProps> = ({
 
         <button
           onClick={openAddModal}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-md shadow-cyan-500/20 transition-all cursor-pointer"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#00d2ff] to-[#2563eb] hover:from-[#38bdf8] hover:to-[#1d4ed8] text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all cursor-pointer"
         >
           <Plus className="w-4 h-4 stroke-[3]" />
-          <span>Agregar Producto / Equipo</span>
+          <span>Agregar Producto</span>
         </button>
       </div>
 
       {/* Categories & Search */}
-      <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900/70 border border-slate-800">
+      <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs">
         <div className="flex items-center gap-1.5 flex-wrap">
           {categories.map(c => (
             <button
@@ -167,8 +163,8 @@ export const InventoryAir: React.FC<InventoryAirProps> = ({
               onClick={() => setSelectedCategory(c.id)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 selectedCategory === c.id
-                  ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
-                  : 'bg-slate-800 text-slate-400 hover:text-white'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
               {c.label}
@@ -176,36 +172,36 @@ export const InventoryAir: React.FC<InventoryAirProps> = ({
           ))}
         </div>
 
-        <div className="relative min-w-[240px]">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+        <div className="relative min-w-[260px]">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             placeholder="Buscar por SKU, nombre, marca..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:bg-white transition-colors"
           />
         </div>
       </div>
 
-      {/* Products Table */}
-      <div className="rounded-2xl bg-slate-900/60 border border-slate-800 overflow-hidden shadow-xl">
+      {/* Products Table in Crisp White */}
+      <div className="rounded-2xl bg-white border border-slate-200/90 overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-950/80 border-b border-slate-800 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
-                <th className="py-3 px-4">SKU & Producto</th>
-                <th className="py-3 px-4">Categoría / Marca</th>
-                <th className="py-3 px-4">Stock Disponible</th>
-                <th className="py-3 px-4">Costo Neto</th>
-                <th className="py-3 px-4">Precio Venta (CLP)</th>
-                <th className="py-3 px-4 text-right">Acciones</th>
+              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                <th className="py-3.5 px-4">SKU & Producto</th>
+                <th className="py-3.5 px-4">Categoría / Marca</th>
+                <th className="py-3.5 px-4">Stock Disponible</th>
+                <th className="py-3.5 px-4">Costo Neto</th>
+                <th className="py-3.5 px-4">Precio Venta (CLP)</th>
+                <th className="py-3.5 px-4 text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-slate-100">
               {filteredParts.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-10 text-center text-slate-500">
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
                     No se encontraron productos en esta categoría.
                   </td>
                 </tr>
@@ -215,43 +211,43 @@ export const InventoryAir: React.FC<InventoryAirProps> = ({
                   const margin = Math.round(((p.sale_price - p.cost_price) / p.sale_price) * 100);
 
                   return (
-                    <tr key={p.id} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="py-3 px-4">
-                        <div className="font-bold text-white text-sm">{p.name}</div>
-                        <div className="text-[10px] text-cyan-400 font-mono">{p.sku}</div>
+                    <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3.5 px-4">
+                        <div className="font-bold text-slate-900 text-sm">{p.name}</div>
+                        <div className="text-[10px] text-cyan-600 font-mono">{p.sku}</div>
                       </td>
-                      <td className="py-3 px-4">
-                        <span className="capitalize text-slate-300 font-medium">
+                      <td className="py-3.5 px-4">
+                        <span className="capitalize text-slate-700 font-medium">
                           {p.category.replace('_', ' ')}
                         </span>
-                        {p.brand && <div className="text-[10px] text-slate-500">{p.brand}</div>}
+                        {p.brand && <div className="text-[10px] text-slate-400">{p.brand}</div>}
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-3.5 px-4">
                         <div className="flex items-center gap-2">
-                          <span className={`font-mono font-bold text-sm ${isLowStock ? 'text-rose-400' : 'text-slate-200'}`}>
+                          <span className={`font-mono font-bold text-sm ${isLowStock ? 'text-red-600' : 'text-slate-800'}`}>
                             {p.stock} {p.unit}s
                           </span>
                           {isLowStock && (
-                            <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px] flex items-center gap-1 font-semibold">
+                            <span className="px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 text-[10px] flex items-center gap-1 font-bold">
                               <AlertTriangle className="w-3 h-3" /> Bajo Stock
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="py-3 px-4 font-mono text-slate-400">
+                      <td className="py-3.5 px-4 font-mono text-slate-500">
                         ${p.cost_price.toLocaleString('es-CL')}
                       </td>
-                      <td className="py-3 px-4 font-mono">
-                        <div className="font-bold text-cyan-300 text-sm">
+                      <td className="py-3.5 px-4 font-mono">
+                        <div className="font-bold text-slate-900 text-sm">
                           ${p.sale_price.toLocaleString('es-CL')}
                         </div>
-                        <div className="text-[10px] text-emerald-400">Margen: {margin}%</div>
+                        <div className="text-[10px] text-emerald-600 font-semibold">Margen: {margin}%</div>
                       </td>
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => openEditModal(p)}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer"
                           >
                             <Edit className="w-3.5 h-3.5" />
                           </button>
@@ -259,7 +255,7 @@ export const InventoryAir: React.FC<InventoryAirProps> = ({
                             onClick={() => {
                               if (confirm(`¿Eliminar ${p.name}?`)) onDeletePart(p.id);
                             }}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/40 text-rose-400 transition-colors"
+                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-red-50 text-red-600 transition-colors cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -274,17 +270,17 @@ export const InventoryAir: React.FC<InventoryAirProps> = ({
         </div>
       </div>
 
-      {/* Add / Edit Modal */}
+      {/* Add / Edit Modal in Crisp White */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden my-8">
-            <div className="px-6 py-4 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between">
-              <h3 className="font-bold text-base text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+          <div className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden my-8">
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="font-bold text-base text-slate-900">
                 {editingPart ? 'Editar Producto' : 'Nuevo Producto / Equipo HVAC'}
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -293,21 +289,21 @@ export const InventoryAir: React.FC<InventoryAirProps> = ({
             <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">SKU / Código</label>
+                  <label className="font-semibold text-slate-700">SKU / Código</label>
                   <input
                     type="text"
                     value={sku}
                     onChange={(e) => setSku(e.target.value)}
-                    className="w-full p-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-cyan-500 focus:outline-none"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:border-cyan-500 focus:outline-none"
                     required
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Categoría</label>
+                  <label className="font-semibold text-slate-700">Categoría</label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value as any)}
-                    className="w-full p-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-cyan-500 focus:outline-none"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
                   >
                     <option value="equipo">Aire Acondicionado</option>
                     <option value="refrigerante">Gas Refrigerante</option>
@@ -319,34 +315,34 @@ export const InventoryAir: React.FC<InventoryAirProps> = ({
               </div>
 
               <div className="space-y-1">
-                <label className="font-semibold text-slate-300">Nombre del Producto</label>
+                <label className="font-semibold text-slate-700">Nombre del Producto</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Ej: Split Anwo 12.000 BTU Inverter A++"
-                  className="w-full p-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-cyan-500 focus:outline-none"
+                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
                   required
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Marca</label>
+                  <label className="font-semibold text-slate-700">Marca</label>
                   <input
                     type="text"
                     value={brand}
                     onChange={(e) => setBrand(e.target.value)}
-                    className="w-full p-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-cyan-500 focus:outline-none"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
                   />
                 </div>
                 {category === 'equipo' && (
                   <div className="space-y-1">
-                    <label className="font-semibold text-slate-300">Capacidad (BTU)</label>
+                    <label className="font-semibold text-slate-700">Capacidad (BTU)</label>
                     <select
                       value={btu}
                       onChange={(e) => setBtu(parseInt(e.target.value))}
-                      className="w-full p-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-cyan-500 focus:outline-none"
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
                     >
                       <option value="9000">9.000 BTU</option>
                       <option value="12000">12.000 BTU</option>
@@ -360,57 +356,57 @@ export const InventoryAir: React.FC<InventoryAirProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Stock Inicial</label>
+                  <label className="font-semibold text-slate-700">Stock Inicial</label>
                   <input
                     type="number"
                     value={stock}
                     onChange={(e) => setStock(parseInt(e.target.value) || 0)}
-                    className="w-full p-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-cyan-500 focus:outline-none"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:border-cyan-500 focus:outline-none"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Stock Mínimo (Alerta)</label>
+                  <label className="font-semibold text-slate-700">Stock Mínimo (Alerta)</label>
                   <input
                     type="number"
                     value={minStock}
                     onChange={(e) => setMinStock(parseInt(e.target.value) || 0)}
-                    className="w-full p-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-cyan-500 focus:outline-none"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:border-cyan-500 focus:outline-none"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Costo ($ CLP)</label>
+                  <label className="font-semibold text-slate-700">Costo ($ CLP)</label>
                   <input
                     type="number"
                     value={costPrice}
                     onChange={(e) => setCostPrice(parseInt(e.target.value) || 0)}
-                    className="w-full p-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-cyan-500 focus:outline-none"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:border-cyan-500 focus:outline-none"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Precio Venta ($ CLP)</label>
+                  <label className="font-semibold text-slate-700">Precio Venta ($ CLP)</label>
                   <input
                     type="number"
                     value={salePrice}
                     onChange={(e) => setSalePrice(parseInt(e.target.value) || 0)}
-                    className="w-full p-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-cyan-500 focus:outline-none"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:border-cyan-500 focus:outline-none"
                   />
                 </div>
               </div>
 
-              <div className="pt-4 flex items-center justify-end gap-2 border-t border-slate-800">
+              <div className="pt-4 flex items-center justify-end gap-2 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white"
+                  className="px-4 py-2 rounded-xl text-slate-500 hover:text-slate-800"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold shadow-lg shadow-cyan-500/20"
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#00d2ff] to-[#2563eb] text-white font-bold shadow-md shadow-blue-500/20"
                 >
                   Guardar en Inventario
                 </button>

@@ -3,20 +3,14 @@ import { calculateThermalLoad } from '../lib/thermalCalculator';
 import { ThermalCalculationInput, AirPart, ServiceOrder } from '../types';
 import { 
   Calculator, 
-  Thermometer, 
   Sun, 
   Users, 
-  Cpu, 
   Home, 
-  Check, 
-  Plus, 
-  Download, 
   Share2, 
-  Sparkles,
-  Zap,
-  Flame,
+  Sparkles, 
+  Plus,
   Snowflake,
-  ShieldCheck
+  Flame
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -42,18 +36,15 @@ export const ThermalQuoterAir: React.FC<ThermalQuoterAirProps> = ({
   const [includeCondensatePump, setIncludeCondensatePump] = useState(false);
   const [extraMetersCopper, setExtraMetersCopper] = useState(0);
 
-  // Cálculo térmico reactivo
   const result = useMemo(() => {
     return calculateThermalLoad(input);
   }, [input]);
 
-  // Buscar equipo en catálogo que coincida con los BTU recomendados
   const matchedEquipment = useMemo(() => {
     return parts.find(p => p.category === 'equipo' && p.btu === result.recommended_btu) ||
            parts.find(p => p.category === 'equipo') || null;
   }, [parts, result.recommended_btu]);
 
-  // Costos y totales
   const equipmentPrice = matchedEquipment?.sale_price || 349990;
   const installationBasePrice = includeInstallation ? 130000 : 0;
   const pumpPrice = includeCondensatePump ? 89000 : 0;
@@ -122,36 +113,36 @@ export const ThermalQuoterAir: React.FC<ThermalQuoterAirProps> = ({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-3xl bg-gradient-to-r from-slate-900 via-slate-900 to-cyan-950/50 border border-cyan-500/20">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-white border border-slate-200/90 shadow-xs">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-semibold mb-2">
-            <Calculator className="w-3.5 h-3.5 text-cyan-400" />
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-50 border border-cyan-200 text-cyan-700 text-xs font-bold mb-2">
+            <Calculator className="w-3.5 h-3.5" />
             <span>Algoritmo de Carga Térmica HVAC</span>
           </div>
-          <h2 className="text-xl md:text-2xl font-black text-white">
+          <h2 className="text-xl md:text-2xl font-black text-slate-900">
             Calculadora de BTU & Cotizador de Instalación
           </h2>
-          <p className="text-xs md:text-sm text-slate-400">
-            Calcula la capacidad térmica exacta según metros cuadrados, radiación solar y recintos para recomendar el equipo ideal.
+          <p className="text-xs text-slate-500">
+            Calcula la capacidad térmica exacta según metros cuadrados, radiación solar y recintos.
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Form: Parameters */}
-        <div className="lg:col-span-7 bg-slate-900/80 border border-slate-800 rounded-3xl p-6 space-y-6">
-          <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-            <span>1. Parámetros del Espacio</span>
+        {/* Left Form: Parameters in Crisp White */}
+        <div className="lg:col-span-7 bg-white border border-slate-200/90 rounded-2xl p-6 space-y-6 shadow-xs">
+          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+            1. Parámetros del Espacio
           </h3>
 
           {/* Área m2 */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                <Home className="w-4 h-4 text-cyan-400" />
+              <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <Home className="w-4 h-4 text-cyan-600" />
                 Superficie del Recinto
               </label>
-              <span className="text-base font-black text-cyan-400 font-mono">
+              <span className="text-base font-black text-cyan-600 font-mono">
                 {input.area_m2} m²
               </span>
             </div>
@@ -162,35 +153,35 @@ export const ThermalQuoterAir: React.FC<ThermalQuoterAirProps> = ({
               step="1"
               value={input.area_m2}
               onChange={(e) => setInput(prev => ({ ...prev, area_m2: parseInt(e.target.value) || 10 }))}
-              className="w-full accent-cyan-400 cursor-pointer"
+              className="w-full accent-cyan-600 cursor-pointer"
             />
-            <div className="flex justify-between text-[10px] text-slate-500">
-              <span>8 m² (Pieza pequeña)</span>
-              <span>30 m² (Living mediano)</span>
-              <span>60 m² (Planta abierta)</span>
+            <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+              <span>8 m² (Pieza)</span>
+              <span>30 m² (Living)</span>
+              <span>60 m² (Planta)</span>
               <span>100 m² (Comercial)</span>
             </div>
           </div>
 
           {/* Tipo de recinto */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-slate-300">Tipo de Espacio</label>
+            <label className="text-xs font-semibold text-slate-700">Tipo de Espacio</label>
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
               {[
                 { id: 'dormitorio', label: 'Dormitorio' },
-                { id: 'living', label: 'Living / Salón' },
+                { id: 'living', label: 'Living' },
                 { id: 'oficina', label: 'Oficina' },
-                { id: 'local_comercial', label: 'Local / Café' },
+                { id: 'local_comercial', label: 'Local' },
                 { id: 'servidores', label: 'Servidores' },
               ].map(r => (
                 <button
                   key={r.id}
                   type="button"
                   onClick={() => setInput(prev => ({ ...prev, room_type: r.id as any }))}
-                  className={`p-2.5 rounded-xl border text-center text-xs font-medium transition-all cursor-pointer ${
+                  className={`p-2.5 rounded-xl border text-center text-xs font-bold transition-all cursor-pointer ${
                     input.room_type === r.id
-                      ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300 font-bold'
-                      : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                      ? 'bg-cyan-50 border-cyan-500 text-cyan-800'
+                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                   }`}
                 >
                   {r.label}
@@ -202,24 +193,24 @@ export const ThermalQuoterAir: React.FC<ThermalQuoterAirProps> = ({
           {/* Exposición Solar y Personas */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                <Sun className="w-4 h-4 text-amber-400" />
+              <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <Sun className="w-4 h-4 text-amber-500" />
                 Exposición al Sol
               </label>
               <div className="grid grid-cols-3 gap-1.5">
                 {[
-                  { id: 'baja', label: 'Sombra / Sur' },
+                  { id: 'baja', label: 'Sombra' },
                   { id: 'media', label: 'Media' },
-                  { id: 'alta', label: 'Poniente / Techo' },
+                  { id: 'alta', label: 'Poniente' },
                 ].map(s => (
                   <button
                     key={s.id}
                     type="button"
                     onClick={() => setInput(prev => ({ ...prev, sun_exposure: s.id as any }))}
-                    className={`py-2 px-1 rounded-xl border text-center text-[11px] font-medium transition-all cursor-pointer ${
+                    className={`py-2 px-1 rounded-xl border text-center text-xs font-semibold transition-all cursor-pointer ${
                       input.sun_exposure === s.id
-                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
-                        : 'bg-slate-950/60 border-slate-800 text-slate-400'
+                        ? 'bg-amber-50 border-amber-400 text-amber-900'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                     }`}
                   >
                     {s.label}
@@ -229,8 +220,8 @@ export const ThermalQuoterAir: React.FC<ThermalQuoterAirProps> = ({
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-blue-400" />
+              <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-blue-600" />
                 Personas Habituales
               </label>
               <div className="flex items-center gap-2">
@@ -241,8 +232,8 @@ export const ThermalQuoterAir: React.FC<ThermalQuoterAirProps> = ({
                     onClick={() => setInput(prev => ({ ...prev, people_count: num }))}
                     className={`flex-1 py-2 rounded-xl border text-center text-xs font-bold transition-all cursor-pointer ${
                       input.people_count === num
-                        ? 'bg-blue-500/20 border-blue-500 text-blue-300'
-                        : 'bg-slate-950/60 border-slate-800 text-slate-400'
+                        ? 'bg-blue-50 border-blue-400 text-blue-800'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                     }`}
                   >
                     {num}
@@ -252,140 +243,123 @@ export const ThermalQuoterAir: React.FC<ThermalQuoterAirProps> = ({
             </div>
           </div>
 
-          {/* Opciones del Kit de Instalación */}
-          <div className="pt-4 border-t border-slate-800 space-y-3">
-            <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+          {/* Opciones del Kit */}
+          <div className="pt-4 border-t border-slate-200 space-y-3">
+            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
               2. Paquete de Instalación & Accesorios
             </h4>
 
-            <label className="flex items-center justify-between p-3 rounded-xl bg-slate-950/80 border border-slate-800 cursor-pointer">
+            <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer">
               <div className="flex items-center gap-3">
                 <input
                   type="checkbox"
                   checked={includeInstallation}
                   onChange={(e) => setIncludeInstallation(e.target.checked)}
-                  className="w-4 h-4 accent-cyan-400 rounded"
+                  className="w-4 h-4 accent-cyan-600 rounded"
                 />
                 <div>
-                  <div className="text-xs font-bold text-white">Instalación Estándar Certificada SEC</div>
-                  <div className="text-[11px] text-slate-400">Hasta 3m cañería cobre, soporte de condensador, vacío y puesta en marcha</div>
+                  <div className="text-xs font-bold text-slate-900">Instalación Estándar Certificada SEC</div>
+                  <div className="text-[11px] text-slate-500">Hasta 3m cañería cobre, soporte exterior y vacío</div>
                 </div>
               </div>
-              <span className="text-xs font-mono font-bold text-cyan-400">+$130.000</span>
+              <span className="text-xs font-mono font-bold text-cyan-700">+$130.000</span>
             </label>
 
-            <label className="flex items-center justify-between p-3 rounded-xl bg-slate-950/80 border border-slate-800 cursor-pointer">
+            <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer">
               <div className="flex items-center gap-3">
                 <input
                   type="checkbox"
                   checked={includeCondensatePump}
                   onChange={(e) => setIncludeCondensatePump(e.target.checked)}
-                  className="w-4 h-4 accent-cyan-400 rounded"
+                  className="w-4 h-4 accent-cyan-600 rounded"
                 />
                 <div>
-                  <div className="text-xs font-bold text-white">Bomba de Condensado Silenciosa</div>
-                  <div className="text-[11px] text-slate-400">Requerida si el desagüe no tiene caída libre natural hacia el exterior</div>
+                  <div className="text-xs font-bold text-slate-900">Bomba de Condensado Silenciosa</div>
+                  <div className="text-[11px] text-slate-500">Para desagüe sin caída libre natural</div>
                 </div>
               </div>
-              <span className="text-xs font-mono font-bold text-cyan-400">+$89.000</span>
+              <span className="text-xs font-mono font-bold text-cyan-700">+$89.000</span>
             </label>
           </div>
         </div>
 
         {/* Right Output: Thermal Recommendation & Quote */}
         <div className="lg:col-span-5 space-y-6">
-          {/* Thermal Recommendation Card */}
-          <div className="p-6 rounded-3xl bg-gradient-to-br from-cyan-950/60 via-slate-900 to-slate-900 border border-cyan-500/30 shadow-2xl space-y-4">
+          {/* Thermal Output Card */}
+          <div className="p-6 rounded-2xl bg-gradient-to-br from-[#0c1833] via-[#080f24] to-[#050b1a] text-white shadow-xl space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-cyan-400" />
+              <span className="text-xs font-bold text-[#00d2ff] uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4" />
                 Dimensionamiento Óptimo
               </span>
-              <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-mono font-bold">
+              <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-[#00d2ff] text-[10px] font-mono font-bold">
                 Clase A++
               </span>
             </div>
 
             <div>
-              <div className="text-3xl font-black text-white tracking-tight">
+              <div className="text-4xl font-black text-white tracking-tight font-mono">
                 {result.recommended_btu.toLocaleString('es-CL')}{' '}
-                <span className="text-lg text-cyan-400 font-bold">BTU/h</span>
+                <span className="text-xl text-[#00d2ff] font-sans font-bold">BTU/h</span>
               </div>
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-xs text-slate-300 mt-1">
                 Carga exacta calculada: {result.exact_btu.toLocaleString('es-CL')} BTU/h
               </p>
             </div>
 
-            {/* Thermal Output (Frío y Calor) */}
             <div className="grid grid-cols-2 gap-2 pt-2">
-              <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center gap-2">
-                <Snowflake className="w-4 h-4 text-cyan-400" />
+              <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
+                <Snowflake className="w-4 h-4 text-[#00d2ff]" />
                 <div>
-                  <div className="text-[10px] text-slate-400">Potencia Frío</div>
+                  <div className="text-[10px] text-slate-300">Potencia Frío</div>
                   <div className="text-xs font-bold text-white font-mono">{result.cooling_kw} kW</div>
                 </div>
               </div>
 
-              <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center gap-2">
-                <Flame className="w-4 h-4 text-orange-400" />
+              <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
+                <Flame className="w-4 h-4 text-amber-400" />
                 <div>
-                  <div className="text-[10px] text-slate-400">Potencia Calor</div>
+                  <div className="text-[10px] text-slate-300">Potencia Calor</div>
                   <div className="text-xs font-bold text-white font-mono">{result.heating_kw} kW</div>
                 </div>
               </div>
             </div>
 
-            <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/40 p-3 rounded-xl border border-slate-800/80">
+            <p className="text-xs text-slate-300 leading-relaxed bg-black/30 p-3 rounded-xl border border-white/5">
               {result.explanation}
             </p>
-
-            {/* Recommended Model */}
-            <div className="space-y-1.5 pt-2">
-              <div className="text-[11px] font-semibold text-slate-400">Modelo en Catálogo Sugerido:</div>
-              <div className="p-3 rounded-xl bg-slate-950/90 border border-cyan-500/30 flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-bold text-white">{matchedEquipment?.name}</div>
-                  <div className="text-[10px] text-slate-400 font-mono">SKU: {matchedEquipment?.sku}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs font-bold text-cyan-400 font-mono">
-                    ${matchedEquipment?.sale_price.toLocaleString('es-CL')}
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
 
-          {/* Quotation Summary Card */}
-          <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4">
-            <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+          {/* Quotation Summary Card in Crisp White */}
+          <div className="p-6 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-4">
+            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
               Resumen del Presupuesto
             </h4>
 
-            <div className="space-y-2 text-xs divide-y divide-slate-800">
-              <div className="flex justify-between py-1 text-slate-300">
+            <div className="space-y-2 text-xs divide-y divide-slate-100">
+              <div className="flex justify-between py-1 text-slate-700">
                 <span>Equipo {result.recommended_btu.toLocaleString()} BTU</span>
-                <span className="font-mono">${equipmentPrice.toLocaleString('es-CL')}</span>
+                <span className="font-mono font-semibold">${equipmentPrice.toLocaleString('es-CL')}</span>
               </div>
               {includeInstallation && (
-                <div className="flex justify-between py-1 text-slate-300">
+                <div className="flex justify-between py-1 text-slate-700">
                   <span>Instalación Estándar SEC</span>
-                  <span className="font-mono">${installationBasePrice.toLocaleString('es-CL')}</span>
+                  <span className="font-mono font-semibold">${installationBasePrice.toLocaleString('es-CL')}</span>
                 </div>
               )}
               {includeCondensatePump && (
-                <div className="flex justify-between py-1 text-slate-300">
-                  <span>Bomba Condensado Aspen</span>
-                  <span className="font-mono">${pumpPrice.toLocaleString('es-CL')}</span>
+                <div className="flex justify-between py-1 text-slate-700">
+                  <span>Bomba Condensado</span>
+                  <span className="font-mono font-semibold">${pumpPrice.toLocaleString('es-CL')}</span>
                 </div>
               )}
               <div className="flex justify-between py-1 text-slate-400 text-[11px]">
                 <span>IVA (19%)</span>
                 <span className="font-mono">${iva.toLocaleString('es-CL')}</span>
               </div>
-              <div className="flex justify-between pt-2 text-base font-black text-white">
+              <div className="flex justify-between pt-2 text-base font-black text-slate-900">
                 <span>TOTAL FINAL:</span>
-                <span className="text-cyan-400 font-mono">${total.toLocaleString('es-CL')}</span>
+                <span className="text-cyan-600 font-mono">${total.toLocaleString('es-CL')}</span>
               </div>
             </div>
 
@@ -393,19 +367,19 @@ export const ThermalQuoterAir: React.FC<ThermalQuoterAirProps> = ({
               <button
                 type="button"
                 onClick={handleCreateOrder}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs shadow-lg shadow-cyan-500/20 transition-all cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-[#00d2ff] to-[#2563eb] hover:from-[#38bdf8] hover:to-[#1d4ed8] text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all cursor-pointer"
               >
                 <Plus className="w-4 h-4 stroke-[3]" />
-                Crear Orden de Instalación en Tablero
+                <span>Crear Orden en Tablero</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleCopyWhatsApp}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs border border-slate-700 transition-colors cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 transition-colors cursor-pointer"
               >
-                <Share2 className="w-3.5 h-3.5 text-emerald-400" />
-                Copiar Presupuesto para WhatsApp
+                <Share2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Copiar para WhatsApp</span>
               </button>
             </div>
           </div>

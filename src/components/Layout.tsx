@@ -67,8 +67,8 @@ export const Layout: React.FC<LayoutProps> = ({
   ];
 
   return (
-    <div className="flex h-screen bg-[#050811] text-slate-100 overflow-hidden font-sans">
-      {/* Smartlean / Nexus Sidebar */}
+    <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
+      {/* Smartlean / Nexus Dark Sidebar */}
       <aside className="w-[270px] bg-[#050811] border-r border-white/[0.04] flex flex-col justify-between shrink-0 shadow-2xl z-30">
         <div className="flex flex-col flex-1 overflow-y-auto">
           {/* Brand Header */}
@@ -81,7 +81,7 @@ export const Layout: React.FC<LayoutProps> = ({
                 <div className="text-[20px] font-black tracking-[-0.04em] text-white flex items-center leading-none">
                   NEXUS<span className="text-[#00d2ff]">AIR</span>
                 </div>
-                <span className="text-[9px] font-extrabold text-[#00d2ff] tracking-[0.16em] uppercase mt-1 text-shadow-[0_0_10px_rgba(0,210,255,0.4)]">
+                <span className="text-[9px] font-extrabold text-[#00d2ff] tracking-[0.16em] uppercase mt-1">
                   BY SMARTLEAN
                 </span>
               </div>
@@ -114,7 +114,7 @@ export const Layout: React.FC<LayoutProps> = ({
                       onClick={() => setActiveTab(item.id)}
                       className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold nexus-sidebar-item cursor-pointer ${
                         isActive
-                          ? 'active text-white text-glow-white font-bold'
+                          ? 'active text-white font-bold'
                           : 'text-slate-400 hover:text-white hover:bg-white/[0.03]'
                       }`}
                     >
@@ -152,7 +152,7 @@ export const Layout: React.FC<LayoutProps> = ({
                       onClick={() => setActiveTab(item.id)}
                       className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold nexus-sidebar-item cursor-pointer ${
                         isActive
-                          ? 'active text-white text-glow-white font-bold'
+                          ? 'active text-white font-bold'
                           : 'text-slate-400 hover:text-white hover:bg-white/[0.03]'
                       }`}
                     >
@@ -170,7 +170,6 @@ export const Layout: React.FC<LayoutProps> = ({
 
         {/* Smartlean Profile Footer */}
         <div className="p-4 border-t border-white/[0.04] bg-[#03060d] space-y-3">
-          {/* User profile row */}
           <div className="flex items-center gap-3">
             <div className="relative group/avatar cursor-pointer">
               <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-[#00d2ff] shrink-0 font-bold">
@@ -182,19 +181,18 @@ export const Layout: React.FC<LayoutProps> = ({
             </div>
 
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-white truncate text-shadow-[0_1px_3px_rgba(0,0,0,0.4)]">
+              <div className="text-xs font-bold text-white truncate">
                 Admin Climatización
               </div>
               <div className="text-[10px] text-slate-500 truncate">
                 contacto@nexusair.cl
               </div>
-              <div className="text-[10px] font-bold text-[#00d2ff] text-shadow-[0_0_10px_rgba(0,210,255,0.35)]">
+              <div className="text-[10px] font-bold text-[#00d2ff]">
                 Técnico Certificado SEC
               </div>
             </div>
           </div>
 
-          {/* Cambiar perfil / contraseña button */}
           <button
             onClick={() => setActiveTab('settings')}
             className="w-full py-2 px-2 bg-[rgba(6,182,212,0.03)] hover:bg-[rgba(6,182,212,0.12)] border border-[rgba(6,182,212,0.2)] hover:border-[rgba(6,182,212,0.45)] text-[#00d2ff] hover:text-white rounded-xl text-[10.5px] font-bold flex items-center justify-center gap-2 whitespace-nowrap tracking-[0.03em] transition-all cursor-pointer"
@@ -203,11 +201,10 @@ export const Layout: React.FC<LayoutProps> = ({
             <span>AJUSTES & PERFIL DE EMPRESA</span>
           </button>
 
-          {/* Action buttons (Reiniciar & Salir) */}
           <div className="flex items-center gap-2 pt-1">
             <button
               onClick={() => window.location.reload()}
-              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white hover:bg-white/[0.04] border border-transparent hover:border-white/[0.06] transition-all group/re"
+              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white hover:bg-white/[0.04] border border-transparent hover:border-white/[0.06] transition-all group/re cursor-pointer"
             >
               <RefreshCw className="w-3 h-3 group-hover/re:rotate-180 transition-transform duration-500" />
               <span>REINICIAR</span>
@@ -215,7 +212,7 @@ export const Layout: React.FC<LayoutProps> = ({
 
             <button
               onClick={onOpenLanding}
-              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-[11px] font-bold text-slate-400 hover:text-[#f87171] hover:bg-rose-500/15 hover:border-rose-500/40 border border-transparent transition-all hover:shadow-[0_4px_14px_rgba(239,68,68,0.25)]"
+              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-[11px] font-bold text-slate-400 hover:text-[#f87171] hover:bg-rose-500/15 hover:border-rose-500/40 border border-transparent transition-all cursor-pointer"
             >
               <LogOut className="w-3 h-3" />
               <span>SALIR</span>
@@ -224,51 +221,52 @@ export const Layout: React.FC<LayoutProps> = ({
         </div>
       </aside>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#050811]">
+      {/* Main Content Area - CRISP LIGHT CONTRAST (Estilo Nexus Lean) */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50">
         {/* Top Navbar */}
-        <header className="h-16 border-b border-white/[0.04] bg-[#050811]/90 backdrop-blur-xl px-6 flex items-center justify-between shrink-0">
+        <header className="h-16 border-b border-slate-200/80 bg-white/90 backdrop-blur-md px-8 flex items-center justify-between shrink-0 shadow-xs">
           <div className="flex items-center gap-4">
-            <h1 className="text-base font-black text-white tracking-tight flex items-center gap-2">
-              {[...mainNav, ...manageNav].find(i => i.id === activeTab)?.label || 'Panel de Climatización'}
-            </h1>
-            <span className="text-slate-700">•</span>
-            <span className="text-xs text-slate-400 hidden sm:inline">
-              {settings.fantasy_name} • Mantenimiento Preventivo Semestral
-            </span>
+            <div>
+              <h1 className="text-lg font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+                {[...mainNav, ...manageNav].find(i => i.id === activeTab)?.label || 'Panel de Climatización'}
+              </h1>
+              <p className="text-[11px] text-slate-500">
+                {settings.company_name} • Mantenimiento Preventivo Semestral
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
             {overdueRecaptacionCount > 0 && (
               <button
                 onClick={() => setActiveTab('recaptacion')}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold hover:bg-amber-500/20 transition-all cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.15)]"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-800 text-xs font-bold hover:bg-amber-100 transition-all cursor-pointer shadow-xs"
               >
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
                 <span>{overdueRecaptacionCount} Equipos por Recaptar (6M)</span>
               </button>
             )}
 
             <button
               onClick={onOpenPortal}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-xs font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 hover:text-slate-900 transition-all cursor-pointer shadow-xs"
             >
-              <UserCheck className="w-3.5 h-3.5 text-[#00d2ff]" />
-              <span className="hidden md:inline">Portal Cliente</span>
+              <UserCheck className="w-4 h-4 text-cyan-600" />
+              <span className="hidden sm:inline">Portal Cliente</span>
             </button>
 
             <button
               onClick={onOpenLanding}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-xs font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 hover:text-slate-900 transition-all cursor-pointer shadow-xs"
             >
-              <ExternalLink className="w-3.5 h-3.5 text-[#00d2ff]" />
-              <span className="hidden md:inline">Landing</span>
+              <ExternalLink className="w-4 h-4 text-cyan-600" />
+              <span className="hidden sm:inline">Landing Pública</span>
             </button>
           </div>
         </header>
 
         {/* Tab Viewport */}
-        <main className="flex-1 overflow-y-auto bg-[#050811] p-6">
+        <main className="flex-1 overflow-y-auto bg-slate-50 p-8">
           {children}
         </main>
       </div>

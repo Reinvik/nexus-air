@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Customer, AirEquipment, Technician, ServiceOrder, ServiceType, OrderStatus } from '../types';
-import { X, Plus, Calendar, Clock, User, Wrench, FileText, CheckCircle2 } from 'lucide-react';
+import { Customer, AirEquipment, Technician, ServiceOrder, ServiceType } from '../types';
+import { X, Plus, Calendar, Clock, User, Wrench } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface AddServiceOrderModalProps {
@@ -31,12 +31,10 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
   const [description, setDescription] = useState('');
   const [totalPrice, setTotalPrice] = useState(45000);
 
-  // Filtrar equipos del cliente seleccionado
   const clientEquipments = equipments.filter(e => e.customer_id === customerId);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
     const selectedCust = customers.find(c => c.id === customerId);
     if (!selectedCust) return;
 
@@ -69,19 +67,19 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-      <div className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+      <div className="w-full max-w-xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col my-8">
         {/* Header */}
-        <div className="px-6 py-4 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between">
+        <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center border border-cyan-500/30">
+            <div className="w-8 h-8 rounded-xl bg-cyan-50 text-cyan-700 flex items-center justify-center border border-cyan-200">
               <Wrench className="w-4 h-4" />
             </div>
-            <h3 className="font-bold text-base text-white">Nueva Orden de Servicio HVAC</h3>
+            <h3 className="font-bold text-base text-slate-900">Nueva Orden de Servicio HVAC</h3>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -89,10 +87,9 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
-          {/* Cliente */}
           <div className="space-y-1.5">
-            <label className="font-semibold text-slate-300 flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-cyan-400" />
+            <label className="font-semibold text-slate-700 flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5 text-cyan-600" />
               Seleccionar Cliente
             </label>
             <select
@@ -101,7 +98,7 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                 setCustomerId(e.target.value);
                 setEquipmentId('');
               }}
-              className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-cyan-500 focus:outline-none"
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
               required
             >
               {customers.map(c => (
@@ -112,10 +109,9 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
             </select>
           </div>
 
-          {/* Tipo de Servicio & Precio estimado */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="font-semibold text-slate-300">Tipo de Servicio</label>
+              <label className="font-semibold text-slate-700">Tipo de Servicio</label>
               <select
                 value={serviceType}
                 onChange={(e) => {
@@ -126,7 +122,7 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                   if (val === 'visita_tecnica') setTotalPrice(30000);
                   if (val === 'recarga_gas') setTotalPrice(65000);
                 }}
-                className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-cyan-500 focus:outline-none"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
               >
                 <option value="mantencion_preventiva">Mantención Preventiva (6 Meses)</option>
                 <option value="instalacion">Instalación Nueva de Equipo</option>
@@ -137,23 +133,22 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
             </div>
 
             <div className="space-y-1.5">
-              <label className="font-semibold text-slate-300">Valor Estimado ($ CLP)</label>
+              <label className="font-semibold text-slate-700">Valor Estimado ($ CLP)</label>
               <input
                 type="number"
                 value={totalPrice}
                 onChange={(e) => setTotalPrice(parseInt(e.target.value) || 0)}
-                className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-cyan-500 focus:outline-none"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:border-cyan-500 focus:outline-none"
               />
             </div>
           </div>
 
-          {/* Equipo Asociado */}
           <div className="space-y-1.5">
-            <label className="font-semibold text-slate-300">Equipo a Intervenir</label>
+            <label className="font-semibold text-slate-700">Equipo a Intervenir</label>
             <select
               value={equipmentId}
               onChange={(e) => setEquipmentId(e.target.value)}
-              className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-cyan-500 focus:outline-none"
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
             >
               <option value="">Seleccionar equipo registrado...</option>
               {clientEquipments.map(eq => (
@@ -164,31 +159,30 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
             </select>
           </div>
 
-          {/* Fecha y Bloque Horario */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="font-semibold text-slate-300 flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-cyan-400" />
+              <label className="font-semibold text-slate-700 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-cyan-600" />
                 Fecha Programada
               </label>
               <input
                 type="date"
                 value={scheduledDate}
                 onChange={(e) => setScheduledDate(e.target.value)}
-                className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-cyan-500 focus:outline-none"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
                 required
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="font-semibold text-slate-300 flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-cyan-400" />
+              <label className="font-semibold text-slate-700 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-cyan-600" />
                 Bloque Horario
               </label>
               <select
                 value={scheduledSlot}
                 onChange={(e) => setScheduledSlot(e.target.value)}
-                className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-cyan-500 focus:outline-none"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
               >
                 <option value="09:00 - 11:00">09:00 - 11:00 (Mañana 1)</option>
                 <option value="11:30 - 13:30">11:30 - 13:30 (Mañana 2)</option>
@@ -198,16 +192,15 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
             </div>
           </div>
 
-          {/* Técnico Asignado */}
           <div className="space-y-1.5">
-            <label className="font-semibold text-slate-300 flex items-center gap-1.5">
-              <Wrench className="w-3.5 h-3.5 text-blue-400" />
+            <label className="font-semibold text-slate-700 flex items-center gap-1.5">
+              <Wrench className="w-3.5 h-3.5 text-blue-600" />
               Técnico HVAC Asignado
             </label>
             <select
               value={technicianId}
               onChange={(e) => setTechnicianId(e.target.value)}
-              className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-cyan-500 focus:outline-none"
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
             >
               {technicians.map(t => (
                 <option key={t.id} value={t.id}>
@@ -217,33 +210,31 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
             </select>
           </div>
 
-          {/* Descripción del Trabajo */}
           <div className="space-y-1.5">
-            <label className="font-semibold text-slate-300">Descripción o Síntomas Reportados</label>
+            <label className="font-semibold text-slate-700">Descripción o Síntomas</label>
             <textarea
               rows={2}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Ej: Mantención preventiva semestral, limpieza profunda de turbina y revisión de carga de gas..."
-              className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+              placeholder="Ej: Mantención preventiva semestral, limpieza profunda de turbina..."
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:outline-none"
             />
           </div>
 
-          {/* Footer Actions */}
-          <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-800">
+          <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="px-4 py-2 rounded-xl text-slate-500 hover:text-slate-800 transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold shadow-lg shadow-cyan-500/20 transition-all cursor-pointer"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#00d2ff] to-[#2563eb] text-white font-bold shadow-md shadow-blue-500/20 cursor-pointer"
             >
               <Plus className="w-4 h-4 stroke-[3]" />
-              Crear Orden de Servicio
+              <span>Crear Orden de Servicio</span>
             </button>
           </div>
         </form>

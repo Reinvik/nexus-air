@@ -61,44 +61,44 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
   const deltaT = checklist.delta_t_celsius || 0;
   let deltaTStatus = {
     text: 'Óptimo (Excelente transferencia)',
-    color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
+    color: 'text-emerald-700 bg-emerald-50 border-emerald-200',
   };
   if (deltaT < 8) {
     deltaTStatus = {
       text: 'Deficiente (Revisar posible fuga de gas o turbina sucia)',
-      color: 'text-rose-400 bg-rose-500/10 border-rose-500/30',
+      color: 'text-rose-700 bg-rose-50 border-rose-200',
     };
   } else if (deltaT < 10) {
     deltaTStatus = {
       text: 'Aceptable (Límite operacional)',
-      color: 'text-amber-400 bg-amber-500/10 border-amber-500/30',
+      color: 'text-amber-700 bg-amber-50 border-amber-200',
     };
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-      <div className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+      <div className="w-full max-w-2xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col my-8 text-slate-900">
         {/* Header */}
-        <div className="px-6 py-4 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between">
+        <div className="px-6 py-4 bg-slate-50/90 border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center border border-cyan-500/30">
+            <div className="w-9 h-9 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center border border-cyan-200 shadow-xs">
               <ClipboardCheck className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-base text-white flex items-center gap-2">
+              <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
                 Ficha Técnica & Checklist HVAC
-                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-cyan-400 font-mono">
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200 font-mono font-bold">
                   {order.ticket_number}
                 </span>
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500">
                 {order.customer?.name} • {order.equipment ? `${order.equipment.brand} ${order.equipment.btu} BTU (${order.equipment.refrigerant})` : 'Equipo HVAC'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -108,8 +108,8 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
         <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
           {/* Checklist Protocol */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-2">
-              <Wind className="w-4 h-4" />
+            <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-700 flex items-center gap-2">
+              <Wind className="w-4 h-4 text-cyan-600" />
               Protocolo de Limpieza y Mantención Preventiva
             </h4>
 
@@ -131,14 +131,14 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
                     onClick={() => handleToggle(key as keyof HVACInspectionChecklist)}
                     className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
                       checked
-                        ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-200'
-                        : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                        ? 'bg-cyan-50 border-cyan-300 text-cyan-950 font-medium'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-100/50'
                     }`}
                   >
                     {checked ? (
-                      <CheckSquare className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                      <CheckSquare className="w-4 h-4 text-cyan-600 shrink-0 mt-0.5" />
                     ) : (
-                      <Square className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+                      <Square className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
                     )}
                     <span className="text-xs font-medium leading-relaxed">{label}</span>
                   </button>
@@ -148,17 +148,17 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
           </div>
 
           {/* Thermodynamic Measurements */}
-          <div className="space-y-3 pt-4 border-t border-slate-800">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-2">
-              <Gauge className="w-4 h-4" />
+          <div className="space-y-3 pt-4 border-t border-slate-200">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-700 flex items-center gap-2">
+              <Gauge className="w-4 h-4 text-cyan-600" />
               Medición de Parámetros Termodinámicos y Eléctricos
             </h4>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {/* Delta T */}
-              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
-                <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
-                  <Thermometer className="w-3.5 h-3.5 text-cyan-400" />
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
+                  <Thermometer className="w-3.5 h-3.5 text-cyan-600" />
                   Salto Térmico ΔT (°C)
                 </label>
                 <div className="flex items-center gap-2">
@@ -167,9 +167,9 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
                     step="0.5"
                     value={checklist.delta_t_celsius || ''}
                     onChange={(e) => setChecklist(prev => ({ ...prev, delta_t_celsius: parseFloat(e.target.value) || 0 }))}
-                    className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white font-mono focus:border-cyan-400 focus:outline-none"
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 font-mono font-bold focus:border-cyan-500 focus:outline-none"
                   />
-                  <span className="text-xs text-slate-400">°C</span>
+                  <span className="text-xs text-slate-500">°C</span>
                 </div>
                 <div className={`text-[10px] px-2 py-1 rounded-lg border font-medium ${deltaTStatus.color}`}>
                   {deltaTStatus.text}
@@ -177,9 +177,9 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
               </div>
 
               {/* Suction Pressure PSI */}
-              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
-                <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
-                  <Gauge className="w-3.5 h-3.5 text-blue-400" />
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
+                  <Gauge className="w-3.5 h-3.5 text-blue-600" />
                   Presión de Succión (PSI)
                 </label>
                 <div className="flex items-center gap-2">
@@ -188,17 +188,17 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
                     step="1"
                     value={checklist.suction_pressure_psi || ''}
                     onChange={(e) => setChecklist(prev => ({ ...prev, suction_pressure_psi: parseFloat(e.target.value) || 0 }))}
-                    className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white font-mono focus:border-cyan-400 focus:outline-none"
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 font-mono font-bold focus:border-cyan-500 focus:outline-none"
                   />
-                  <span className="text-xs text-slate-400">PSI</span>
+                  <span className="text-xs text-slate-500">PSI</span>
                 </div>
-                <p className="text-[10px] text-slate-400">R410A: 110-130 PSI / R32: 120-135 PSI</p>
+                <p className="text-[10px] text-slate-500">R410A: 110-130 PSI / R32: 120-135 PSI</p>
               </div>
 
               {/* Amperage */}
-              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
-                <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
-                  <Zap className="w-3.5 h-3.5 text-amber-400" />
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
+                  <Zap className="w-3.5 h-3.5 text-amber-500" />
                   Consumo Eléctrico (A)
                 </label>
                 <div className="flex items-center gap-2">
@@ -207,18 +207,18 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
                     step="0.1"
                     value={checklist.amperage_amps || ''}
                     onChange={(e) => setChecklist(prev => ({ ...prev, amperage_amps: parseFloat(e.target.value) || 0 }))}
-                    className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white font-mono focus:border-cyan-400 focus:outline-none"
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 font-mono font-bold focus:border-cyan-500 focus:outline-none"
                   />
-                  <span className="text-xs text-slate-400">A</span>
+                  <span className="text-xs text-slate-500">A</span>
                 </div>
-                <p className="text-[10px] text-slate-400">Verificar con placa del compresor</p>
+                <p className="text-[10px] text-slate-500">Verificar con placa del compresor</p>
               </div>
             </div>
           </div>
 
           {/* Observations and Notes */}
           <div className="space-y-2 pt-2">
-            <label className="text-xs font-semibold text-slate-300">
+            <label className="text-xs font-semibold text-slate-700">
               Observaciones del Técnico para el Informe del Cliente:
             </label>
             <textarea
@@ -226,21 +226,21 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
               value={checklist.technician_notes || ''}
               onChange={(e) => setChecklist(prev => ({ ...prev, technician_notes: e.target.value }))}
               placeholder="Ej: Se realizó prueba de calor y frío. Desagüe libre de sarro. Se recomienda próxima mantención preventiva en 6 meses antes de verano..."
-              className="w-full p-3 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:border-cyan-400 focus:outline-none leading-relaxed"
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none leading-relaxed transition-colors"
             />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-slate-950/90 border-t border-slate-800 flex items-center justify-between">
-          <div className="text-[11px] text-slate-400">
+        <div className="px-6 py-4 bg-slate-50/90 border-t border-slate-200 flex items-center justify-between">
+          <div className="text-[11px] text-slate-500">
             Los datos se sincronizan con el informe de entrega y el portal del cliente.
           </div>
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
             >
               Cancelar
             </button>
