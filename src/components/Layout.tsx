@@ -16,7 +16,10 @@ import {
   ExternalLink, 
   UserCheck, 
   ShieldCheck, 
-  AlertTriangle 
+  AlertTriangle,
+  Camera,
+  RefreshCw,
+  LogOut
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -42,7 +45,7 @@ export const Layout: React.FC<LayoutProps> = ({
   settings,
   children,
 }) => {
-  const navItems: { id: ViewTab; label: string; icon: React.ElementType; badge?: number; badgeColor?: string }[] = [
+  const mainNav: { id: ViewTab; label: string; icon: React.ElementType; badge?: number; badgeColor?: string }[] = [
     { id: 'dashboard', label: 'Tablero Órdenes', icon: Kanban, badge: activeOrdersCount },
     { 
       id: 'recaptacion', 
@@ -53,6 +56,9 @@ export const Layout: React.FC<LayoutProps> = ({
     },
     { id: 'agenda', label: 'Agenda & Visitas', icon: Calendar },
     { id: 'cotizador', label: 'Cotizador BTU', icon: Calculator },
+  ];
+
+  const manageNav: { id: ViewTab; label: string; icon: React.ElementType }[] = [
     { id: 'inventory', label: 'Equipos & Stock', icon: Boxes },
     { id: 'customers', label: 'Clientes & Inmuebles', icon: Users },
     { id: 'technicians', label: 'Técnicos HVAC', icon: Wrench },
@@ -61,125 +67,174 @@ export const Layout: React.FC<LayoutProps> = ({
   ];
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden font-sans">
-      {/* Lateral Sidebar */}
-      <aside className="w-72 bg-slate-900/80 backdrop-blur-xl border-r border-slate-800/80 flex flex-col justify-between shrink-0 shadow-2xl">
-        {/* Brand Header */}
-        <div className="p-5 border-b border-slate-800/60">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
-              <Wind className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-cyan-400 bg-clip-text text-transparent">
-                  NEXUS<span className="text-cyan-400">AIR</span>
-                </span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-semibold">
-                  HVAC
+    <div className="flex h-screen bg-[#050811] text-slate-100 overflow-hidden font-sans">
+      {/* Smartlean / Nexus Sidebar */}
+      <aside className="w-[270px] bg-[#050811] border-r border-white/[0.04] flex flex-col justify-between shrink-0 shadow-2xl z-30">
+        <div className="flex flex-col flex-1 overflow-y-auto">
+          {/* Brand Header */}
+          <div className="p-5 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[rgba(0,210,255,0.1)] border border-[rgba(0,210,255,0.3)] flex items-center justify-center text-[#00d2ff] shadow-[0_0_15px_rgba(0,210,255,0.25)] transition-transform hover:scale-105">
+                <Wind className="w-5 h-5" />
+              </div>
+              <div className="flex flex-col">
+                <div className="text-[20px] font-black tracking-[-0.04em] text-white flex items-center leading-none">
+                  NEXUS<span className="text-[#00d2ff]">AIR</span>
+                </div>
+                <span className="text-[9px] font-extrabold text-[#00d2ff] tracking-[0.16em] uppercase mt-1 text-shadow-[0_0_10px_rgba(0,210,255,0.4)]">
+                  BY SMARTLEAN
                 </span>
               </div>
-              <p className="text-xs text-slate-400 truncate max-w-[170px]">{settings.fantasy_name}</p>
             </div>
+
+            {/* Quick Action Button - Smartlean Gradient */}
+            <button
+              onClick={onOpenNewOrder}
+              className="w-full mt-4 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-gradient-to-r from-[#00d2ff] to-[#2563eb] hover:from-[#38bdf8] hover:to-[#1d4ed8] text-white font-bold text-xs shadow-[0_6px_20px_rgba(37,99,235,0.35)] transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" />
+              <span>NUEVA ORDEN TÉCNICA</span>
+            </button>
           </div>
 
-          {/* Air Status indicator */}
-          <div className="mt-4 px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-800 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2 text-cyan-400">
-              <ThermometerSnowflake className="w-4 h-4 text-cyan-400 animate-pulse" />
-              <span className="font-medium text-slate-300">Clima Óptimo</span>
+          {/* Navigation Sections */}
+          <nav className="flex-1 px-3 py-2 space-y-4">
+            {/* Category: MENU PRINCIPAL */}
+            <div>
+              <div className="text-[10px] font-extrabold text-[#475569] tracking-[0.15em] px-3 py-1.5 uppercase">
+                MENÚ PRINCIPAL
+              </div>
+              <div className="space-y-1 mt-1">
+                {mainNav.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveTab(item.id)}
+                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold nexus-sidebar-item cursor-pointer ${
+                        isActive
+                          ? 'active text-white text-glow-white font-bold'
+                          : 'text-slate-400 hover:text-white hover:bg-white/[0.03]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Icon className={`w-4 h-4 transition-colors ${isActive ? 'text-[#00d2ff]' : 'text-slate-500'}`} />
+                        <span>{item.label}</span>
+                      </div>
+                      {item.badge !== undefined && item.badge > 0 && (
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
+                            item.badgeColor || (isActive ? 'bg-cyan-500/20 text-[#00d2ff] border-cyan-500/40' : 'bg-slate-800/80 text-slate-400 border-slate-700')
+                          }`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <span className="text-cyan-300 font-mono font-bold">22.5°C</span>
-          </div>
 
-          {/* Quick Action Button */}
-          <button
-            onClick={onOpenNewOrder}
-            className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-sm shadow-lg shadow-cyan-500/20 transition-all active:scale-[0.98] cursor-pointer"
-          >
-            <Plus className="w-4 h-4 text-slate-950 stroke-[3]" />
-            Nueva Orden Técnica
-          </button>
+            {/* Category: GESTIÓN & EQUIPOS */}
+            <div>
+              <div className="text-[10px] font-extrabold text-[#475569] tracking-[0.15em] px-3 py-1.5 uppercase">
+                GESTIÓN & EQUIPOS
+              </div>
+              <div className="space-y-1 mt-1">
+                {manageNav.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveTab(item.id)}
+                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold nexus-sidebar-item cursor-pointer ${
+                        isActive
+                          ? 'active text-white text-glow-white font-bold'
+                          : 'text-slate-400 hover:text-white hover:bg-white/[0.03]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Icon className={`w-4 h-4 transition-colors ${isActive ? 'text-[#00d2ff]' : 'text-slate-500'}`} />
+                        <span>{item.label}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </nav>
         </div>
 
-        {/* Navigation Menu */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all group cursor-pointer ${
-                  isActive
-                    ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-sm shadow-cyan-500/10'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Icon className={`w-4 h-4 transition-colors ${isActive ? 'text-cyan-400' : 'text-slate-500 group-hover:text-slate-300'}`} />
-                  <span>{item.label}</span>
-                </div>
-                {item.badge !== undefined && item.badge > 0 && (
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full font-bold border ${
-                      item.badgeColor || (isActive ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' : 'bg-slate-800 text-slate-400 border-slate-700')
-                    }`}
-                  >
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
+        {/* Smartlean Profile Footer */}
+        <div className="p-4 border-t border-white/[0.04] bg-[#03060d] space-y-3">
+          {/* User profile row */}
+          <div className="flex items-center gap-3">
+            <div className="relative group/avatar cursor-pointer">
+              <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-[#00d2ff] shrink-0 font-bold">
+                NA
+              </div>
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#090f1e] border border-cyan-500/40 flex items-center justify-center text-cyan-400 group-hover/avatar:scale-110 group-hover/avatar:bg-[#00d2ff] group-hover/avatar:text-slate-950 transition-all">
+                <Camera className="w-2.5 h-2.5" />
+              </div>
+            </div>
 
-        {/* External Views & Footer */}
-        <div className="p-4 border-t border-slate-800/60 space-y-2 bg-slate-950/40">
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-bold text-white truncate text-shadow-[0_1px_3px_rgba(0,0,0,0.4)]">
+                Admin Climatización
+              </div>
+              <div className="text-[10px] text-slate-500 truncate">
+                contacto@nexusair.cl
+              </div>
+              <div className="text-[10px] font-bold text-[#00d2ff] text-shadow-[0_0_10px_rgba(0,210,255,0.35)]">
+                Técnico Certificado SEC
+              </div>
+            </div>
+          </div>
+
+          {/* Cambiar perfil / contraseña button */}
           <button
-            onClick={onOpenLanding}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors border border-slate-800 cursor-pointer"
+            onClick={() => setActiveTab('settings')}
+            className="w-full py-2 px-2 bg-[rgba(6,182,212,0.03)] hover:bg-[rgba(6,182,212,0.12)] border border-[rgba(6,182,212,0.2)] hover:border-[rgba(6,182,212,0.45)] text-[#00d2ff] hover:text-white rounded-xl text-[10.5px] font-bold flex items-center justify-center gap-2 whitespace-nowrap tracking-[0.03em] transition-all cursor-pointer"
           >
-            <span className="flex items-center gap-2">
-              <ExternalLink className="w-3.5 h-3.5 text-cyan-400" />
-              Ver Landing Pública
-            </span>
-            <span className="text-[10px] text-cyan-400/80 font-mono">nexusair.cl</span>
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>AJUSTES & PERFIL DE EMPRESA</span>
           </button>
 
-          <button
-            onClick={onOpenPortal}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors border border-slate-800 cursor-pointer"
-          >
-            <span className="flex items-center gap-2">
-              <UserCheck className="w-3.5 h-3.5 text-blue-400" />
-              Portal de Cliente
-            </span>
-            <span className="text-[10px] text-blue-400/80 font-mono">Mis Aires</span>
-          </button>
+          {/* Action buttons (Reiniciar & Salir) */}
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              onClick={() => window.location.reload()}
+              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white hover:bg-white/[0.04] border border-transparent hover:border-white/[0.06] transition-all group/re"
+            >
+              <RefreshCw className="w-3 h-3 group-hover/re:rotate-180 transition-transform duration-500" />
+              <span>REINICIAR</span>
+            </button>
 
-          <div className="pt-2 flex items-center justify-between text-[11px] text-slate-500">
-            <span className="flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              Certificación SEC
-            </span>
-            <span>v1.0 • Nexus</span>
+            <button
+              onClick={onOpenLanding}
+              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-[11px] font-bold text-slate-400 hover:text-[#f87171] hover:bg-rose-500/15 hover:border-rose-500/40 border border-transparent transition-all hover:shadow-[0_4px_14px_rgba(239,68,68,0.25)]"
+            >
+              <LogOut className="w-3 h-3" />
+              <span>SALIR</span>
+            </button>
           </div>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#050811]">
         {/* Top Navbar */}
-        <header className="h-16 border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md px-6 flex items-center justify-between shrink-0">
+        <header className="h-16 border-b border-white/[0.04] bg-[#050811]/90 backdrop-blur-xl px-6 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-4">
-            <h1 className="text-lg font-bold text-white tracking-wide">
-              {navItems.find(i => i.id === activeTab)?.label || 'Panel de Climatización'}
+            <h1 className="text-base font-black text-white tracking-tight flex items-center gap-2">
+              {[...mainNav, ...manageNav].find(i => i.id === activeTab)?.label || 'Panel de Climatización'}
             </h1>
-            <span className="text-slate-600">•</span>
-            <span className="text-xs text-slate-400">
-              {settings.company_name} — Mantenimiento Preventivo Semestral (Cada 6 Meses)
+            <span className="text-slate-700">•</span>
+            <span className="text-xs text-slate-400 hidden sm:inline">
+              {settings.fantasy_name} • Mantenimiento Preventivo Semestral
             </span>
           </div>
 
@@ -187,22 +242,33 @@ export const Layout: React.FC<LayoutProps> = ({
             {overdueRecaptacionCount > 0 && (
               <button
                 onClick={() => setActiveTab('recaptacion')}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold hover:bg-amber-500/20 transition-colors cursor-pointer"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold hover:bg-amber-500/20 transition-all cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.15)]"
               >
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
                 <span>{overdueRecaptacionCount} Equipos por Recaptar (6M)</span>
               </button>
             )}
 
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700/80 text-xs text-slate-300">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span>Sistema Activo</span>
-            </div>
+            <button
+              onClick={onOpenPortal}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-xs font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer"
+            >
+              <UserCheck className="w-3.5 h-3.5 text-[#00d2ff]" />
+              <span className="hidden md:inline">Portal Cliente</span>
+            </button>
+
+            <button
+              onClick={onOpenLanding}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-xs font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-[#00d2ff]" />
+              <span className="hidden md:inline">Landing</span>
+            </button>
           </div>
         </header>
 
         {/* Tab Viewport */}
-        <main className="flex-1 overflow-y-auto bg-slate-950 p-6">
+        <main className="flex-1 overflow-y-auto bg-[#050811] p-6">
           {children}
         </main>
       </div>
