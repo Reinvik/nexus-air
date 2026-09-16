@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Customer, AirEquipment, Technician, ServiceOrder, ServiceType } from '../types';
-import { X, Plus, Calendar, Clock, User, Wrench } from 'lucide-react';
+import { X, Plus, Calendar, Clock, User, Wrench, UserCheck, Users, Percent, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface AddServiceOrderModalProps {
@@ -28,10 +28,24 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
   const [scheduledDate, setScheduledDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [scheduledSlot, setScheduledSlot] = useState('09:30 - 11:30');
   const [technicianId, setTechnicianId] = useState(technicians[0]?.id || '');
+  const [assistantId, setAssistantId] = useState('');
+  const [techPayoutType, setTechPayoutType] = useState<'fixed' | 'percentage'>('fixed');
+  const [techPayoutValue, setTechPayoutValue] = useState<number>(20000);
+  const [assistantPayoutType, setAssistantPayoutType] = useState<'fixed' | 'percentage'>('fixed');
+  const [assistantPayoutValue, setAssistantPayoutValue] = useState<number>(10000);
   const [description, setDescription] = useState('');
   const [totalPrice, setTotalPrice] = useState(45000);
 
   const clientEquipments = equipments.filter(e => e.customer_id === customerId);
+
+  const calculatedTechPayout = techPayoutType === 'percentage' 
+    ? Math.round((totalPrice * techPayoutValue) / 100) 
+    : techPayoutValue;
+  const calculatedAssistantPayout = assistantId 
+    ? (assistantPayoutType === 'percentage' 
+        ? Math.round((totalPrice * assistantPayoutValue) / 100) 
+        : assistantPayoutValue)
+    : 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,6 +60,11 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
       scheduled_date: scheduledDate,
       scheduled_time_slot: scheduledSlot,
       assigned_technician_id: technicianId,
+      assigned_assistant_id: assistantId || undefined,
+      technician_payout_type: techPayoutType,
+      technician_payout_value: techPayoutValue,
+      assistant_payout_type: assistantPayoutType,
+      assistant_payout_value: assistantPayoutValue,
       description: description || `Servicio de ${serviceType.replace('_', ' ')} para ${selectedCust.name}`,
       items: [
         {
@@ -192,22 +211,134 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="font-semibold text-slate-700 flex items-center gap-1.5">
-              <Wrench className="w-3.5 h-3.5 text-blue-600" />
-              Técnico HVAC Asignado
-            </label>
-            <select
-              value={technicianId}
-              onChange={(e) => setTechnicianId(e.target.value)}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
-            >
-              {technicians.map(t => (
-                <option key={t.id} value={t.id}>
-                  {t.name} {t.sec_certified ? '(Certificación SEC)' : ''}
-                </option>
-              ))}
-            </select>
+          {/* Asignación de Equipo en Terreno y % de Mano de Obra */}
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                <Users className="w-3.5 h-3.5 text-cyan-600" />
+                Equipo de Terreno & Pago por Mano de Obra
+              </span>
+              <span className="text-[10px] text-slate-500 font-semibold">
+                Control de comisiones
+              </span>
+            </div>
+
+            {/* 1. Técnico Principal */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center">
+              <div className="sm:col-span-1">
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                  Técnico Principal
+                </label>
+                <select
+                  value={technicianId}
+                  onChange={(e) => setTechnicianId(e.target.value)}
+                  className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs focus:border-cyan-500 focus:outline-none"
+                  required
+                >
+                  {technicians.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                  Modalidad Pago
+                </label>
+                <select
+                  value={techPayoutType}
+                  onChange={(e) => setTechPayoutType(e.target.value as any)}
+                  className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs focus:border-cyan-500 focus:outline-none"
+                >
+                  <option value="fixed">Monto Fijo ($)</option>
+                  <option value="percentage">Porcentaje (%)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                  {techPayoutType === 'percentage' ? '% Mano de Obra' : 'Monto a Pagar ($)'}
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={techPayoutValue}
+                    onChange={(e) => setTechPayoutValue(parseFloat(e.target.value) || 0)}
+                    className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs font-mono font-bold focus:border-cyan-500 focus:outline-none"
+                  />
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">
+                    {techPayoutType === 'percentage' ? '%' : '$'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Ayudante / Asistente */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center pt-2 border-t border-slate-200/80">
+              <div className="sm:col-span-1">
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                  Ayudante (Opcional)
+                </label>
+                <select
+                  value={assistantId}
+                  onChange={(e) => setAssistantId(e.target.value)}
+                  className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs focus:border-cyan-500 focus:outline-none"
+                >
+                  <option value="">Sin ayudante</option>
+                  {technicians.filter(t => t.id !== technicianId).map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                  Modalidad Pago
+                </label>
+                <select
+                  disabled={!assistantId}
+                  value={assistantPayoutType}
+                  onChange={(e) => setAssistantPayoutType(e.target.value as any)}
+                  className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs focus:border-cyan-500 focus:outline-none disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  <option value="fixed">Monto Fijo ($)</option>
+                  <option value="percentage">Porcentaje (%)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                  {assistantPayoutType === 'percentage' ? '% Mano de Obra' : 'Monto a Pagar ($)'}
+                </label>
+                <div className="relative">
+                  <input
+                    disabled={!assistantId}
+                    type="number"
+                    value={assistantPayoutValue}
+                    onChange={(e) => setAssistantPayoutValue(parseFloat(e.target.value) || 0)}
+                    className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs font-mono font-bold focus:border-cyan-500 focus:outline-none disabled:bg-slate-100 disabled:text-slate-400"
+                  />
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">
+                    {assistantPayoutType === 'percentage' ? '%' : '$'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Resumen de Liquidación Estimada */}
+            <div className="p-2.5 rounded-lg bg-cyan-50/80 border border-cyan-200 text-xs flex flex-wrap items-center justify-between gap-2 text-cyan-950 font-medium">
+              <span>Pago Técnico: <strong>${calculatedTechPayout.toLocaleString('es-CL')}</strong></span>
+              {assistantId && (
+                <span>Pago Ayudante: <strong>${calculatedAssistantPayout.toLocaleString('es-CL')}</strong></span>
+              )}
+              <span className="font-bold text-blue-900">
+                Total Mano de Obra: ${(calculatedTechPayout + calculatedAssistantPayout).toLocaleString('es-CL')}
+              </span>
+            </div>
           </div>
 
           <div className="space-y-1.5">

@@ -1,3 +1,4 @@
+import React, { useState, useMemo } from 'react';
 import { Customer, AirEquipment, EquipmentType, RefrigerantType, AirSettings } from '../types';
 import { 
   Users, 

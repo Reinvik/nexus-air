@@ -83,6 +83,20 @@ export interface HVACInspectionChecklist {
   technician_notes?: string;
   photos_before?: string[];
   photos_after?: string[];
+  videos_before?: string[];
+  videos_after?: string[];
+}
+
+export interface TechnicianLocation {
+  order_id: string;
+  technician_name?: string;
+  lat: number;
+  lng: number;
+  accuracy?: number;
+  speed?: number | null;
+  heading?: number | null;
+  updated_at: string;
+  is_active: boolean;
 }
 
 export interface OrderItem {
@@ -107,6 +121,13 @@ export interface ServiceOrder {
   scheduled_time_slot: string; // ej: "09:00 - 11:00"
   assigned_technician_id?: string;
   assigned_technician?: Technician;
+  assigned_assistant_id?: string;
+  assigned_assistant?: Technician;
+  technician_payout_type?: 'fixed' | 'percentage';
+  technician_payout_value?: number;
+  assistant_payout_type?: 'fixed' | 'percentage';
+  assistant_payout_value?: number;
+  technician_location?: TechnicianLocation;
   description: string;
   diagnosis?: string;
   resolution?: string;

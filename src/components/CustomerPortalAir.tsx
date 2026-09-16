@@ -14,7 +14,13 @@ import {
   FileText,
   Phone,
   MessageCircle,
-  HelpCircle
+  HelpCircle,
+  Navigation,
+  MapPin,
+  Camera,
+  Video,
+  Play,
+  ExternalLink
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -132,6 +138,119 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
           </div>
         </div>
 
+        {/* SECCIÓN EN VIVO: TÉCNICO EN RUTA (GPS TRACKING) */}
+        {clientOrders.some(o => o.status === 'en_ruta' || o.status === 'en_proceso') && (
+          <div className="p-6 rounded-3xl bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 border border-cyan-500/40 text-white shadow-xl space-y-4">
+            {clientOrders.filter(o => o.status === 'en_ruta' || o.status === 'en_proceso').map((liveOrd) => {
+              const techName = liveOrd.assigned_technician?.name || 'Técnico Especialista';
+              const isEnRuta = liveOrd.status === 'en_ruta';
+              const loc = liveOrd.technician_location;
+
+              return (
+                <div key={`live-${liveOrd.id}`} className="space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-400 text-cyan-400 flex items-center justify-center">
+                          <Navigation className="w-5 h-5 animate-pulse" />
+                        </div>
+                        <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-400 ring-2 ring-slate-900 animate-ping" />
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider">
+                          {isEnRuta ? '🚐 Técnico en Camino a tu Domicilio' : '🛠️ Técnico en Terreno Trabajando'}
+                        </span>
+                        <h3 className="text-lg font-black text-white">{techName}</h3>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 font-mono">
+                        Orden #{liveOrd.ticket_number}
+                      </span>
+                      {liveOrd.assigned_technician?.phone && (
+                        <a
+                          href={`https://wa.me/${liveOrd.assigned_technician.phone.replace(/[^0-9]/g, '')}?text=Hola%20${encodeURIComponent(techName)}%2C%20te%20escribo%20del%20domicilio%20por%20la%20orden%20${liveOrd.ticket_number}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-all shadow-xs"
+                        >
+                          <Phone className="w-3 h-3" />
+                          <span>WhatsApp</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Mapa Interactivo / Radar de Trayecto */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                    <div className="md:col-span-2 relative h-48 bg-slate-950/80 rounded-2xl border border-slate-800 overflow-hidden flex flex-col justify-between p-4">
+                      {/* Simulación visual de mapa y ruta */}
+                      <div className="absolute inset-0 opacity-20 pointer-events-none bg-[radial-gradient(#00d2ff_1px,transparent_1px)] [background-size:16px_16px]" />
+                      <div className="flex items-center justify-between z-10">
+                        <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                          GPS Satelital Activo (watchPosition)
+                        </span>
+                        {loc?.updated_at && (
+                          <span className="text-[10px] text-cyan-300/80 font-mono">
+                            Última actualización: hace unos segundos
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Indicadores de ruta */}
+                      <div className="flex items-center justify-around py-4 z-10">
+                        <div className="flex flex-col items-center gap-1 text-center">
+                          <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-400 text-blue-300 flex items-center justify-center shadow-lg">
+                            🚐
+                          </div>
+                          <span className="text-[11px] font-bold text-white">{techName.split(' ')[0]}</span>
+                          <span className="text-[9px] text-cyan-300">En ruta</span>
+                        </div>
+
+                        <div className="flex-1 mx-4 flex flex-col items-center">
+                          <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden relative">
+                            <div className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 w-2/3 animate-pulse" />
+                          </div>
+                          <span className="text-[10px] text-cyan-400 mt-1 font-bold">Tiempo estimado: 10 - 15 min</span>
+                        </div>
+
+                        <div className="flex flex-col items-center gap-1 text-center">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-600/30 border border-emerald-400 text-emerald-300 flex items-center justify-center shadow-lg">
+                            📍
+                          </div>
+                          <span className="text-[11px] font-bold text-white">Tu Domicilio</span>
+                          <span className="text-[9px] text-slate-400">{matchedCustomer?.commune}</span>
+                        </div>
+                      </div>
+
+                      <div className="z-10 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-800/80 pt-2">
+                        <span>Dirección de destino: <strong className="text-white">{matchedCustomer?.address}</strong></span>
+                        {loc && (
+                          <span className="font-mono text-[10px] text-cyan-300">
+                            Lat: {loc.lat.toFixed(4)} • Lng: {loc.lng.toFixed(4)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Estado y Recomendaciones de Espera */}
+                    <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2 text-xs">
+                      <strong className="text-cyan-300 block">ℹ️ Al momento de la llegada:</strong>
+                      <ul className="space-y-1.5 text-[11px] text-slate-300">
+                        <li>• Mantén despejada el área cercana al equipo split interior o condensador exterior.</li>
+                        <li>• Si vives en edificio, autoriza el ingreso en conserjería para evitar demoras.</li>
+                        <li>• El técnico cuenta con implementos de seguridad y acreditación SEC.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* Installed Equipments Section */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -243,6 +362,81 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
                           Consumo: {ord.checklist.amperage_amps} Amperes
                         </div>
                       )}
+                    </div>
+                  )}
+                  {/* Evidencia Fotográfica y Videos Antes y Después */}
+                  {((ord.checklist?.photos_before?.length || 0) > 0 || 
+                    (ord.checklist?.photos_after?.length || 0) > 0 || 
+                    (ord.checklist?.videos_before?.length || 0) > 0 || 
+                    (ord.checklist?.videos_after?.length || 0) > 0) && (
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <Camera className="w-3.5 h-3.5 text-cyan-600" />
+                          Evidencia del Trabajo Realizado (Antes y Después)
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-medium">
+                          Transparencia técnica de mantención
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Columna Antes */}
+                        <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-2">
+                          <span className="text-[11px] font-bold text-slate-700 block pb-1 border-b border-slate-100">
+                            🔍 Estado Inicial (Antes)
+                          </span>
+                          <div className="grid grid-cols-2 gap-2">
+                            {(ord.checklist?.photos_before || []).map((url, i) => (
+                              <a
+                                key={`pb-${i}`}
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="group relative aspect-video rounded-lg overflow-hidden border border-slate-200 bg-black block"
+                              >
+                                <img src={url} alt={`Antes ${i + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                <span className="absolute bottom-1 right-1 bg-black/70 text-white text-[9px] px-1 rounded flex items-center gap-0.5">
+                                  <ExternalLink className="w-2.5 h-2.5" /> Ver
+                                </span>
+                              </a>
+                            ))}
+                            {(ord.checklist?.videos_before || []).map((url, i) => (
+                              <div key={`vb-${i}`} className="aspect-video rounded-lg overflow-hidden border border-slate-200 bg-black">
+                                <video src={url} controls className="w-full h-full object-cover" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Columna Después */}
+                        <div className="p-3 rounded-xl bg-emerald-50/50 border border-emerald-200 space-y-2">
+                          <span className="text-[11px] font-bold text-emerald-800 block pb-1 border-b border-emerald-100">
+                            ✨ Resultado Final (Después)
+                          </span>
+                          <div className="grid grid-cols-2 gap-2">
+                            {(ord.checklist?.photos_after || []).map((url, i) => (
+                              <a
+                                key={`pa-${i}`}
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="group relative aspect-video rounded-lg overflow-hidden border border-emerald-200 bg-black block"
+                              >
+                                <img src={url} alt={`Después ${i + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                <span className="absolute bottom-1 right-1 bg-black/70 text-white text-[9px] px-1 rounded flex items-center gap-0.5">
+                                  <ExternalLink className="w-2.5 h-2.5" /> Ver
+                                </span>
+                              </a>
+                            ))}
+                            {(ord.checklist?.videos_after || []).map((url, i) => (
+                              <div key={`va-${i}`} className="aspect-video rounded-lg overflow-hidden border border-emerald-200 bg-black">
+                                <video src={url} controls className="w-full h-full object-cover" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
 

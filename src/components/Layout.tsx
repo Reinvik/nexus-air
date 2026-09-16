@@ -64,7 +64,7 @@ export const Layout: React.FC<LayoutProps> = ({
 
   const manageNav: { id: ViewTab; label: string; icon: React.ElementType }[] = [
     { id: 'inventory', label: 'Equipos & Stock', icon: Boxes },
-    { id: 'customers', label: 'Clientes & Inmuebles', icon: Users },
+    { id: 'customers', label: 'Clientes', icon: Users },
     { id: 'technicians', label: 'Técnicos HVAC', icon: Wrench },
     { id: 'sales', label: 'Ventas & Finanzas', icon: TrendingUp },
     { id: 'settings', label: 'Configuración', icon: Settings },

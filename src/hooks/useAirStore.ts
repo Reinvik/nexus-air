@@ -30,9 +30,19 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
   const [equipments, setEquipments] = useState<AirEquipment[]>(INITIAL_EQUIPMENTS);
   const [technicians, setTechnicians] = useState<Technician[]>(INITIAL_TECHNICIANS);
   const [parts, setParts] = useState<AirPart[]>(INITIAL_PARTS);
-  const [settings, setSettings] = useState<AirSettings>({
-    ...INITIAL_SETTINGS,
-    company_id: companyId,
+  const [settings, setSettings] = useState<AirSettings>(() => {
+    try {
+      const saved = localStorage.getItem(`nexus_air_settings_${companyId}`);
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn('Error reading settings from localStorage:', e);
+    }
+    return {
+      ...INITIAL_SETTINGS,
+      company_id: companyId,
+    };
   });
   const [isLoaded, setIsLoaded] = useState(false);
   const [contactedReminderIds, setContactedReminderIds] = useState<Record<string, string>>(() => {
@@ -338,11 +348,13 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       const customer = customers.find(c => c.id === ord.customer_id);
       const equipment = equipments.find(e => e.id === ord.equipment_id);
       const technician = technicians.find(t => t.id === ord.assigned_technician_id);
+      const assistant = technicians.find(t => t.id === ord.assigned_assistant_id);
       return {
         ...ord,
         customer: customer || ord.customer,
         equipment: equipment || ord.equipment,
         assigned_technician: technician || ord.assigned_technician,
+        assigned_assistant: assistant || ord.assigned_assistant,
       };
     });
   }, [orders, customers, equipments, technicians]);
@@ -391,6 +403,12 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       const dbUpdates: any = { updated_at: new Date().toISOString() };
       if (updates.status) dbUpdates.status = updates.status;
       if (updates.assigned_technician_id !== undefined) dbUpdates.assigned_technician_id = updates.assigned_technician_id || null;
+      if (updates.assigned_assistant_id !== undefined) dbUpdates.assigned_assistant_id = updates.assigned_assistant_id || null;
+      if (updates.technician_payout_type !== undefined) dbUpdates.technician_payout_type = updates.technician_payout_type;
+      if (updates.technician_payout_value !== undefined) dbUpdates.technician_payout_value = updates.technician_payout_value;
+      if (updates.assistant_payout_type !== undefined) dbUpdates.assistant_payout_type = updates.assistant_payout_type;
+      if (updates.assistant_payout_value !== undefined) dbUpdates.assistant_payout_value = updates.assistant_payout_value;
+      if (updates.technician_location !== undefined) dbUpdates.technician_location = updates.technician_location;
       if (updates.scheduled_date) dbUpdates.scheduled_date = updates.scheduled_date;
       if (updates.scheduled_time_slot) dbUpdates.scheduled_time_slot = updates.scheduled_time_slot;
       if (updates.description) dbUpdates.description = updates.description;
@@ -816,11 +834,19 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
 
   // Configuración de la Empresa
   const updateSettings = useCallback(async (updates: Partial<AirSettings>) => {
-    setSettings(prev => ({ ...prev, ...updates }));
+    const activeId = companyId || DEFAULT_COMPANY_ID;
+    setSettings(prev => {
+      const next = { ...prev, ...updates };
+      try {
+        localStorage.setItem(`nexus_air_settings_${activeId}`, JSON.stringify(next));
+      } catch (e) {
+        console.warn('Error saving settings to localStorage:', e);
+      }
+      return next;
+    });
     toast.success('Configuración de Nexus Air actualizada');
 
     try {
-      const activeId = companyId || DEFAULT_COMPANY_ID;
       const dbUpdates: any = {
         updated_at: new Date().toISOString()
       };
@@ -840,10 +866,9 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
 
       await supabaseAir
         .from('settings')
-        .update(dbUpdates)
-        .eq('company_id', activeId);
+        .upsert({ company_id: activeId, ...dbUpdates }, { onConflict: 'company_id' });
     } catch (e) {
-      console.warn('[useAirStore] Error updating settings:', e);
+      console.warn('[useAirStore] Error updating settings in Supabase:', e);
     }
   }, [companyId]);
 

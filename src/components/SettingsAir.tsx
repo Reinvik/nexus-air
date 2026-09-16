@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AirSettings } from '../types';
 import { 
   Settings, 
@@ -39,6 +39,20 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
     division_label: settings.division_label || 'Comuna',
   });
 
+  useEffect(() => {
+    setFormData({
+      ...settings,
+      country: settings.country || 'Chile',
+      country_code: settings.country_code || 'CL',
+      currency_symbol: settings.currency_symbol || '$',
+      currency_code: settings.currency_code || 'CLP',
+      tax_id_label: settings.tax_id_label || 'RUT',
+      tax_rate: settings.tax_rate !== undefined ? settings.tax_rate : 0.19,
+      tax_name: settings.tax_name || 'IVA',
+      division_label: settings.division_label || 'Comuna',
+    });
+  }, [settings]);
+
   const selectedCountry = findCountry(formData.country_code || formData.country);
 
   // Manejador de cambio de país
@@ -46,8 +60,8 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
     const country = LATIN_AMERICAN_COUNTRIES.find(c => c.code === countryCode);
     if (!country) return;
 
-    setFormData(prev => ({
-      ...prev,
+    const updated = {
+      ...formData,
       country: country.name,
       country_code: country.code,
       currency_symbol: country.currency_symbol,
@@ -58,8 +72,11 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
       division_label: country.division_label,
       standard_maintenance_price: country.standard_maintenance_price_default,
       standard_installation_price: country.standard_installation_price_default,
-      commune: country.sample_cities[0] || prev.commune
-    }));
+      commune: country.sample_cities[0] || formData.commune
+    };
+
+    setFormData(updated);
+    onUpdateSettings(updated);
 
     toast.success(`País cambiado a ${country.flag} ${country.name}. Se adaptaron la moneda (${country.currency_symbol} ${country.currency_code}) y tasas fiscales.`);
   };
