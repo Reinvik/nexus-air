@@ -329,6 +329,7 @@ export default function App() {
           <RecaptacionSemestral
             reminders={reminders}
             settings={settings}
+            orders={orders}
             onMarkContacted={markReminderContacted}
             onScheduleService={scheduleReminderService}
             generateWhatsAppUrl={generateWhatsAppUrl}
@@ -347,6 +348,8 @@ export default function App() {
         {activeTab === 'cotizador' && (
           <ThermalQuoterAir
             parts={parts}
+            settings={settings}
+            customers={customers}
             onCreateOrderFromQuote={handleCreateOrderFromQuote}
           />
         )}

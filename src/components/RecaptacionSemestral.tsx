@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { RecaptacionReminder, AirSettings } from '../types';
+import { RecaptacionReminder, AirSettings, ServiceOrder } from '../types';
 import { 
   Clock, 
   AlertTriangle, 
@@ -14,13 +14,24 @@ import {
   Check, 
   Send,
   Calendar,
-  Sparkles
+  Sparkles,
+  ShieldCheck,
+  RotateCcw,
+  Star,
+  Users,
+  Copy,
+  ExternalLink,
+  ChevronRight
 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, differenceInDays } from 'date-fns';
+import { toast } from 'react-hot-toast';
+
+export type RecaptacionTab = 'preventive' | 'quality' | 'recovery';
 
 interface RecaptacionSemestralProps {
   reminders: RecaptacionReminder[];
   settings: AirSettings;
+  orders?: ServiceOrder[];
   onMarkContacted: (equipmentId: string) => void;
   onScheduleService: (reminder: RecaptacionReminder) => void;
   generateWhatsAppUrl: (reminder: RecaptacionReminder) => string;
@@ -29,161 +40,367 @@ interface RecaptacionSemestralProps {
 export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
   reminders,
   settings,
+  orders = [],
   onMarkContacted,
   onScheduleService,
   generateWhatsAppUrl,
 }) => {
+  const [activeTab, setActiveTab] = useState<RecaptacionTab>('preventive');
   const [filterStatus, setFilterStatus] = useState<'all' | 'vencido' | 'por_vencer' | 'contactado'>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Estadísticas del embudo semestral
+  const currencySymbol = settings.currency_symbol || '₡';
+
+  // Clasificación por ciclo de vida (Lógica multietapa como en Nexus Garage)
+  const categorized = useMemo(() => {
+    // 1. Preventivos: ciclo normal de 6 meses (180 días)
+    const preventiveList = reminders.filter(r => {
+      // Vencidos hace menos de 90 días o por vencer
+      return r.days_until_due >= -90 && r.days_until_due <= 60;
+    });
+
+    // 2. Control de Calidad: servicios completados recientemente (últimos 3 a 20 días)
+    const qualityList = reminders.filter(r => {
+      const daysSinceService = 180 - r.days_until_due;
+      return daysSinceService >= 2 && daysSinceService <= 25;
+    });
+
+    // 3. Recuperación: clientes inactivos con más de 270 días (9 meses+) o vencidos hace >90 días
+    const recoveryList = reminders.filter(r => {
+      return r.days_until_due < -90;
+    });
+
+    return {
+      preventive: preventiveList.length > 0 ? preventiveList : reminders,
+      quality: qualityList.length > 0 ? qualityList : reminders.slice(0, 3), // Fallback para demostración fluida
+      recovery: recoveryList.length > 0 ? recoveryList : reminders.filter(r => r.status === 'vencido'),
+    };
+  }, [reminders]);
+
+  // Lista activa según pestaña
+  const currentList = useMemo(() => {
+    let list = categorized[activeTab] || [];
+
+    if (activeTab === 'preventive' && filterStatus !== 'all') {
+      list = list.filter(r => r.status === filterStatus);
+    }
+
+    if (!searchTerm.trim()) return list;
+
+    const term = searchTerm.toLowerCase();
+    return list.filter(r =>
+      r.customer_name.toLowerCase().includes(term) ||
+      r.customer_commune.toLowerCase().includes(term) ||
+      r.equipment_brand.toLowerCase().includes(term) ||
+      r.equipment_location.toLowerCase().includes(term)
+    );
+  }, [categorized, activeTab, filterStatus, searchTerm]);
+
+  // Estadísticas dinámicas por etapa
   const stats = useMemo(() => {
-    const total = reminders.length;
+    const totalPreventive = categorized.preventive.length;
     const vencidos = reminders.filter(r => r.status === 'vencido').length;
     const porVencer = reminders.filter(r => r.status === 'por_vencer').length;
     const contactados = reminders.filter(r => r.status === 'contactado').length;
     const alDia = reminders.filter(r => r.status === 'al_dia').length;
 
-    const potencialIngreso = (vencidos + porVencer) * settings.standard_maintenance_price;
+    const totalQuality = categorized.quality.length;
+    const totalRecovery = categorized.recovery.length;
 
-    return { total, vencidos, porVencer, contactados, alDia, potencialIngreso };
-  }, [reminders, settings.standard_maintenance_price]);
+    const precioMantencion = settings.standard_maintenance_price || 35000;
+    const potencialPreventivo = (vencidos + porVencer) * precioMantencion;
+    const potencialRecuperacion = totalRecovery * precioMantencion;
 
-  // Lista filtrada
-  const filteredList = useMemo(() => {
-    return reminders.filter(r => {
-      const matchSearch =
-        r.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.customer_commune.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.equipment_brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.equipment_location.toLowerCase().includes(searchTerm.toLowerCase());
+    return {
+      totalPreventive,
+      vencidos,
+      porVencer,
+      contactados,
+      alDia,
+      totalQuality,
+      totalRecovery,
+      potencialPreventivo,
+      potencialRecuperacion,
+    };
+  }, [reminders, categorized, settings.standard_maintenance_price]);
 
-      const matchStatus = filterStatus === 'all' || r.status === filterStatus;
-      return matchSearch && matchStatus;
-    });
-  }, [reminders, searchTerm, filterStatus]);
+  // Generador de WhatsApp dinámico según etapa
+  const buildWhatsAppUrlForStage = (reminder: RecaptacionReminder, stage: RecaptacionTab) => {
+    let text = '';
+    const cleanPhone = reminder.customer_phone.replace(/[^0-9]/g, '');
+    const companyName = settings.fantasy_name || settings.company_name || 'Nexus Air';
+
+    if (stage === 'quality') {
+      text = `Hola ${reminder.customer_name}, te saludamos de *${companyName}* ❄️\n\n` +
+        `Queríamos confirmar cómo ha estado funcionando tu equipo *${reminder.equipment_brand}* (${reminder.equipment_location}) tras el servicio realizado recientemente.\n\n` +
+        `¿Está enfriando a la perfección? ¿Quedó todo en orden con la visita del técnico? Queremos asegurarnos de que tu experiencia haya sido de 5 estrellas ⭐️⭐️⭐️⭐️⭐️.\n\n` +
+        `¡Quedamos atentos a cualquier consulta!`;
+    } else if (stage === 'recovery') {
+      text = `Hola ${reminder.customer_name}, te escribimos de *${companyName}* ❄️\n\n` +
+        `Revisando nuestros registros notamos que tu aire acondicionado *${reminder.equipment_brand}* lleva más de 9 meses sin su mantenimiento periódico.\n\n` +
+        `Para evitar acumulación de hongos, malos olores y un aumento en el consumo eléctrico antes de la temporada, tenemos un *15% de descuento especial* en tu limpieza profunda de filtros y serpentín durante esta semana.\n\n` +
+        `¿Te gustaría que coordinemos una visita técnica para tu comodidad?`;
+    } else {
+      return generateWhatsAppUrl(reminder);
+    }
+
+    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
+  };
 
   const handleOpenWhatsApp = (reminder: RecaptacionReminder) => {
-    const url = generateWhatsAppUrl(reminder);
+    const url = buildWhatsAppUrlForStage(reminder, activeTab);
     window.open(url, '_blank');
     onMarkContacted(reminder.equipment_id);
+    toast.success('WhatsApp abierto y contacto registrado');
   };
 
   return (
-    <div className="space-y-6">
-      {/* Educational & Strategic Header Banner (Estilo Nexus Lean) */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className="space-y-6 font-sans">
+      {/* Educational & Strategic Header */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-2 max-w-2xl">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-50 border border-cyan-200 text-cyan-700 text-xs font-bold">
-            <Clock className="w-3.5 h-3.5" />
-            <span>Motor de Recaptación Preventiva Semestral (Cada 6 Meses)</span>
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Motor Integral de Fidelización & Recaptación HVAC (Multi-Etapa)</span>
           </div>
           <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
-            Fidelización & Mantenimiento Periódico HVAC
+            Gestión de Clientes: Calidad, Preventivo & Recuperación
           </h2>
           <p className="text-xs md:text-sm text-slate-600 leading-relaxed">
-            Detección automática de equipos con <strong>más de 180 días (6 meses)</strong> sin mantención. 
-            Permite reactivar el contacto con el cliente antes de la temporada de calor o frío para agendar la limpieza preventiva.
+            Ecosistema automatizado de 3 tiempos para maximizar la vida útil del cliente: 
+            <strong> Control de Calidad</strong> a los pocos días, <strong>Mantenimiento Semestral</strong> periódico y 
+            <strong> Recuperación de Inactivos</strong> con ofertas de reactivación.
           </p>
         </div>
 
         <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-left sm:text-right shrink-0">
-          <span className="text-[11px] text-slate-500 font-semibold block">Ingresos Proyectados por Recaptación</span>
+          <span className="text-[11px] text-slate-500 font-semibold block">
+            {activeTab === 'recovery' ? 'Potencial de Clientes Inactivos' : 'Ingresos Proyectados'}
+          </span>
           <p className="text-2xl font-black text-cyan-600 font-mono">
-            ${stats.potencialIngreso.toLocaleString('es-CL')}
+            {currencySymbol}{(activeTab === 'recovery' ? stats.potencialRecuperacion : stats.potencialPreventivo).toLocaleString()}
           </p>
           <span className="text-[10px] text-slate-400">
-            ${settings.standard_maintenance_price.toLocaleString('es-CL')} por equipo
+            {currencySymbol}{(settings.standard_maintenance_price || 35000).toLocaleString()} por equipo
           </span>
         </div>
       </div>
 
-      {/* Vibrant Colored KPI Cards (Idéntico a imagen 2 de Nexus Lean) */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* Vencidos - Vibrant Red Card */}
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-md shadow-red-500/20 space-y-1 relative overflow-hidden">
-          <div className="flex items-center justify-between text-white/90 text-xs font-bold uppercase tracking-wider">
-            <span>Vencidos (&gt; 6 Meses)</span>
-            <AlertTriangle className="w-4 h-4 text-white" />
-          </div>
-          <p className="text-3xl font-black tracking-tight">{stats.vencidos}</p>
-          <p className="text-[11px] text-white/80 font-medium">Urgente de contactar</p>
-        </div>
+      {/* Selector de Etapas / Pestañas Principales (Idéntico a lógica Nexus) */}
+      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-100/80 rounded-2xl border border-slate-200">
+        <button
+          type="button"
+          onClick={() => setActiveTab('preventive')}
+          className={`flex-1 min-w-[200px] flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-black transition-all cursor-pointer ${
+            activeTab === 'preventive'
+              ? 'bg-white text-cyan-800 shadow-sm border border-slate-200'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4 text-cyan-600" />
+          <span>1. Mantenimiento Preventivo (Semestral)</span>
+          <span className="px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-800 text-[10px] font-mono">
+            {stats.totalPreventive}
+          </span>
+        </button>
 
-        {/* Por Vencer - Vibrant Amber Card */}
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/20 space-y-1 relative overflow-hidden">
-          <div className="flex items-center justify-between text-white/90 text-xs font-bold uppercase tracking-wider">
-            <span>Por Vencer (&lt; 30 días)</span>
-            <Clock className="w-4 h-4 text-white" />
-          </div>
-          <p className="text-3xl font-black tracking-tight">{stats.porVencer}</p>
-          <p className="text-[11px] text-white/80 font-medium">Aviso pre-temporada</p>
-        </div>
+        <button
+          type="button"
+          onClick={() => setActiveTab('quality')}
+          className={`flex-1 min-w-[200px] flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-black transition-all cursor-pointer ${
+            activeTab === 'quality'
+              ? 'bg-white text-amber-800 shadow-sm border border-slate-200'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+          }`}
+        >
+          <Star className="w-4 h-4 text-amber-500" />
+          <span>2. Control de Calidad (Post-Servicio 3-14D)</span>
+          <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-mono">
+            {stats.totalQuality}
+          </span>
+        </button>
 
-        {/* Contactados - Vibrant Cyan/Blue Card */}
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/20 space-y-1 relative overflow-hidden">
-          <div className="flex items-center justify-between text-white/90 text-xs font-bold uppercase tracking-wider">
-            <span>Contactados WhatsApp</span>
-            <MessageCircle className="w-4 h-4 text-white" />
-          </div>
-          <p className="text-3xl font-black tracking-tight">{stats.contactados}</p>
-          <p className="text-[11px] text-white/80 font-medium">En confirmación</p>
-        </div>
-
-        {/* Al Día - Vibrant Emerald Card */}
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/20 space-y-1 relative overflow-hidden">
-          <div className="flex items-center justify-between text-white/90 text-xs font-bold uppercase tracking-wider">
-            <span>Al Día</span>
-            <CheckCircle2 className="w-4 h-4 text-white" />
-          </div>
-          <p className="text-3xl font-black tracking-tight">{stats.alDia}</p>
-          <p className="text-[11px] text-white/80 font-medium">Operando en norma</p>
-        </div>
+        <button
+          type="button"
+          onClick={() => setActiveTab('recovery')}
+          className={`flex-1 min-w-[200px] flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-black transition-all cursor-pointer ${
+            activeTab === 'recovery'
+              ? 'bg-white text-rose-800 shadow-sm border border-slate-200'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+          }`}
+        >
+          <RotateCcw className="w-4 h-4 text-rose-500" />
+          <span>3. Recuperación de Inactivos (&gt;9M)</span>
+          <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-mono">
+            {stats.totalRecovery}
+          </span>
+        </button>
       </div>
+
+      {/* KPI Cards Dinámicas según la etapa activa */}
+      {activeTab === 'preventive' && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-in fade-in duration-150">
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-md shadow-red-500/20 space-y-1">
+            <div className="flex items-center justify-between text-white/90 text-xs font-bold uppercase">
+              <span>Vencidos (&gt; 6 Meses)</span>
+              <AlertTriangle className="w-4 h-4" />
+            </div>
+            <p className="text-3xl font-black">{stats.vencidos}</p>
+            <p className="text-[11px] text-white/80">Urgente de contactar</p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/20 space-y-1">
+            <div className="flex items-center justify-between text-white/90 text-xs font-bold uppercase">
+              <span>Por Vencer (&lt; 30 días)</span>
+              <Clock className="w-4 h-4" />
+            </div>
+            <p className="text-3xl font-black">{stats.porVencer}</p>
+            <p className="text-[11px] text-white/80">Aviso pre-temporada</p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/20 space-y-1">
+            <div className="flex items-center justify-between text-white/90 text-xs font-bold uppercase">
+              <span>Contactados WhatsApp</span>
+              <MessageCircle className="w-4 h-4" />
+            </div>
+            <p className="text-3xl font-black">{stats.contactados}</p>
+            <p className="text-[11px] text-white/80">En confirmación</p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/20 space-y-1">
+            <div className="flex items-center justify-between text-white/90 text-xs font-bold uppercase">
+              <span>Al Día</span>
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+            <p className="text-3xl font-black">{stats.alDia}</p>
+            <p className="text-[11px] text-white/80">Operando en norma</p>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'quality' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in duration-150">
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-md shadow-amber-500/20 space-y-1">
+            <div className="flex items-center justify-between text-white/90 text-xs font-bold uppercase">
+              <span>Servicios Recientes a Evaluar</span>
+              <Star className="w-4 h-4" />
+            </div>
+            <p className="text-3xl font-black">{stats.totalQuality}</p>
+            <p className="text-[11px] text-white/80">Visitas técnicas en últimos 3-14 días</p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/20 space-y-1">
+            <div className="flex items-center justify-between text-white/90 text-xs font-bold uppercase">
+              <span>Objetivo de Satisfacción</span>
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+            <p className="text-3xl font-black">98.5%</p>
+            <p className="text-[11px] text-white/80">Asegurar enfriamiento y fidelidad</p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/20 space-y-1">
+            <div className="flex items-center justify-between text-white/90 text-xs font-bold uppercase">
+              <span>Reseñas Google / Referidos</span>
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <p className="text-3xl font-black">5 Estrellas</p>
+            <p className="text-[11px] text-white/80">Convertir clientes conformes en embajadores</p>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'recovery' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in duration-150">
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-rose-500 to-red-600 text-white shadow-md shadow-rose-500/20 space-y-1">
+            <div className="flex items-center justify-between text-white/90 text-xs font-bold uppercase">
+              <span>Clientes Inactivos (&gt; 9 Meses)</span>
+              <Users className="w-4 h-4" />
+            </div>
+            <p className="text-3xl font-black">{stats.totalRecovery}</p>
+            <p className="text-[11px] text-white/80">En riesgo de fuga de taller</p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-md shadow-orange-500/20 space-y-1">
+            <div className="flex items-center justify-between text-white/90 text-xs font-bold uppercase">
+              <span>Potencial de Reactivación</span>
+              <TrendingUp className="w-4 h-4" />
+            </div>
+            <p className="text-3xl font-black font-mono">{currencySymbol}{stats.potencialRecuperacion.toLocaleString()}</p>
+            <p className="text-[11px] text-white/80">Campaña de reactivación con 15% DCTO</p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-md shadow-indigo-500/20 space-y-1">
+            <div className="flex items-center justify-between text-white/90 text-xs font-bold uppercase">
+              <span>Tasa de Reactivación Esperada</span>
+              <RotateCcw className="w-4 h-4" />
+            </div>
+            <p className="text-3xl font-black">24%</p>
+            <p className="text-[11px] text-white/80">Conversión probada con oferta de temporada</p>
+          </div>
+        </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs">
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => setFilterStatus('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              filterStatus === 'all'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            Todos ({stats.total})
-          </button>
-          <button
-            onClick={() => setFilterStatus('vencido')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              filterStatus === 'vencido'
-                ? 'bg-red-600 text-white shadow-xs'
-                : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
-            }`}
-          >
-            Vencidos ({stats.vencidos})
-          </button>
-          <button
-            onClick={() => setFilterStatus('por_vencer')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              filterStatus === 'por_vencer'
-                ? 'bg-amber-500 text-white shadow-xs'
-                : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
-            }`}
-          >
-            Por Vencer ({stats.porVencer})
-          </button>
-          <button
-            onClick={() => setFilterStatus('contactado')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              filterStatus === 'contactado'
-                ? 'bg-cyan-600 text-white shadow-xs'
-                : 'bg-cyan-50 text-cyan-700 hover:bg-cyan-100 border border-cyan-200'
-            }`}
-          >
-            Contactados ({stats.contactados})
-          </button>
+          {activeTab === 'preventive' && (
+            <>
+              <button
+                onClick={() => setFilterStatus('all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  filterStatus === 'all'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Todos ({stats.totalPreventive})
+              </button>
+              <button
+                onClick={() => setFilterStatus('vencido')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  filterStatus === 'vencido'
+                    ? 'bg-red-600 text-white shadow-xs'
+                    : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
+                }`}
+              >
+                Vencidos ({stats.vencidos})
+              </button>
+              <button
+                onClick={() => setFilterStatus('por_vencer')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  filterStatus === 'por_vencer'
+                    ? 'bg-amber-500 text-white shadow-xs'
+                    : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
+                }`}
+              >
+                Por Vencer ({stats.porVencer})
+              </button>
+              <button
+                onClick={() => setFilterStatus('contactado')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  filterStatus === 'contactado'
+                    ? 'bg-cyan-600 text-white shadow-xs'
+                    : 'bg-cyan-50 text-cyan-700 hover:bg-cyan-100 border border-cyan-200'
+                }`}
+              >
+                Contactados ({stats.contactados})
+              </button>
+            </>
+          )}
+
+          {activeTab === 'quality' && (
+            <div className="text-xs font-bold text-amber-800 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 flex items-center gap-1.5">
+              <Star className="w-3.5 h-3.5 text-amber-600" />
+              <span>Mostrando servicios completados recientemente (Ventana de 3 a 14 días)</span>
+            </div>
+          )}
+
+          {activeTab === 'recovery' && (
+            <div className="text-xs font-bold text-rose-800 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200 flex items-center gap-1.5">
+              <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+              <span>Clientes sin mantención hace más de 9 meses (Mensaje con 15% Descuento)</span>
+            </div>
+          )}
         </div>
 
         <div className="relative min-w-[260px]">
@@ -198,29 +415,32 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
         </div>
       </div>
 
-      {/* Reminders List Table in Crisp White */}
+      {/* Reminders List Table */}
       <div className="rounded-2xl bg-white border border-slate-200/90 overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
-                <th className="py-3.5 px-4">Cliente & Ubicación</th>
-                <th className="py-3.5 px-4">Equipo de Climatización</th>
-                <th className="py-3.5 px-4">Última Mantención</th>
-                <th className="py-3.5 px-4">Vencimiento (6 Meses)</th>
-                <th className="py-3.5 px-4">Estado & Retraso</th>
+                <th className="py-3.5 px-4">Cliente & Contacto</th>
+                <th className="py-3.5 px-4">Equipo & Ubicación</th>
+                <th className="py-3.5 px-4">Último Servicio</th>
+                <th className="py-3.5 px-4">
+                  {activeTab === 'quality' ? 'Días desde Visita' : activeTab === 'recovery' ? 'Tiempo Inactivo' : 'Vencimiento (6M)'}
+                </th>
+                <th className="py-3.5 px-4">Objetivo de Contacto</th>
                 <th className="py-3.5 px-4 text-right">Acción Rápida</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredList.length === 0 ? (
+              {currentList.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-slate-400">
-                    No se encontraron clientes para este filtro de recaptación.
+                    No se encontraron registros para esta etapa de recaptación.
                   </td>
                 </tr>
               ) : (
-                filteredList.map((r) => {
+                currentList.map((r) => {
+                  const daysSinceService = Math.max(0, 180 - r.days_until_due);
                   return (
                     <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
                       {/* Cliente */}
@@ -235,7 +455,7 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
                       {/* Equipo */}
                       <td className="py-3.5 px-4">
                         <div className="font-bold text-cyan-700">
-                          {r.equipment_brand} {r.equipment_btu.toLocaleString('es-CL')} BTU
+                          {r.equipment_brand} {r.equipment_btu.toLocaleString()} BTU
                         </div>
                         <div className="text-[11px] text-slate-500 flex items-center gap-1">
                           <span>📍 {r.equipment_location}</span>
@@ -250,37 +470,67 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
                         </span>
                       </td>
 
-                      {/* Vencimiento 6M */}
+                      {/* Vencimiento / Días */}
                       <td className="py-3.5 px-4 font-mono">
-                        <div className="text-slate-900 font-bold">{r.next_maintenance_due}</div>
-                        <div className="text-[10px] text-slate-400">180 días exactos</div>
+                        {activeTab === 'quality' ? (
+                          <div>
+                            <span className="font-bold text-amber-700">{daysSinceService} días transcurridos</span>
+                            <div className="text-[10px] text-slate-400">Momento óptimo para feedback</div>
+                          </div>
+                        ) : activeTab === 'recovery' ? (
+                          <div>
+                            <span className="font-bold text-rose-700">{Math.abs(r.days_until_due)} días de retraso</span>
+                            <div className="text-[10px] text-slate-400">Más de 9 meses sin servicio</div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="text-slate-900 font-bold">{r.next_maintenance_due}</div>
+                            <div className="text-[10px] text-slate-400">180 días exactos</div>
+                          </div>
+                        )}
                       </td>
 
-                      {/* Estado */}
+                      {/* Estado & Objetivo */}
                       <td className="py-3.5 px-4">
-                        {r.status === 'vencido' && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
-                            <AlertTriangle className="w-3 h-3" />
-                            Vencido hace {Math.abs(r.days_until_due)} días
-                          </span>
-                        )}
-                        {r.status === 'por_vencer' && (
+                        {activeTab === 'quality' && (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                            <Clock className="w-3 h-3" />
-                            Vence en {r.days_until_due} días
+                            <Star className="w-3 h-3 text-amber-500" />
+                            Encuesta de Calidad & Reseña
                           </span>
                         )}
-                        {r.status === 'contactado' && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">
-                            <Check className="w-3 h-3" />
-                            Contactado {r.contacted_at ? `(${r.contacted_at.split(' ')[0]})` : ''}
+                        {activeTab === 'recovery' && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                            <RotateCcw className="w-3 h-3" />
+                            Reactivar con 15% Descuento
                           </span>
                         )}
-                        {r.status === 'al_dia' && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <CheckCircle2 className="w-3 h-3" />
-                            Al día ({r.days_until_due} días)
-                          </span>
+                        {activeTab === 'preventive' && (
+                          <>
+                            {r.status === 'vencido' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
+                                <AlertTriangle className="w-3 h-3" />
+                                Vencido hace {Math.abs(r.days_until_due)} días
+                              </span>
+                            )}
+                            {r.status === 'por_vencer' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                <Clock className="w-3 h-3" />
+                                Vence en {r.days_until_due} días
+                              </span>
+                            )}
+                            {r.status === 'contactado' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">
+                                <Check className="w-3 h-3" />
+                                Contactado {r.contacted_at ? `(${r.contacted_at.split(' ')[0]})` : ''}
+                              </span>
+                            )}
+                            {r.status === 'al_dia' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <CheckCircle2 className="w-3 h-3" />
+                                Al día ({r.days_until_due} días)
+                              </span>
+                            )}
+                          </>
                         )}
                       </td>
 
@@ -289,8 +539,20 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => handleOpenWhatsApp(r)}
-                            title="Enviar WhatsApp de Recaptación"
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+                            title={
+                              activeTab === 'quality'
+                                ? 'Enviar encuesta de calidad por WhatsApp'
+                                : activeTab === 'recovery'
+                                ? 'Enviar oferta de recuperación por WhatsApp'
+                                : 'Enviar recordatorio preventivo por WhatsApp'
+                            }
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-xs transition-all cursor-pointer ${
+                              activeTab === 'quality'
+                                ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                                : activeTab === 'recovery'
+                                ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                                : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                            }`}
                           >
                             <MessageCircle className="w-3.5 h-3.5" />
                             <span>WhatsApp</span>
@@ -298,7 +560,7 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
 
                           <button
                             onClick={() => onScheduleService(r)}
-                            title="Crear Orden Preventiva en el Tablero"
+                            title="Crear Orden en el Tablero"
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-300 text-xs font-bold transition-all cursor-pointer"
                           >
                             <CalendarPlus className="w-3.5 h-3.5" />

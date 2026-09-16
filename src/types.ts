@@ -186,11 +186,16 @@ export interface ThermalCalculationInput {
   room_type: 'dormitorio' | 'living' | 'oficina' | 'local_comercial' | 'servidores';
   people_count: number;
   electronic_load: 'baja' | 'media' | 'alta';
+  climate_zone?: 'templada' | 'costera_calida'; // Costa Rica: 600 BTU/m² (Templada) vs 700 BTU/m² (Cálida/Costera)
+  use_type?: 'residencial' | 'comercial';
+  electronics_count?: number;
+  large_windows_sun?: boolean;
 }
 
 export interface ThermalCalculationResult {
   exact_btu: number;
-  recommended_btu: number; // 9000, 12000, 18000, 24000, 36000
+  recommended_btu: number; // 9000, 12000, 15000, 18000, 24000, 30000, 36000, 48000, 60000
+  recommended_ton: number; // 0.75, 1.0, 1.25, 1.5, 2.0, 3.0 Ton
   cooling_kw: number;
   heating_kw: number;
   explanation: string;
