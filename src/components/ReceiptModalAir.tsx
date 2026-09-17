@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
 import { ServiceOrder, AirSettings } from '../types';
 import { formatAirPrice, getTaxPercentage } from '../lib/countries';
-import html2canvas from 'html2canvas';
 import { toast } from 'react-hot-toast';
+import { 
+  generateReceiptPdfAir, 
+  buildReceiptHtml, 
+  downloadElementAsCleanPng, 
+  copyElementAsCleanPng 
+} from '../lib/pdfServiceAir';
 import { 
   X, 
   Printer, 
@@ -62,75 +67,86 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
     window.print();
   };
 
-  // Capturar y copiar como imagen PNG lista para pegar con Ctrl+V en WhatsApp (NK-026)
-  const handleCopyImageToWhatsApp = async () => {
-    const el = document.getElementById('printable-receipt');
-    if (!el) return;
+  // Generar y descargar PDF liviano y optimizado (estándar Nexus Pallet)
+  const handleDownloadPdf = async () => {
     try {
       setIsCapturing(true);
-      toast.loading('Generando imagen del comprobante...', { id: 'cap-rec' });
-      const canvas = await html2canvas(el, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-      });
-      canvas.toBlob(async (blob) => {
-        if (!blob) {
-          toast.error('No se pudo generar la imagen', { id: 'cap-rec' });
-          setIsCapturing(false);
-          return;
-        }
-        try {
-          const item = new ClipboardItem({ 'image/png': blob });
-          await navigator.clipboard.write([item]);
-          toast.success('¡Imagen copiada al portapapeles! Ahora abre WhatsApp y presiona Ctrl + V para pegarla.', {
-            id: 'cap-rec',
-            duration: 6000,
-          });
-          const rawPhone = (order.customer?.phone || '').replace(/\D/g, '');
-          if (rawPhone) {
-            window.open(`https://wa.me/${rawPhone}`, '_blank');
-          }
-        } catch (clipErr) {
-          console.warn('Clipboard write failed, triggering download:', clipErr);
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `comprobante-REC-${order.ticket_number}.png`;
-          a.click();
-          URL.revokeObjectURL(url);
-          toast.success('Imagen descargada. Puedes adjuntarla en WhatsApp.', { id: 'cap-rec' });
-        } finally {
-          setIsCapturing(false);
-        }
-      }, 'image/png');
-    } catch (e) {
-      console.error('html2canvas error:', e);
-      toast.error('Error al capturar comprobante', { id: 'cap-rec' });
+      toast.loading('Generando PDF liviano del comprobante...', { id: 'pdf-rec' });
+      await generateReceiptPdfAir(order, settings);
+      toast.success('¡PDF generado y descargado con éxito!', { id: 'pdf-rec' });
+    } catch (err) {
+      console.error('Error al generar PDF:', err);
+      toast.error('Error al generar PDF. Intenta Imprimir / PDF.', { id: 'pdf-rec' });
+    } finally {
       setIsCapturing(false);
     }
   };
 
+  // Capturar y copiar como imagen PNG lista para pegar con Ctrl+V en WhatsApp usando contenedor limpio
+  const handleCopyImageToWhatsApp = async () => {
+    const container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.top = '0';
+    container.style.left = '0';
+    container.style.width = '760px';
+    container.style.backgroundColor = '#ffffff';
+    container.style.zIndex = '999999';
+    container.style.boxSizing = 'border-box';
+    container.innerHTML = buildReceiptHtml(order, settings);
+    document.body.appendChild(container);
+
+    try {
+      setIsCapturing(true);
+      toast.loading('Generando imagen para WhatsApp...', { id: 'cap-rec' });
+      const copied = await copyElementAsCleanPng(container, `comprobante-REC-${order.ticket_number}.png`);
+      if (copied) {
+        toast.success('¡Imagen copiada al portapapeles! Abre WhatsApp y presiona Ctrl + V.', {
+          id: 'cap-rec',
+          duration: 6000,
+        });
+      } else {
+        toast.success('Imagen descargada. Puedes adjuntarla en WhatsApp.', { id: 'cap-rec' });
+      }
+      const rawPhone = (order.customer?.phone || '').replace(/\D/g, '');
+      if (rawPhone) {
+        window.open(`https://wa.me/${rawPhone}`, '_blank');
+      }
+    } catch (e) {
+      console.error('html2canvas error:', e);
+      toast.error('Error al capturar comprobante', { id: 'cap-rec' });
+    } finally {
+      if (container && document.body.contains(container)) {
+        document.body.removeChild(container);
+      }
+      setIsCapturing(false);
+    }
+  };
+
+  // Descargar PNG sin errores CSS usando el contenedor limpio
   const handleDownloadImage = async () => {
-    const el = document.getElementById('printable-receipt');
-    if (!el) return;
+    const container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.top = '0';
+    container.style.left = '0';
+    container.style.width = '760px';
+    container.style.backgroundColor = '#ffffff';
+    container.style.zIndex = '999999';
+    container.style.boxSizing = 'border-box';
+    container.innerHTML = buildReceiptHtml(order, settings);
+    document.body.appendChild(container);
+
     try {
       setIsCapturing(true);
       toast.loading('Generando imagen PNG...', { id: 'dl-rec' });
-      const canvas = await html2canvas(el, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-      });
-      const dataUrl = canvas.toDataURL('image/png');
-      const a = document.createElement('a');
-      a.href = dataUrl;
-      a.download = `comprobante-REC-${order.ticket_number}.png`;
-      a.click();
+      await downloadElementAsCleanPng(container, `comprobante-REC-${order.ticket_number}.png`);
       toast.success('Comprobante descargado en formato PNG', { id: 'dl-rec' });
     } catch (e) {
+      console.error('Error al descargar imagen PNG:', e);
       toast.error('Error al descargar imagen', { id: 'dl-rec' });
     } finally {
+      if (container && document.body.contains(container)) {
+        document.body.removeChild(container);
+      }
       setIsCapturing(false);
     }
   };
@@ -187,20 +203,31 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
             <button
               type="button"
               disabled={isCapturing}
+              onClick={handleDownloadPdf}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+              title="Descargar comprobante oficial en PDF liviano (Nexus Pallet)"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Descargar PDF</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isCapturing}
               onClick={handleCopyImageToWhatsApp}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
               title="Copia la imagen al portapapeles y abre WhatsApp para pegar con Ctrl+V"
             >
               <Copy className="w-3.5 h-3.5" />
-              <span>Copiar Imagen WhatsApp (Ctrl + V)</span>
+              <span>Copiar WhatsApp (Ctrl + V)</span>
             </button>
 
             <button
               type="button"
               disabled={isCapturing}
               onClick={handleDownloadImage}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
-              title="Descargar imagen PNG en alta definición"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+              title="Descargar imagen PNG optimizada"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Descargar PNG</span>
@@ -528,6 +555,17 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
           <button
             type="button"
             disabled={isCapturing}
+            onClick={handleDownloadPdf}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+            title="Descargar comprobante en PDF liviano"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Descargar PDF</span>
+          </button>
+
+          <button
+            type="button"
+            disabled={isCapturing}
             onClick={handleCopyImageToWhatsApp}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
             title="Copia la imagen y abre WhatsApp para pegar con Ctrl+V"
@@ -540,7 +578,7 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
             type="button"
             disabled={isCapturing}
             onClick={handleDownloadImage}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Descargar PNG</span>

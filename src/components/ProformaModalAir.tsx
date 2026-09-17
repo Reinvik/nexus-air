@@ -19,8 +19,14 @@ import {
   Copy
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import html2canvas from 'html2canvas';
 import { getTaxPercentage, formatAirPrice } from '../lib/countries';
+import { 
+  generateProformaPdfAir, 
+  buildProformaHtml, 
+  downloadElementAsCleanPng, 
+  copyElementAsCleanPng,
+  ProformaPdfData
+} from '../lib/pdfServiceAir';
 
 export interface ProformaItem {
   id: string;
@@ -189,79 +195,124 @@ export function ProformaModalAir({
   const montoIva = Math.round(subTotalDirecto * (taxRatePercent / 100));
   const precioVentaTotal = subTotalDirecto + montoIva;
 
-  if (!isOpen) return null;
+  const getProformaData = (): ProformaPdfData => ({
+    folio: proformaFolio,
+    date: emissionDate,
+    clientName,
+    clientIdNumber,
+    clientPhone,
+    clientEmail,
+    areaM2,
+    recommendedBtu,
+    recommendedTon,
+    equipmentName: currentEquipment?.name || 'Aire Acondicionado Split Inverter Ecológico',
+    equipmentQty,
+    equipmentPrice,
+    installationItems: installationItems.map(it => ({
+      concept: it.concept,
+      quantity: it.quantity,
+      unitPrice: it.unitPrice,
+      total: it.total,
+    })),
+    subtotal: subTotalDirecto,
+    taxRate: settings?.tax_rate ?? (isChile ? 0.19 : 0.13),
+    taxAmount: montoIva,
+    total: precioVentaTotal,
+  });
 
   const handlePrint = () => {
     window.print();
   };
 
+  const handleDownloadPdf = async () => {
+    if (!settings) return;
+    try {
+      setIsGeneratingImage(true);
+      toast.loading('Generando PDF liviano de la proforma...', { id: 'pdf-pf' });
+      await generateProformaPdfAir(getProformaData(), settings);
+      toast.success('¡Proforma descargada en PDF con éxito!', { id: 'pdf-pf' });
+    } catch (err) {
+      console.error('Error generando PDF:', err);
+      toast.error('Error al generar PDF. Intenta Imprimir / PDF.', { id: 'pdf-pf' });
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
+
   const handleCopyImageToWhatsApp = async () => {
-    const el = document.getElementById('printable-proforma');
-    if (!el) return;
+    if (!settings) return;
+    const container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.top = '0';
+    container.style.left = '0';
+    container.style.width = '760px';
+    container.style.backgroundColor = '#ffffff';
+    container.style.zIndex = '999999';
+    container.style.boxSizing = 'border-box';
+    container.innerHTML = buildProformaHtml(getProformaData(), settings);
+    document.body.appendChild(container);
+
     setIsGeneratingImage(true);
     try {
-      const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
-      canvas.toBlob(async (blob) => {
-        if (!blob) {
-          toast.error('No se pudo generar la imagen');
-          setIsGeneratingImage(false);
-          return;
-        }
-        try {
-          const data = [new ClipboardItem({ 'image/png': blob })];
-          await navigator.clipboard.write(data);
-          toast.success('¡Imagen copiada al portapapeles! Ahora presiona Ctrl + V en WhatsApp', { duration: 6000 });
+      toast.loading('Generando imagen para WhatsApp...', { id: 'cap-pf' });
+      const copied = await copyElementAsCleanPng(container, `proforma-${proformaFolio}.png`);
+      if (copied) {
+        toast.success('¡Imagen copiada al portapapeles! Presiona Ctrl + V en WhatsApp.', { id: 'cap-pf', duration: 6000 });
+      } else {
+        toast.success('Imagen descargada para adjuntar en WhatsApp.', { id: 'cap-pf' });
+      }
+      const phone = clientPhone.replace(/\D/g, '');
+      const msg = `*PROFORMA OFICIAL DE CLIMATIZACIÓN* ❄️\n` +
+        `*Folio:* ${proformaFolio}\n` +
+        `*Cliente:* ${clientName}\n\n` +
+        `📦 *Equipo Cotizado:* ${currentEquipment?.name || 'Split Inverter'}\n` +
+        `• Cantidad: ${equipmentQty} un.\n` +
+        `• Precio Equipo: ${formatAirPrice(subtotalEquipos, currencySymbol, countryCode)}\n\n` +
+        `🔧 *Instalación y Materiales:* ${formatAirPrice(subtotalInstalacion, currencySymbol, countryCode)}\n` +
+        `──────────────────\n` +
+        `*Subtotal:* ${formatAirPrice(subTotalDirecto, currencySymbol, countryCode)}\n` +
+        `*IVA (${taxRatePercent}%):* ${formatAirPrice(montoIva, currencySymbol, countryCode)}\n` +
+        `*TOTAL FINAL:* ${formatAirPrice(precioVentaTotal, currencySymbol, countryCode)}\n\n` +
+        `📋 *Te adjunto la proforma oficial (Presiona Ctrl + V para pegarla).*`;
 
-          // Abrir WhatsApp con texto resumen
-          const phone = clientPhone.replace(/\D/g, '');
-          const msg = `*PROFORMA OFICIAL DE CLIMATIZACIÓN* ❄️\n` +
-            `*Folio:* ${proformaFolio}\n` +
-            `*Cliente:* ${clientName}\n\n` +
-            `📦 *Equipo Cotizado:* ${currentEquipment?.name || 'Split Inverter'}\n` +
-            `• Cantidad: ${equipmentQty} un.\n` +
-            `• Precio Equipo: ${formatAirPrice(subtotalEquipos, currencySymbol, countryCode)}\n\n` +
-            `🔧 *Instalación y Materiales:* ${formatAirPrice(subtotalInstalacion, currencySymbol, countryCode)}\n` +
-            `──────────────────\n` +
-            `*Subtotal:* ${formatAirPrice(subTotalDirecto, currencySymbol, countryCode)}\n` +
-            `*IVA (${taxRatePercent}%):* ${formatAirPrice(montoIva, currencySymbol, countryCode)}\n` +
-            `*TOTAL FINAL:* ${formatAirPrice(precioVentaTotal, currencySymbol, countryCode)}\n\n` +
-            `📋 *Te adjunto la proforma oficial en imagen (Presiona Ctrl + V para pegarla).*`;
-
-          const url = `https://wa.me/${phone ? (phone.length <= 8 && !isChile ? `506${phone}` : (isChile && !phone.startsWith('56') ? `56${phone}` : phone)) : ''}?text=${encodeURIComponent(msg)}`;
-          window.open(url, '_blank');
-        } catch (err) {
-          console.error('Clipboard write error', err);
-          const link = document.createElement('a');
-          link.download = `proforma-${proformaFolio}.png`;
-          link.href = canvas.toDataURL('image/png');
-          link.click();
-          toast('No se pudo copiar directamente al portapapeles. Se descargó el PNG para que lo adjuntes.', { icon: '📎' });
-        } finally {
-          setIsGeneratingImage(false);
-        }
-      }, 'image/png');
+      const url = `https://wa.me/${phone ? (phone.length <= 8 && !isChile ? `506${phone}` : (isChile && !phone.startsWith('56') ? `56${phone}` : phone)) : ''}?text=${encodeURIComponent(msg)}`;
+      window.open(url, '_blank');
     } catch (e) {
       console.error(e);
-      toast.error('Error al generar la imagen de la proforma');
+      toast.error('Error al generar la imagen de la proforma', { id: 'cap-pf' });
+    } finally {
+      if (container && document.body.contains(container)) {
+        document.body.removeChild(container);
+      }
       setIsGeneratingImage(false);
     }
   };
 
   const handleDownloadImage = async () => {
-    const el = document.getElementById('printable-proforma');
-    if (!el) return;
+    if (!settings) return;
+    const container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.top = '0';
+    container.style.left = '0';
+    container.style.width = '760px';
+    container.style.backgroundColor = '#ffffff';
+    container.style.zIndex = '999999';
+    container.style.boxSizing = 'border-box';
+    container.innerHTML = buildProformaHtml(getProformaData(), settings);
+    document.body.appendChild(container);
+
     setIsGeneratingImage(true);
     try {
-      const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
-      const link = document.createElement('a');
-      link.download = `proforma-${proformaFolio}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-      toast.success('Proforma descargada como PNG');
+      toast.loading('Generando imagen PNG...', { id: 'dl-pf' });
+      await downloadElementAsCleanPng(container, `proforma-${proformaFolio}.png`);
+      toast.success('Proforma descargada como PNG', { id: 'dl-pf' });
     } catch (e) {
       console.error(e);
-      toast.error('Error al exportar PNG');
+      toast.error('Error al exportar PNG', { id: 'dl-pf' });
     } finally {
+      if (container && document.body.contains(container)) {
+        document.body.removeChild(container);
+      }
       setIsGeneratingImage(false);
     }
   };
@@ -340,18 +391,29 @@ export function ProformaModalAir({
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <button
+              onClick={handleDownloadPdf}
+              disabled={isGeneratingImage}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-colors shadow-xs disabled:opacity-50 cursor-pointer active:scale-95"
+              title="Descargar cotización oficial en PDF liviano (Nexus Pallet)"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Descargar PDF</span>
+            </button>
+
+            <button
               onClick={handleCopyImageToWhatsApp}
               disabled={isGeneratingImage}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors shadow-xs disabled:opacity-50"
               title="Copia la proforma como imagen y abre WhatsApp para pegarla con Ctrl+V"
             >
               <Copy className="w-3.5 h-3.5" />
-              <span>{isGeneratingImage ? 'Generando...' : 'Copiar Imagen WhatsApp (Ctrl + V)'}</span>
+              <span>{isGeneratingImage ? 'Generando...' : 'Copiar WhatsApp (Ctrl + V)'}</span>
             </button>
+
             <button
               onClick={handleDownloadImage}
               disabled={isGeneratingImage}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-bold border border-slate-700 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition-colors cursor-pointer active:scale-95"
               title="Descargar imagen PNG de la proforma"
             >
               <Download className="w-3.5 h-3.5" />
@@ -733,6 +795,16 @@ export function ProformaModalAir({
 
           <div className="flex flex-wrap items-center gap-2">
             <button
+              onClick={handleDownloadPdf}
+              disabled={isGeneratingImage}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-colors shadow-xs disabled:opacity-50 cursor-pointer active:scale-95"
+              title="Descargar cotización oficial en PDF liviano"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Descargar PDF</span>
+            </button>
+
+            <button
               onClick={handleCopyImageToWhatsApp}
               disabled={isGeneratingImage}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors shadow-xs disabled:opacity-50 cursor-pointer active:scale-95"
@@ -745,7 +817,7 @@ export function ProformaModalAir({
             <button
               onClick={handleDownloadImage}
               disabled={isGeneratingImage}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-colors shadow-xs disabled:opacity-50 cursor-pointer active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition-colors shadow-xs disabled:opacity-50 cursor-pointer active:scale-95"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Descargar PNG</span>
