@@ -25,14 +25,44 @@ import { toast } from 'react-hot-toast';
 export const DEFAULT_COMPANY_ID = 'a1111111-2222-3333-4444-555555555555';
 
 export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
-  const [orders, setOrders] = useState<ServiceOrder[]>(INITIAL_SERVICE_ORDERS);
-  const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
-  const [equipments, setEquipments] = useState<AirEquipment[]>(INITIAL_EQUIPMENTS);
+  const [orders, setOrders] = useState<ServiceOrder[]>(() => {
+    try {
+      const saved = localStorage.getItem(`nexus_air_orders_${companyId}`) || localStorage.getItem('nexus_air_orders');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Error reading orders from localStorage:', e);
+    }
+    return INITIAL_SERVICE_ORDERS;
+  });
+
+  const [customers, setCustomers] = useState<Customer[]>(() => {
+    try {
+      const saved = localStorage.getItem(`nexus_air_customers_${companyId}`) || localStorage.getItem('nexus_air_customers');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Error reading customers from localStorage:', e);
+    }
+    return INITIAL_CUSTOMERS;
+  });
+
+  const [equipments, setEquipments] = useState<AirEquipment[]>(() => {
+    try {
+      const saved = localStorage.getItem(`nexus_air_equipments_${companyId}`) || localStorage.getItem('nexus_air_equipments');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Error reading equipments from localStorage:', e);
+    }
+    return INITIAL_EQUIPMENTS;
+  });
+
   const [technicians, setTechnicians] = useState<Technician[]>(INITIAL_TECHNICIANS);
   const [parts, setParts] = useState<AirPart[]>(INITIAL_PARTS);
   const [settings, setSettings] = useState<AirSettings>(() => {
     try {
-      const saved = localStorage.getItem(`nexus_air_settings_${companyId}`);
+      const saved = 
+        localStorage.getItem(`nexus_air_settings_${companyId}`) ||
+        localStorage.getItem('nexus_air_active_settings') ||
+        localStorage.getItem('nexus_air_settings');
       if (saved) {
         return JSON.parse(saved);
       }
@@ -63,6 +93,53 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     }
   }, [contactedReminderIds, companyId]);
 
+  // Persistir clientes localmente
+  useEffect(() => {
+    try {
+      localStorage.setItem(`nexus_air_customers_${companyId}`, JSON.stringify(customers));
+      localStorage.setItem('nexus_air_customers', JSON.stringify(customers));
+    } catch (e) {
+      console.warn('Error saving customers:', e);
+    }
+  }, [customers, companyId]);
+
+  // Persistir equipos localmente
+  useEffect(() => {
+    try {
+      localStorage.setItem(`nexus_air_equipments_${companyId}`, JSON.stringify(equipments));
+      localStorage.setItem('nexus_air_equipments', JSON.stringify(equipments));
+    } catch (e) {
+      console.warn('Error saving equipments:', e);
+    }
+  }, [equipments, companyId]);
+
+  // Persistir órdenes localmente
+  useEffect(() => {
+    try {
+      localStorage.setItem(`nexus_air_orders_${companyId}`, JSON.stringify(orders));
+      localStorage.setItem('nexus_air_orders', JSON.stringify(orders));
+    } catch (e) {
+      console.warn('Error saving orders:', e);
+    }
+  }, [orders, companyId]);
+
+  // Sincronizar settings si companyId cambia
+  useEffect(() => {
+    if (companyId) {
+      try {
+        const saved = 
+          localStorage.getItem(`nexus_air_settings_${companyId}`) ||
+          localStorage.getItem('nexus_air_active_settings');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setSettings(prev => ({ ...prev, ...parsed, company_id: companyId }));
+        }
+      } catch (e) {
+        console.warn('Error syncing settings on companyId change:', e);
+      }
+    }
+  }, [companyId]);
+
   // Cargar datos desde Supabase (Schema 'air')
   const fetchData = useCallback(async () => {
     try {
@@ -76,25 +153,76 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         .maybeSingle();
 
       if (dbSettings) {
-        setSettings(prev => ({
-          ...prev,
-          company_id: dbSettings.company_id,
-          company_name: dbSettings.company_name || prev.company_name,
-          fantasy_name: dbSettings.company_name || prev.fantasy_name,
-          country: dbSettings.country || prev.country || 'Chile',
-          country_code: dbSettings.country_code || prev.country_code || 'CL',
-          currency_symbol: dbSettings.currency_symbol || prev.currency_symbol || '$',
-          currency_code: dbSettings.currency_code || prev.currency_code || 'CLP',
-          tax_id_label: dbSettings.tax_id_label || prev.tax_id_label || 'RUT',
-          tax_rate: dbSettings.tax_rate !== null && dbSettings.tax_rate !== undefined ? Number(dbSettings.tax_rate) : (prev.tax_rate ?? 0.19),
-          tax_name: dbSettings.tax_name || prev.tax_name || 'IVA',
-          division_label: dbSettings.division_label || prev.division_label || 'Comuna',
-          phone: dbSettings.phone || prev.phone,
-          whatsapp_number: (dbSettings.phone || prev.whatsapp_number).replace(/[^0-9]/g, ''),
-          email: dbSettings.email || prev.email,
-          address: dbSettings.address || prev.address,
-          landing_config: dbSettings.landing_config || prev.landing_config,
-        }));
+        // Leer configuración local para respetar la selección explícita del usuario
+        let localSaved: Partial<AirSettings> | null = null;
+        try {
+          const raw = 
+            localStorage.getItem(`nexus_air_settings_${activeId}`) ||
+            localStorage.getItem('nexus_air_active_settings');
+          if (raw) localSaved = JSON.parse(raw);
+        } catch {}
+
+        setSettings(prev => {
+          // Si el usuario configuró localmente un país específico (ej. Costa Rica), mantenerlo
+          const preferredCountry = localSaved?.country && localSaved.country !== 'Chile'
+            ? localSaved.country
+            : (dbSettings.country || localSaved?.country || prev.country || 'Chile');
+
+          const preferredCountryCode = localSaved?.country && localSaved.country !== 'Chile' && localSaved.country_code
+            ? localSaved.country_code
+            : (dbSettings.country_code || localSaved?.country_code || prev.country_code || 'CL');
+
+          const preferredCurrencySymbol = localSaved?.country && localSaved.country !== 'Chile' && localSaved.currency_symbol
+            ? localSaved.currency_symbol
+            : (dbSettings.currency_symbol || localSaved?.currency_symbol || prev.currency_symbol || '$');
+
+          const preferredCurrencyCode = localSaved?.country && localSaved.country !== 'Chile' && localSaved.currency_code
+            ? localSaved.currency_code
+            : (dbSettings.currency_code || localSaved?.currency_code || prev.currency_code || 'CLP');
+
+          const preferredTaxLabel = localSaved?.country && localSaved.country !== 'Chile' && localSaved.tax_id_label
+            ? localSaved.tax_id_label
+            : (dbSettings.tax_id_label || localSaved?.tax_id_label || prev.tax_id_label || 'RUT');
+
+          const preferredTaxRate = localSaved?.country && localSaved.country !== 'Chile' && localSaved.tax_rate !== undefined
+            ? localSaved.tax_rate
+            : (dbSettings.tax_rate !== null && dbSettings.tax_rate !== undefined ? Number(dbSettings.tax_rate) : (prev.tax_rate ?? 0.19));
+
+          const preferredTaxName = localSaved?.country && localSaved.country !== 'Chile' && localSaved.tax_name
+            ? localSaved.tax_name
+            : (dbSettings.tax_name || localSaved?.tax_name || prev.tax_name || 'IVA');
+
+          const preferredDivision = localSaved?.country && localSaved.country !== 'Chile' && localSaved.division_label
+            ? localSaved.division_label
+            : (dbSettings.division_label || localSaved?.division_label || prev.division_label || 'Comuna');
+
+          const merged: AirSettings = {
+            ...prev,
+            company_id: dbSettings.company_id || prev.company_id,
+            company_name: dbSettings.company_name || prev.company_name,
+            fantasy_name: dbSettings.company_name || prev.fantasy_name,
+            country: preferredCountry,
+            country_code: preferredCountryCode,
+            currency_symbol: preferredCurrencySymbol,
+            currency_code: preferredCurrencyCode,
+            tax_id_label: preferredTaxLabel,
+            tax_rate: preferredTaxRate,
+            tax_name: preferredTaxName,
+            division_label: preferredDivision,
+            phone: dbSettings.phone || prev.phone,
+            whatsapp_number: (dbSettings.phone || prev.whatsapp_number).replace(/[^0-9]/g, ''),
+            email: dbSettings.email || prev.email,
+            address: dbSettings.address || prev.address,
+            landing_config: dbSettings.landing_config || prev.landing_config,
+          };
+
+          try {
+            localStorage.setItem(`nexus_air_settings_${activeId}`, JSON.stringify(merged));
+            localStorage.setItem('nexus_air_active_settings', JSON.stringify(merged));
+          } catch {}
+
+          return merged;
+        });
       }
 
       // 2. Clientes
@@ -607,16 +735,20 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     toast.success('Cliente actualizado');
 
     try {
+      const dbUpdates: any = {
+        updated_at: new Date().toISOString()
+      };
+      if (updates.name !== undefined) dbUpdates.name = updates.name;
+      if (updates.rut !== undefined) dbUpdates.rut = updates.rut;
+      if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
+      if (updates.email !== undefined) dbUpdates.email = updates.email;
+      if (updates.address !== undefined) dbUpdates.address = updates.address;
+      if (updates.commune !== undefined) dbUpdates.commune = updates.commune;
+      if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+
       await supabaseAir
         .from('customers')
-        .update({
-          name: updates.name,
-          phone: updates.phone,
-          email: updates.email,
-          address: updates.address,
-          commune: updates.commune,
-          updated_at: new Date().toISOString()
-        })
+        .update(dbUpdates)
         .eq('id', id);
     } catch (e) {
       console.warn('[useAirStore] Error updating customer:', e);
@@ -839,6 +971,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       const next = { ...prev, ...updates };
       try {
         localStorage.setItem(`nexus_air_settings_${activeId}`, JSON.stringify(next));
+        localStorage.setItem('nexus_air_active_settings', JSON.stringify(next));
       } catch (e) {
         console.warn('Error saving settings to localStorage:', e);
       }
@@ -864,9 +997,18 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       if (updates.division_label !== undefined) dbUpdates.division_label = updates.division_label;
       if (updates.landing_config !== undefined) dbUpdates.landing_config = updates.landing_config;
 
-      await supabaseAir
+      // Intentar update primero por company_id
+      const { error: updateErr } = await supabaseAir
         .from('settings')
-        .upsert({ company_id: activeId, ...dbUpdates }, { onConflict: 'company_id' });
+        .update(dbUpdates)
+        .eq('company_id', activeId);
+
+      if (updateErr) {
+        // Fallback a upsert
+        await supabaseAir
+          .from('settings')
+          .upsert({ company_id: activeId, ...dbUpdates }, { onConflict: 'company_id' });
+      }
     } catch (e) {
       console.warn('[useAirStore] Error updating settings in Supabase:', e);
     }
@@ -881,6 +1023,16 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     setOrders(INITIAL_SERVICE_ORDERS);
     setSettings({ ...INITIAL_SETTINGS, company_id: companyId });
     setContactedReminderIds({});
+    try {
+      localStorage.removeItem(`nexus_air_settings_${companyId}`);
+      localStorage.removeItem('nexus_air_active_settings');
+      localStorage.removeItem(`nexus_air_customers_${companyId}`);
+      localStorage.removeItem('nexus_air_customers');
+      localStorage.removeItem(`nexus_air_equipments_${companyId}`);
+      localStorage.removeItem('nexus_air_equipments');
+      localStorage.removeItem(`nexus_air_orders_${companyId}`);
+      localStorage.removeItem('nexus_air_orders');
+    } catch {}
     toast.success('Datos de demostración restaurados');
   }, [companyId]);
 

@@ -75,6 +75,10 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
       commune: country.sample_cities[0] || formData.commune
     };
 
+    try {
+      localStorage.setItem('nexus_air_active_settings', JSON.stringify(updated));
+    } catch {}
+
     setFormData(updated);
     onUpdateSettings(updated);
 
@@ -83,6 +87,9 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    try {
+      localStorage.setItem('nexus_air_active_settings', JSON.stringify(formData));
+    } catch {}
     onUpdateSettings(formData);
   };
 

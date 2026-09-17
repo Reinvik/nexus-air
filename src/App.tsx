@@ -45,6 +45,7 @@ export default function App() {
     addCustomer,
     updateCustomer,
     addEquipment,
+    deleteEquipment,
     addTechnician,
     updateTechnician,
     addPart,
@@ -371,6 +372,7 @@ export default function App() {
             onAddCustomer={addCustomer}
             onAddEquipment={addEquipment}
             onUpdateCustomer={updateCustomer}
+            onDeleteEquipment={deleteEquipment}
           />
         )}
 
