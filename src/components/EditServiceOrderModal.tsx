@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ServiceOrder, Technician, OrderStatus, ServiceType, AirSettings } from '../types';
 import { X, Save, Trash2, Calendar, Clock, Wrench, DollarSign, CheckCircle, Navigation, Radio, MapPin, Users, Percent, Check, FileText } from 'lucide-react';
+import { calculateLiveRouteETA, getCustomerCoordinates, RouteETA } from '../lib/routingService';
 
 interface EditServiceOrderModalProps {
   isOpen: boolean;
@@ -47,6 +48,26 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
     order.technician_location ? { lat: order.technician_location.lat, lng: order.technician_location.lng } : null
   );
   const [geoWatchId, setGeoWatchId] = useState<number | null>(null);
+  const [routeEta, setRouteEta] = useState<RouteETA | null>(null);
+
+  // Cálculo Dinámico de Ruta OSRM hacia el Cliente
+  useEffect(() => {
+    if (!lastCoords) return;
+    const dest = getCustomerCoordinates(
+      order.customer?.commune,
+      order.customer?.city,
+      order.customer?.address
+    );
+    calculateLiveRouteETA(
+      lastCoords,
+      dest,
+      order.customer?.commune || 'Cliente'
+    ).then((res) => {
+      setRouteEta(res);
+    }).catch((err) => {
+      console.warn('Error calculando ETA en modal:', err);
+    });
+  }, [lastCoords?.lat, lastCoords?.lng, order.customer?.commune, order.customer?.address]);
 
   const calculatedTechPayout = techPayoutType === 'percentage' 
     ? Math.round((total * techPayoutValue) / 100) 
@@ -404,31 +425,56 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                     </span>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
-                    {!isTrackingGps ? (
-                      <button
-                        type="button"
-                        onClick={handleStartTrip}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#00d2ff] to-[#2563eb] text-white text-xs font-bold shadow-md shadow-blue-500/20 hover:brightness-110 transition-all cursor-pointer"
-                      >
-                        <Navigation className="w-3.5 h-3.5" />
-                        <span>Iniciar Trayecto (GPS)</span>
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-2">
+                  <div className="space-y-2 pt-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {!isTrackingGps ? (
                         <button
                           type="button"
-                          onClick={handleArrived}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-all cursor-pointer"
+                          onClick={handleStartTrip}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#00d2ff] to-[#2563eb] text-white text-xs font-bold shadow-md shadow-blue-500/20 hover:brightness-110 transition-all cursor-pointer"
                         >
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
-                          <span>¡Llegué a Terreno!</span>
+                          <Navigation className="w-3.5 h-3.5" />
+                          <span>Iniciar Trayecto (GPS)</span>
                         </button>
-                        {lastCoords && (
-                          <span className="text-[10px] text-cyan-300 font-mono">
-                            📍 {lastCoords.lat.toFixed(4)}, {lastCoords.lng.toFixed(4)}
-                          </span>
-                        )}
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={handleArrived}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-all cursor-pointer"
+                          >
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                            <span>¡Llegué a Terreno!</span>
+                          </button>
+                          {lastCoords && (
+                            <span className="text-[10px] text-cyan-300 font-mono">
+                              📍 {lastCoords.lat.toFixed(4)}, {lastCoords.lng.toFixed(4)}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ETA Dinámico en Vivo */}
+                    {lastCoords && (
+                      <div className="w-full pt-2 border-t border-blue-900/60 flex flex-wrap items-center justify-between gap-1 text-[11px]">
+                        <span className="text-slate-300">
+                          Ruta hacia <strong className="text-white">{order.customer?.commune || order.customer?.address || 'Destino'}</strong>:
+                        </span>
+                        <div className="flex items-center gap-2">
+                          {routeEta ? (
+                            <>
+                              <span className="text-cyan-300 font-medium">
+                                📏 {routeEta.distanceFormatted}
+                              </span>
+                              <span className="bg-cyan-950 px-2 py-0.5 rounded border border-cyan-500/40 text-emerald-300 font-bold">
+                                ⏱️ {routeEta.durationFormatted}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-cyan-400 animate-pulse text-[10px]">Calculando ruta real...</span>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

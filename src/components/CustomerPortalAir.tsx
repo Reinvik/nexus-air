@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Customer, AirEquipment, ServiceOrder, AirSettings } from '../types';
 import { 
   Wind, 
@@ -25,6 +25,7 @@ import {
 import { format } from 'date-fns';
 import { formatAirPrice } from '../lib/countries';
 import { parseVideoUrl } from '../lib/videoUtils';
+import { calculateLiveRouteETA, getCustomerCoordinates, RouteETA } from '../lib/routingService';
 
 interface CustomerPortalAirProps {
   customers: Customer[];
@@ -34,6 +35,155 @@ interface CustomerPortalAirProps {
   onBackToApp: () => void;
   onOpenBooking: (customer?: Customer, equipment?: AirEquipment) => void;
 }
+
+const LiveRadarGpsCard: React.FC<{
+  liveOrd: ServiceOrder;
+  matchedCustomer?: Customer;
+  isEnRuta: boolean;
+  isEnProceso: boolean;
+  techName: string;
+}> = ({ liveOrd, matchedCustomer, isEnRuta, isEnProceso, techName }) => {
+  const loc = liveOrd.technician_location;
+  const [routeEta, setRouteEta] = useState<RouteETA | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
+
+  useEffect(() => {
+    if (!loc || !loc.lat || !loc.lng) return;
+
+    const destination = getCustomerCoordinates(
+      matchedCustomer?.commune,
+      matchedCustomer?.city,
+      matchedCustomer?.address
+    );
+
+    setIsCalculating(true);
+    calculateLiveRouteETA(
+      { lat: loc.lat, lng: loc.lng },
+      destination,
+      matchedCustomer?.commune || 'Tu Domicilio'
+    )
+      .then((res) => {
+        setRouteEta(res);
+        setIsCalculating(false);
+      })
+      .catch((err) => {
+        console.warn('Error calculando ruta dinámica:', err);
+        setIsCalculating(false);
+      });
+  }, [loc?.lat, loc?.lng, loc?.updated_at, matchedCustomer?.commune, matchedCustomer?.address]);
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center pt-2">
+      <div className="md:col-span-2 relative h-52 bg-slate-950/80 rounded-2xl border border-slate-800 overflow-hidden flex flex-col justify-between p-4">
+        <div className="absolute inset-0 opacity-20 pointer-events-none bg-[radial-gradient(#00d2ff_1px,transparent_1px)] [background-size:16px_16px]" />
+        
+        {/* Cabecera del Radar */}
+        <div className="flex items-center justify-between z-10">
+          <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+            <span className="text-emerald-400 font-bold">GPS Satelital Activo</span>
+            <span className="text-slate-500">•</span>
+            <span className="text-[10px] text-cyan-300">
+              {routeEta?.source === 'osrm' ? 'Red vial OSRM en vivo' : 'Ruta vial calculada'}
+            </span>
+          </span>
+          {loc?.updated_at && (
+            <span className="text-[10px] text-cyan-300/80 font-mono">
+              Actualizado en vivo
+            </span>
+          )}
+        </div>
+
+        {/* Indicadores de ruta y progreso */}
+        <div className="flex items-center justify-around py-3 z-10">
+          {/* Técnico Origen */}
+          <div className="flex flex-col items-center gap-1 text-center">
+            <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-400 text-blue-300 flex items-center justify-center shadow-lg">
+              🚐
+            </div>
+            <span className="text-[11px] font-bold text-white">{techName.split(' ')[0]}</span>
+            <span className="text-[9px] text-cyan-300">{isEnRuta ? 'En trayecto (GPS)' : 'En tu domicilio'}</span>
+          </div>
+
+          {/* Barra y ETA Dinámico */}
+          <div className="flex-1 mx-4 flex flex-col items-center">
+            <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden relative">
+              <div className={`h-full bg-gradient-to-r from-cyan-400 to-emerald-400 ${isEnRuta ? 'w-2/3 animate-pulse' : 'w-full'}`} />
+            </div>
+
+            {/* Tiempo Dinámico Calculado */}
+            <div className="text-center mt-1.5 space-y-0.5">
+              <div className="text-[11px] font-extrabold text-cyan-300 flex items-center justify-center gap-1">
+                {isEnRuta ? (
+                  isCalculating && !routeEta ? (
+                    <span className="animate-pulse">Calculando tiempo de viaje...</span>
+                  ) : routeEta ? (
+                    <>
+                      <span>⏱️ Tiempo estimado:</span>
+                      <span className="text-white bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-500/40">
+                        {routeEta.durationFormatted}
+                      </span>
+                      <span className="text-cyan-400 font-normal">({routeEta.distanceFormatted})</span>
+                    </>
+                  ) : (
+                    <span>Tiempo estimado: 35 - 45 min aprox.</span>
+                  )
+                ) : (
+                  <span className="text-emerald-300">🛠️ Técnico trabajando en terreno</span>
+                )}
+              </div>
+
+              {/* Alerta de tráfico si aplica */}
+              {isEnRuta && routeEta?.trafficStatus === 'alto' && (
+                <span className="inline-block text-[9px] text-amber-300 font-medium px-1.5 py-0.2 rounded bg-amber-950/40 border border-amber-500/30">
+                  ⚠️ Tráfico horario punta considerado
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Domicilio Destino */}
+          <div className="flex flex-col items-center gap-1 text-center">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600/30 border border-emerald-400 text-emerald-300 flex items-center justify-center shadow-lg">
+              📍
+            </div>
+            <span className="text-[11px] font-bold text-white">Tu Domicilio</span>
+            <span className="text-[9px] text-emerald-300 font-medium">{matchedCustomer?.commune || 'Destino'}</span>
+          </div>
+        </div>
+
+        {/* Footer con información de llegada */}
+        <div className="z-10 flex flex-wrap items-center justify-between gap-1 text-[11px] text-slate-400 border-t border-slate-800/80 pt-2">
+          <span>
+            Destino: <strong className="text-white">{matchedCustomer?.address}</strong> ({matchedCustomer?.commune})
+          </span>
+          <div className="flex items-center gap-2 font-mono text-[10px]">
+            {routeEta && (
+              <span className="text-emerald-300 font-bold">
+                Distancia: {routeEta.distanceFormatted}
+              </span>
+            )}
+            {loc && (
+              <span className="text-cyan-300/80">
+                GPS: {loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Recomendaciones de Espera */}
+      <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2 text-xs">
+        <strong className="text-cyan-300 block">ℹ️ Al momento de la visita:</strong>
+        <ul className="space-y-1.5 text-[11px] text-slate-300">
+          <li>• Mantén despejada el área cercana al equipo split interior o condensador.</li>
+          <li>• Si vives en edificio, autoriza el ingreso en conserjería para evitar demoras.</li>
+          <li>• El técnico cuenta con implementos de seguridad y acreditación SEC.</li>
+        </ul>
+      </div>
+    </div>
+  );
+};
 
 export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
   customers,
@@ -256,71 +406,15 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
                     </div>
                   </div>
 
-                  {/* Si está en ruta o en proceso: Radar GPS y Mapa */}
+                  {/* Si está en ruta o en proceso: Radar GPS y Mapa con ETA Dinámico OSRM */}
                   {(isEnRuta || isEnProceso) && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center pt-2">
-                      <div className="md:col-span-2 relative h-48 bg-slate-950/80 rounded-2xl border border-slate-800 overflow-hidden flex flex-col justify-between p-4">
-                        <div className="absolute inset-0 opacity-20 pointer-events-none bg-[radial-gradient(#00d2ff_1px,transparent_1px)] [background-size:16px_16px]" />
-                        <div className="flex items-center justify-between z-10">
-                          <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
-                            GPS Satelital Activo (watchPosition)
-                          </span>
-                          {loc?.updated_at && (
-                            <span className="text-[10px] text-cyan-300/80 font-mono">
-                              Actualizado en vivo
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Indicadores de ruta */}
-                        <div className="flex items-center justify-around py-4 z-10">
-                          <div className="flex flex-col items-center gap-1 text-center">
-                            <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-400 text-blue-300 flex items-center justify-center shadow-lg">
-                              🚐
-                            </div>
-                            <span className="text-[11px] font-bold text-white">{techName.split(' ')[0]}</span>
-                            <span className="text-[9px] text-cyan-300">{isEnRuta ? 'En trayecto' : 'En tu domicilio'}</span>
-                          </div>
-
-                          <div className="flex-1 mx-4 flex flex-col items-center">
-                            <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden relative">
-                              <div className={`h-full bg-gradient-to-r from-cyan-400 to-emerald-400 ${isEnRuta ? 'w-2/3 animate-pulse' : 'w-full'}`} />
-                            </div>
-                            <span className="text-[10px] text-cyan-400 mt-1 font-bold">
-                              {isEnRuta ? 'Tiempo estimado: 10 - 15 min' : 'Técnico trabajando en terreno'}
-                            </span>
-                          </div>
-
-                          <div className="flex flex-col items-center gap-1 text-center">
-                            <div className="w-10 h-10 rounded-xl bg-emerald-600/30 border border-emerald-400 text-emerald-300 flex items-center justify-center shadow-lg">
-                              📍
-                            </div>
-                            <span className="text-[11px] font-bold text-white">Tu Domicilio</span>
-                            <span className="text-[9px] text-slate-400">{matchedCustomer?.commune}</span>
-                          </div>
-                        </div>
-
-                        <div className="z-10 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-800/80 pt-2">
-                          <span>Destino: <strong className="text-white">{matchedCustomer?.address}</strong></span>
-                          {loc && (
-                            <span className="font-mono text-[10px] text-cyan-300">
-                              Lat: {loc.lat.toFixed(4)} • Lng: {loc.lng.toFixed(4)}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Recomendaciones de Espera */}
-                      <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2 text-xs">
-                        <strong className="text-cyan-300 block">ℹ️ Al momento de la visita:</strong>
-                        <ul className="space-y-1.5 text-[11px] text-slate-300">
-                          <li>• Mantén despejada el área cercana al equipo split interior o condensador.</li>
-                          <li>• Si vives en edificio, autoriza el ingreso en conserjería para evitar demoras.</li>
-                          <li>• El técnico cuenta con implementos de seguridad y acreditación SEC.</li>
-                        </ul>
-                      </div>
-                    </div>
+                    <LiveRadarGpsCard 
+                      liveOrd={liveOrd} 
+                      matchedCustomer={matchedCustomer} 
+                      isEnRuta={isEnRuta} 
+                      isEnProceso={isEnProceso} 
+                      techName={techName} 
+                    />
                   )}
                 </div>
               );
