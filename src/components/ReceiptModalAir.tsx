@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { ServiceOrder, AirSettings } from '../types';
 import { formatAirPrice, getTaxPercentage } from '../lib/countries';
+import html2canvas from 'html2canvas';
+import { toast } from 'react-hot-toast';
 import { 
   X, 
   Printer, 
@@ -17,7 +19,10 @@ import {
   Phone,
   Building2,
   DollarSign,
-  Layers
+  Layers,
+  Download,
+  Copy,
+  Image as ImageIcon
 } from 'lucide-react';
 
 interface ReceiptModalAirProps {
@@ -34,6 +39,7 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
   settings,
 }) => {
   const [showInternalCommission, setShowInternalCommission] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
 
   if (!isOpen || !order) return null;
 
@@ -54,6 +60,79 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
 
   const handlePrint = () => {
     window.print();
+  };
+
+  // Capturar y copiar como imagen PNG lista para pegar con Ctrl+V en WhatsApp (NK-026)
+  const handleCopyImageToWhatsApp = async () => {
+    const el = document.getElementById('printable-receipt');
+    if (!el) return;
+    try {
+      setIsCapturing(true);
+      toast.loading('Generando imagen del comprobante...', { id: 'cap-rec' });
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+      });
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          toast.error('No se pudo generar la imagen', { id: 'cap-rec' });
+          setIsCapturing(false);
+          return;
+        }
+        try {
+          const item = new ClipboardItem({ 'image/png': blob });
+          await navigator.clipboard.write([item]);
+          toast.success('¡Imagen copiada al portapapeles! Ahora abre WhatsApp y presiona Ctrl + V para pegarla.', {
+            id: 'cap-rec',
+            duration: 6000,
+          });
+          const rawPhone = (order.customer?.phone || '').replace(/\D/g, '');
+          if (rawPhone) {
+            window.open(`https://wa.me/${rawPhone}`, '_blank');
+          }
+        } catch (clipErr) {
+          console.warn('Clipboard write failed, triggering download:', clipErr);
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `comprobante-REC-${order.ticket_number}.png`;
+          a.click();
+          URL.revokeObjectURL(url);
+          toast.success('Imagen descargada. Puedes adjuntarla en WhatsApp.', { id: 'cap-rec' });
+        } finally {
+          setIsCapturing(false);
+        }
+      }, 'image/png');
+    } catch (e) {
+      console.error('html2canvas error:', e);
+      toast.error('Error al capturar comprobante', { id: 'cap-rec' });
+      setIsCapturing(false);
+    }
+  };
+
+  const handleDownloadImage = async () => {
+    const el = document.getElementById('printable-receipt');
+    if (!el) return;
+    try {
+      setIsCapturing(true);
+      toast.loading('Generando imagen PNG...', { id: 'dl-rec' });
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+      });
+      const dataUrl = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = `comprobante-REC-${order.ticket_number}.png`;
+      a.click();
+      toast.success('Comprobante descargado en formato PNG', { id: 'dl-rec' });
+    } catch (e) {
+      toast.error('Error al descargar imagen', { id: 'dl-rec' });
+    } finally {
+      setIsCapturing(false);
+    }
   };
 
   const handleSendWhatsApp = () => {
@@ -88,7 +167,7 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-xs overflow-y-auto print:p-0 print:bg-white print:static">
       <div className="w-full max-w-3xl bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden my-4 text-slate-900 print:border-none print:shadow-none print:rounded-none print:my-0">
         {/* Modal Toolbar (hidden when printing) */}
-        <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between print:hidden">
+        <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 print:hidden">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-cyan-50 border border-cyan-200 text-cyan-600 flex items-center justify-center">
               <FileText className="w-4 h-4" />
@@ -99,14 +178,37 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={isCapturing}
+              onClick={handleCopyImageToWhatsApp}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+              title="Copia la imagen al portapapeles y abre WhatsApp para pegar con Ctrl+V"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>Copiar Imagen WhatsApp (Ctrl + V)</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isCapturing}
+              onClick={handleDownloadImage}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+              title="Descargar imagen PNG en alta definición"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Descargar PNG</span>
+            </button>
+
             <button
               type="button"
               onClick={handleSendWhatsApp}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all shadow-xs cursor-pointer"
+              title="Enviar como texto a WhatsApp"
             >
-              <Share2 className="w-3.5 h-3.5" />
-              <span>Enviar WhatsApp</span>
+              <Share2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Texto WhatsApp</span>
             </button>
 
             <button
@@ -147,10 +249,10 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
                 </div>
               </div>
               <p className="text-slate-500 text-[11px] pt-1">
-                {settings.tax_id_label || 'RUT/ID'}: <strong className="text-slate-800">{settings.rut || 'N/A'}</strong>
+                {settings.tax_id_label || 'RUT/ID'}: <strong className="text-slate-800">{settings.rut || settings.tax_id || 'N/A'}</strong>
               </p>
               <p className="text-slate-500 text-[11px]">
-                {settings.address}, {settings.commune} • Tel: {settings.phone || settings.whatsapp_number}
+                {[settings.address, settings.commune].filter(Boolean).join(', ') || 'Dirección comercial'} • Tel: {settings.phone || settings.whatsapp_number || 'N/A'}
               </p>
               {settings.website && (
                 <p className="text-cyan-700 text-[11px] font-mono">{settings.website}</p>
@@ -192,11 +294,13 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
                 {settings.tax_id_label || 'RUT/ID'}: {order.customer?.rut || 'Sin registrar'}
               </p>
               <p className="text-slate-600 text-[11px]">
-                Dirección: {order.customer?.address}, {order.customer?.commune}
+                Dirección: {[order.customer?.address, order.customer?.commune].filter(Boolean).join(', ') || 'En taller / Domicilio cliente'}
               </p>
-              <p className="text-slate-600 text-[11px]">
-                Tel: {order.customer?.phone}
-              </p>
+              {order.customer?.phone && (
+                <p className="text-slate-600 text-[11px]">
+                  Tel: {order.customer.phone}
+                </p>
+              )}
             </div>
 
             {/* Equipment Box */}

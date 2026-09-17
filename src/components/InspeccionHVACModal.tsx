@@ -18,8 +18,11 @@ import {
   Trash2,
   Plus,
   Play,
-  Image as ImageIcon
+  Image as ImageIcon,
+  ExternalLink,
+  UploadCloud
 } from 'lucide-react';
+import { parseVideoUrl } from '../lib/videoUtils';
 
 interface InspeccionHVACModalProps {
   isOpen: boolean;
@@ -57,6 +60,20 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
 
   const [inputUrl, setInputUrl] = useState('');
   const [activeMediaTab, setActiveMediaTab] = useState<'before' | 'after'>('before');
+  const [driveModalTarget, setDriveModalTarget] = useState<'before' | 'after' | null>(null);
+  const [driveUrlInput, setDriveUrlInput] = useState('');
+
+  const handleConfirmDriveVideo = () => {
+    if (!driveUrlInput.trim() || !driveModalTarget) return;
+    const parsed = parseVideoUrl(driveUrlInput.trim());
+    const key = driveModalTarget === 'before' ? 'videos_before' : 'videos_after';
+    setChecklist(prev => ({
+      ...prev,
+      [key]: [...(prev[key] || []), parsed.rawUrl]
+    }));
+    setDriveUrlInput('');
+    setDriveModalTarget(null);
+  };
 
   const handleAddMedia = (type: 'photo' | 'video', target: 'before' | 'after') => {
     const url = prompt(`Ingresa la URL o enlace de la ${type === 'photo' ? 'foto' : 'video'} (${target === 'before' ? 'Antes' : 'Después'}):`);
@@ -80,6 +97,15 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'photo' | 'video', target: 'before' | 'after') => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
+
+    if (type === 'video') {
+      const largeFile = files.find(f => f.size > 5 * 1024 * 1024);
+      if (largeFile) {
+        alert(
+          `⚠️ Video pesado detectado (${(largeFile.size / (1024 * 1024)).toFixed(1)}MB).\n\nPara no saturar el servidor ni la base de datos, te recomendamos usar el botón "📁 Google Drive" y pegar el enlace compartido desde la nube.`
+        );
+      }
+    }
 
     files.forEach((file) => {
       const reader = new FileReader();
@@ -336,9 +362,22 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
                     />
                   </label>
 
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDriveUrlInput('');
+                      setDriveModalTarget('before');
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-800 text-[11px] font-bold cursor-pointer transition-all shadow-xs active:scale-95"
+                    title="Enlazar video desde Google Drive sin saturar el servidor"
+                  >
+                    <Video className="w-3.5 h-3.5 text-blue-600" />
+                    <span>📁 Google Drive Video</span>
+                  </button>
+
                   <label className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 hover:border-purple-400 text-slate-700 text-[11px] font-bold cursor-pointer transition-all shadow-xs active:scale-95">
                     <Video className="w-3.5 h-3.5 text-purple-600" />
-                    <span>🎥 Grabar Video</span>
+                    <span>🎥 Clip Corto</span>
                     <input
                       type="file"
                       accept="video/*"
@@ -352,9 +391,9 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
                     type="button"
                     onClick={() => handleAddMedia('photo', 'before')}
                     className="px-2 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-[11px] font-medium transition-colors"
-                    title="Agregar por URL web"
+                    title="Agregar foto por URL web"
                   >
-                    + URL
+                    + URL Foto
                   </button>
                 </div>
               </div>
@@ -378,22 +417,35 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
                   </div>
                 ))}
 
-                {(checklist.videos_before || []).map((url, i) => (
-                  <div key={`vb-${i}`} className="relative group rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video flex items-center justify-center shadow-xs">
-                    <video src={url} controls className="w-full h-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveMedia('before', 'video', i)}
-                      className="absolute top-1.5 right-1.5 p-1 rounded-md bg-rose-600 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-md"
-                      title="Eliminar video"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                    <span className="absolute bottom-1 left-1 bg-purple-900/90 text-white text-[9px] px-1.5 py-0.5 rounded flex items-center gap-0.5 font-mono">
-                      <Video className="w-2.5 h-2.5" /> Video #{i + 1}
-                    </span>
-                  </div>
-                ))}
+                {(checklist.videos_before || []).map((url, i) => {
+                  const vInfo = parseVideoUrl(url);
+                  return (
+                    <div key={`vb-${i}`} className="relative group rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video flex items-center justify-center shadow-xs">
+                      {vInfo.isEmbed ? (
+                        <iframe
+                          src={vInfo.embedUrl}
+                          className="w-full h-full border-0"
+                          allow="autoplay; encrypted-media"
+                          allowFullScreen
+                          title={`Video Antes ${i + 1}`}
+                        />
+                      ) : (
+                        <video src={url} controls className="w-full h-full object-cover" />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMedia('before', 'video', i)}
+                        className="absolute top-1.5 right-1.5 p-1 rounded-md bg-rose-600 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-md z-10"
+                        title="Eliminar video"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                      <span className="absolute bottom-1 left-1 bg-purple-900/90 text-white text-[9px] px-1.5 py-0.5 rounded flex items-center gap-0.5 font-mono z-10 pointer-events-none">
+                        <Video className="w-2.5 h-2.5" /> Video #{i + 1} {vInfo.isDrive && '(Drive)'}
+                      </span>
+                    </div>
+                  );
+                })}
 
                 {(!checklist.photos_before?.length && !checklist.videos_before?.length) && (
                   <div className="col-span-full py-4 text-center text-xs text-slate-400 border border-dashed border-slate-300 rounded-xl bg-white/50">
@@ -442,9 +494,22 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
                     />
                   </label>
 
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDriveUrlInput('');
+                      setDriveModalTarget('after');
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 text-emerald-900 text-[11px] font-bold cursor-pointer transition-all shadow-xs active:scale-95"
+                    title="Enlazar video desde Google Drive sin saturar el servidor"
+                  >
+                    <Video className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>📁 Google Drive Video</span>
+                  </button>
+
                   <label className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white border border-emerald-300 hover:border-purple-400 text-slate-700 text-[11px] font-bold cursor-pointer transition-all shadow-xs active:scale-95">
                     <Video className="w-3.5 h-3.5 text-purple-600" />
-                    <span>🎥 Grabar Video</span>
+                    <span>🎥 Clip Corto</span>
                     <input
                       type="file"
                       accept="video/*"
@@ -458,9 +523,9 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
                     type="button"
                     onClick={() => handleAddMedia('photo', 'after')}
                     className="px-2 py-1.5 rounded-lg bg-emerald-200/80 hover:bg-emerald-300 text-emerald-900 text-[11px] font-medium transition-colors"
-                    title="Agregar por URL web"
+                    title="Agregar foto por URL web"
                   >
-                    + URL
+                    + URL Foto
                   </button>
                 </div>
               </div>
@@ -484,22 +549,35 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
                   </div>
                 ))}
 
-                {(checklist.videos_after || []).map((url, i) => (
-                  <div key={`va-${i}`} className="relative group rounded-xl overflow-hidden border border-emerald-300 bg-black aspect-video flex items-center justify-center shadow-xs">
-                    <video src={url} controls className="w-full h-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveMedia('after', 'video', i)}
-                      className="absolute top-1.5 right-1.5 p-1 rounded-md bg-rose-600 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-md"
-                      title="Eliminar video"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                    <span className="absolute bottom-1 left-1 bg-purple-900/90 text-white text-[9px] px-1.5 py-0.5 rounded flex items-center gap-0.5 font-mono">
-                      <Video className="w-2.5 h-2.5" /> Video #{i + 1}
-                    </span>
-                  </div>
-                ))}
+                {(checklist.videos_after || []).map((url, i) => {
+                  const vInfo = parseVideoUrl(url);
+                  return (
+                    <div key={`va-${i}`} className="relative group rounded-xl overflow-hidden border border-emerald-300 bg-black aspect-video flex items-center justify-center shadow-xs">
+                      {vInfo.isEmbed ? (
+                        <iframe
+                          src={vInfo.embedUrl}
+                          className="w-full h-full border-0"
+                          allow="autoplay; encrypted-media"
+                          allowFullScreen
+                          title={`Video Después ${i + 1}`}
+                        />
+                      ) : (
+                        <video src={url} controls className="w-full h-full object-cover" />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMedia('after', 'video', i)}
+                        className="absolute top-1.5 right-1.5 p-1 rounded-md bg-rose-600 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-md z-10"
+                        title="Eliminar video"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                      <span className="absolute bottom-1 left-1 bg-purple-900/90 text-white text-[9px] px-1.5 py-0.5 rounded flex items-center gap-0.5 font-mono z-10 pointer-events-none">
+                        <Video className="w-2.5 h-2.5" /> Video #{i + 1} {vInfo.isDrive && '(Drive)'}
+                      </span>
+                    </div>
+                  );
+                })}
 
                 {(!checklist.photos_after?.length && !checklist.videos_after?.length) && (
                   <div className="col-span-full py-4 text-center text-xs text-emerald-700 border border-dashed border-emerald-300 rounded-xl bg-white/50">
@@ -549,6 +627,66 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Modal Enlazar Video Google Drive (NK-014) */}
+      {driveModalTarget && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-blue-600 font-bold text-sm">
+                <Video className="w-5 h-5" />
+                <span>Enlazar Video de Google Drive ({driveModalTarget === 'before' ? 'Antes' : 'Después'})</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDriveModalTarget(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-900 space-y-1">
+              <strong className="block font-bold">💡 Ahorro de Servidor y Base de Datos:</strong>
+              <p className="text-[11px] text-blue-800 leading-relaxed">
+                Pega el enlace de video de Google Drive (o YouTube/Loom). Se reproducirá directamente en el portal del cliente sin límites de peso ni saturación.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 block">
+                Enlace o URL compartida de Google Drive:
+              </label>
+              <input
+                type="url"
+                value={driveUrlInput}
+                onChange={(e) => setDriveUrlInput(e.target.value)}
+                placeholder="https://drive.google.com/file/d/.../view?usp=sharing"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:border-blue-500 focus:outline-none"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setDriveModalTarget(null)}
+                className="px-3.5 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!driveUrlInput.trim()}
+                onClick={handleConfirmDriveVideo}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs disabled:opacity-50 cursor-pointer"
+              >
+                Guardar Video
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

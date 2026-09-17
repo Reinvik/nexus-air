@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatAirPrice } from '../lib/countries';
+import { parseVideoUrl } from '../lib/videoUtils';
 
 interface CustomerPortalAirProps {
   customers: Customer[];
@@ -31,7 +32,7 @@ interface CustomerPortalAirProps {
   orders: ServiceOrder[];
   settings: AirSettings;
   onBackToApp: () => void;
-  onOpenBooking: () => void;
+  onOpenBooking: (customer?: Customer, equipment?: AirEquipment) => void;
 }
 
 export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
@@ -92,7 +93,7 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
 
         <div className="flex items-center gap-3">
           <button
-            onClick={onOpenBooking}
+            onClick={() => onOpenBooking(matchedCustomer)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-md shadow-cyan-500/20 transition-all cursor-pointer"
           >
             <Calendar className="w-4 h-4" />
@@ -378,7 +379,7 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
                     <span>Garantía Vigente</span>
                   </div>
                   <button
-                    onClick={onOpenBooking}
+                    onClick={() => onOpenBooking(matchedCustomer, eq)}
                     className="px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold transition-all cursor-pointer shadow-xs"
                   >
                     Agendar Mantención
@@ -477,11 +478,34 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
                                 </span>
                               </a>
                             ))}
-                            {(ord.checklist?.videos_before || []).map((url, i) => (
-                              <div key={`vb-${i}`} className="aspect-video rounded-lg overflow-hidden border border-slate-200 bg-black">
-                                <video src={url} controls className="w-full h-full object-cover" />
-                              </div>
-                            ))}
+                            {(ord.checklist?.videos_before || []).map((url, i) => {
+                              const vInfo = parseVideoUrl(url);
+                              return (
+                                <div key={`vb-${i}`} className="relative aspect-video rounded-lg overflow-hidden border border-slate-200 bg-black">
+                                  {vInfo.isEmbed ? (
+                                    <iframe
+                                      src={vInfo.embedUrl}
+                                      className="w-full h-full border-0"
+                                      allow="autoplay; encrypted-media"
+                                      allowFullScreen
+                                      title={`Video Antes ${i + 1}`}
+                                    />
+                                  ) : (
+                                    <video src={url} controls className="w-full h-full object-cover" />
+                                  )}
+                                  {vInfo.isDrive && (
+                                    <a
+                                      href={vInfo.rawUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="absolute top-1 left-1 bg-blue-600/90 hover:bg-blue-700 text-white text-[9px] px-1.5 py-0.5 rounded font-bold flex items-center gap-1 shadow-xs transition-colors z-10"
+                                    >
+                                      <ExternalLink className="w-2.5 h-2.5" /> Drive
+                                    </a>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
 
@@ -505,11 +529,34 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
                                 </span>
                               </a>
                             ))}
-                            {(ord.checklist?.videos_after || []).map((url, i) => (
-                              <div key={`va-${i}`} className="aspect-video rounded-lg overflow-hidden border border-emerald-200 bg-black">
-                                <video src={url} controls className="w-full h-full object-cover" />
-                              </div>
-                            ))}
+                            {(ord.checklist?.videos_after || []).map((url, i) => {
+                              const vInfo = parseVideoUrl(url);
+                              return (
+                                <div key={`va-${i}`} className="relative aspect-video rounded-lg overflow-hidden border border-emerald-200 bg-black">
+                                  {vInfo.isEmbed ? (
+                                    <iframe
+                                      src={vInfo.embedUrl}
+                                      className="w-full h-full border-0"
+                                      allow="autoplay; encrypted-media"
+                                      allowFullScreen
+                                      title={`Video Después ${i + 1}`}
+                                    />
+                                  ) : (
+                                    <video src={url} controls className="w-full h-full object-cover" />
+                                  )}
+                                  {vInfo.isDrive && (
+                                    <a
+                                      href={vInfo.rawUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="absolute top-1 left-1 bg-blue-600/90 hover:bg-blue-700 text-white text-[9px] px-1.5 py-0.5 rounded font-bold flex items-center gap-1 shadow-xs transition-colors z-10"
+                                    >
+                                      <ExternalLink className="w-2.5 h-2.5" /> Drive
+                                    </a>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       </div>

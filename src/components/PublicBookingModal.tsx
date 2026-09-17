@@ -1,13 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { ServiceType, AirSettings, ServiceOrder, Customer } from '../types';
+import { ServiceType, AirSettings, ServiceOrder, Customer, AirEquipment } from '../types';
 import { X, Calendar, Clock, MapPin, Phone, User, CheckCircle2, Wind, Sparkles, ShieldCheck, Search } from 'lucide-react';
 import { format, addDays } from 'date-fns';
+
+export interface BookingPrefill {
+  customer?: Customer;
+  equipment?: AirEquipment;
+  serviceType?: ServiceType;
+  notes?: string;
+}
 
 interface PublicBookingModalProps {
   isOpen: boolean;
   onClose: () => void;
   settings: AirSettings;
   customers?: Customer[];
+  prefill?: BookingPrefill | null;
   onConfirmBooking: (bookingData: {
     name: string;
     rut?: string;
@@ -26,21 +34,46 @@ export const PublicBookingModal: React.FC<PublicBookingModalProps> = ({
   onClose,
   settings,
   customers = [],
+  prefill = null,
   onConfirmBooking,
 }) => {
   if (!isOpen) return null;
 
+  const defaultPrefix = settings?.phone_prefix || '+56 9 ';
+  const defaultCity = settings?.sample_cities?.[0] || 'Las Condes';
+
   const [rut, setRut] = useState('');
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('+56 9 ');
+  const [phone, setPhone] = useState(defaultPrefix);
   const [address, setAddress] = useState('');
-  const [commune, setCommune] = useState('Las Condes');
+  const [commune, setCommune] = useState(defaultCity);
   const [serviceType, setServiceType] = useState<ServiceType>('mantencion_preventiva');
   const [scheduledDate, setScheduledDate] = useState(format(addDays(new Date(), 1), 'yyyy-MM-dd'));
   const [scheduledSlot, setScheduledSlot] = useState('09:00 - 11:00');
   const [notes, setNotes] = useState('');
   const [matchedCustomer, setMatchedCustomer] = useState<Customer | null>(null);
   const [confirmedOrder, setConfirmedOrder] = useState<ServiceOrder | null>(null);
+
+  // Auto-cargar datos desde prefill (NK-024)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (prefill) {
+      if (prefill.customer) {
+        applyMatchedCustomer(prefill.customer);
+      }
+      if (prefill.serviceType) {
+        setServiceType(prefill.serviceType);
+      }
+      if (prefill.equipment) {
+        const eq = prefill.equipment;
+        const eqText = `Mantención de equipo ${eq.brand} ${eq.btu.toLocaleString()} BTU (${eq.technology.toUpperCase()})${eq.location_in_property ? ` ubicado en ${eq.location_in_property}` : ''}${eq.serial_number ? ` • Serial: ${eq.serial_number}` : ''}`;
+        setNotes(prev => prev ? `${prev}\n${eqText}` : eqText);
+      } else if (prefill.notes) {
+        setNotes(prefill.notes);
+      }
+    }
+  }, [isOpen, prefill]);
 
   // Auto-fill from URL params (NK-024)
   useEffect(() => {

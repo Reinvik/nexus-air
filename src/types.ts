@@ -66,6 +66,12 @@ export interface Technician {
   certification_number?: string;
   default_commission_type?: 'fixed' | 'percentage';
   default_commission_value?: number;
+  commission_mantencion_type?: 'fixed' | 'percentage';
+  commission_mantencion_value?: number;
+  commission_instalacion_type?: 'fixed' | 'percentage';
+  commission_instalacion_value?: number;
+  commission_reparacion_type?: 'fixed' | 'percentage';
+  commission_reparacion_value?: number;
   status: 'disponible' | 'en_servicio' | 'vacaciones' | 'inactivo';
   avatar_url?: string;
   active_orders_count?: number;

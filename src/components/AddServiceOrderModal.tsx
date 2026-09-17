@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Customer, AirEquipment, Technician, ServiceOrder, ServiceType } from '../types';
 import { X, Plus, Calendar, Clock, User, Wrench, UserCheck, Users, Percent, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
@@ -37,6 +37,43 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
   const [totalPrice, setTotalPrice] = useState(45000);
 
   const clientEquipments = equipments.filter(e => e.customer_id === customerId);
+
+  // Auto-cargar comisión pactada según el tipo de servicio y colaborador (NK-012)
+  useEffect(() => {
+    const tech = technicians.find(t => t.id === technicianId);
+    if (!tech) return;
+
+    if (serviceType === 'instalacion') {
+      setTechPayoutType(tech.commission_instalacion_type || 'fixed');
+      setTechPayoutValue(tech.commission_instalacion_value ?? 35000);
+    } else if (serviceType === 'mantencion_preventiva') {
+      setTechPayoutType(tech.commission_mantencion_type || 'fixed');
+      setTechPayoutValue(tech.commission_mantencion_value ?? 20000);
+    } else {
+      setTechPayoutType(tech.commission_reparacion_type || tech.default_commission_type || 'fixed');
+      setTechPayoutValue(tech.commission_reparacion_value ?? tech.default_commission_value ?? 15000);
+    }
+  }, [technicianId, serviceType, technicians]);
+
+  useEffect(() => {
+    if (!assistantId) {
+      setAssistantPayoutValue(0);
+      return;
+    }
+    const asst = technicians.find(t => t.id === assistantId);
+    if (!asst) return;
+
+    if (serviceType === 'instalacion') {
+      setAssistantPayoutType(asst.commission_instalacion_type || 'fixed');
+      setAssistantPayoutValue(asst.commission_instalacion_value ?? 25000);
+    } else if (serviceType === 'mantencion_preventiva') {
+      setAssistantPayoutType(asst.commission_mantencion_type || 'fixed');
+      setAssistantPayoutValue(asst.commission_mantencion_value ?? 10000);
+    } else {
+      setAssistantPayoutType(asst.commission_reparacion_type || asst.default_commission_type || 'fixed');
+      setAssistantPayoutValue(asst.commission_reparacion_value ?? asst.default_commission_value ?? 8000);
+    }
+  }, [assistantId, serviceType, technicians]);
 
   const calculatedTechPayout = techPayoutType === 'percentage' 
     ? Math.round((totalPrice * techPayoutValue) / 100) 

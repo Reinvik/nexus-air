@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { AirSettings, AirPart, ServiceOrder, CustomerAir } from '../types';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { AirSettings, AirPart, ServiceOrder, Customer } from '../types';
 import { 
   X, 
   Printer, 
@@ -15,10 +15,12 @@ import {
   DollarSign, 
   Package, 
   Wrench,
-  Snowflake
+  Snowflake,
+  Copy
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { getTaxPercentage } from '../lib/countries';
+import html2canvas from 'html2canvas';
+import { getTaxPercentage, formatAirPrice } from '../lib/countries';
 
 export interface ProformaItem {
   id: string;
@@ -37,7 +39,7 @@ interface ProformaModalAirProps {
   areaM2?: number;
   parts: AirPart[];
   settings?: AirSettings | null;
-  customers?: CustomerAir[];
+  customers?: Customer[];
   onCreateOrder?: (orderData: Partial<ServiceOrder>) => void;
 }
 
@@ -52,8 +54,13 @@ export function ProformaModalAir({
   customers = [],
   onCreateOrder,
 }: ProformaModalAirProps) {
-  const currencySymbol = settings?.currency_symbol || '₡';
+  const countryCode = settings?.country_code || 'CR';
+  const isChile = countryCode === 'CL';
+  const currencySymbol = settings?.currency_symbol || (isChile ? '$' : '₡');
   const taxRatePercent = getTaxPercentage(settings?.tax_rate);
+
+  // Selector de cliente registrado
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
 
   // Datos del Cliente en la proforma
   const [clientName, setClientName] = useState('Cliente Empresa / Particular');
@@ -62,12 +69,34 @@ export function ProformaModalAir({
   const [clientPhone, setClientPhone] = useState('');
   const [proformaFolio, setProformaFolio] = useState(() => `PF-${Math.floor(1000 + Math.random() * 9000)}`);
   const [emissionDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+
+  const handleSelectCustomer = (id: string) => {
+    setSelectedCustomerId(id);
+    if (!id) return;
+    const c = customers.find(item => item.id === id);
+    if (c) {
+      setClientName(c.name || '');
+      setClientIdNumber(c.id_number || (c as any).rut || '');
+      setClientEmail(c.email || '');
+      setClientPhone(c.phone || '');
+    }
+  };
 
   // Selección de equipo
   const availableEquipments = useMemo(() => {
     const equips = parts.filter(p => p.category === 'equipo');
     if (equips.length > 0) return equips;
     // Fallback de catálogo estándar si aún no han registrado en inventario
+    if (isChile) {
+      return [
+        { id: 'eq-9k', name: 'Aire Acondicionado Split 9.000 BTU Inverter Ecológico', sale_price: 389990, btu: 9000, category: 'equipo' },
+        { id: 'eq-12k', name: 'Aire Acondicionado Split 12.000 BTU Inverter WiFi', sale_price: 439990, btu: 12000, category: 'equipo' },
+        { id: 'eq-18k', name: 'Aire Acondicionado Split Midea Breezeless 18.000 BTU Inverter', sale_price: 529990, btu: 18000, category: 'equipo' },
+        { id: 'eq-24k', name: 'Aire Acondicionado Split 24.000 BTU Inverter WiFi', sale_price: 689990, btu: 24000, category: 'equipo' },
+        { id: 'eq-36k', name: 'Aire Acondicionado Cassette / Piso-Cielo 36.000 BTU', sale_price: 1150000, btu: 36000, category: 'equipo' },
+      ] as AirPart[];
+    }
     return [
       { id: 'eq-9k', name: 'A.A ECOLD 9K BTU SEER 21.5 INVERTER CON WIFI (0.75 Ton)', sale_price: 180000, btu: 9000, category: 'equipo' },
       { id: 'eq-12k', name: 'A.A ECOLD 12K BTU SEER 21.5 INVERTER CON WIFI (1.0 Ton)', sale_price: 200000, btu: 12000, category: 'equipo' },
@@ -76,35 +105,45 @@ export function ProformaModalAir({
       { id: 'eq-24k', name: 'A.A ECOLD 24K BTU SEER 20 INVERTER CON WIFI (2.0 Ton)', sale_price: 395000, btu: 24000, category: 'equipo' },
       { id: 'eq-36k', name: 'A.A ECOLD 36K BTU PISO-CIELO / CASSETTE (3.0 Ton)', sale_price: 680000, btu: 36000, category: 'equipo' },
     ] as AirPart[];
-  }, [parts]);
+  }, [parts, isChile]);
 
   // Equipo inicial emparejado al BTU recomendado
   const defaultEquip = useMemo(() => {
     return availableEquipments.find(e => e.btu === recommendedBtu) || availableEquipments[0];
   }, [availableEquipments, recommendedBtu]);
 
-  const [selectedEquipId, setSelectedEquipId] = useState<string>(defaultEquip?.id || 'eq-12k');
-  const [equipmentPrice, setEquipmentPrice] = useState<number>(defaultEquip?.sale_price || 200000);
+  const [selectedEquipId, setSelectedEquipId] = useState<string>(defaultEquip?.id || (isChile ? 'eq-18k' : 'eq-12k'));
+  const [equipmentPrice, setEquipmentPrice] = useState<number>(defaultEquip?.sale_price || (isChile ? 529990 : 200000));
   const [equipmentQty, setEquipmentQty] = useState<number>(1);
 
   // Al cambiar la recomendación inicial
   React.useEffect(() => {
     if (defaultEquip) {
       setSelectedEquipId(defaultEquip.id);
-      setEquipmentPrice(defaultEquip.sale_price || 200000);
+      setEquipmentPrice(defaultEquip.sale_price || (isChile ? 529990 : 200000));
     }
-  }, [defaultEquip]);
+  }, [defaultEquip, isChile]);
 
-  // Mano de Obra y Materiales de Instalación (basado en la proforma real de Costa Rica)
-  const [installationItems, setInstallationItems] = useState<ProformaItem[]>([
-    { id: 'mat-1', concept: 'MANO DE OBRA DE INSTALACION', quantity: 1, unitPrice: 80000, total: 80000, type: 'instalacion' },
-    { id: 'mat-2', concept: 'BASE DE CONDENSADO', quantity: 1, unitPrice: 15000, total: 15000, type: 'material' },
-    { id: 'mat-3', concept: 'PROTECTOR DE VOLTAJE', quantity: 1, unitPrice: 16000, total: 16000, type: 'material' },
-    { id: 'mat-4', concept: 'BREAKER', quantity: 1, unitPrice: 15500, total: 15500, type: 'material' },
-    { id: 'mat-5', concept: 'TORNILLERIA Y ANCLAJES', quantity: 1, unitPrice: 5000, total: 5000, type: 'material' },
-    { id: 'mat-6', concept: 'DURETAN Y SELLOS', quantity: 1, unitPrice: 7000, total: 7000, type: 'material' },
-    { id: 'mat-7', concept: 'CABLE 3X12 USO RUDO (Metros)', quantity: 10, unitPrice: 1700, total: 17000, type: 'material' },
-  ]);
+  // Mano de Obra y Materiales de Instalación calibrados por país (Total base: 155.500)
+  const [installationItems, setInstallationItems] = useState<ProformaItem[]>(() => {
+    if (isChile) {
+      return [
+        { id: 'mat-1', concept: 'MANO DE OBRA DE INSTALACION ESTANDAR (HASTA 3M)', quantity: 1, unitPrice: 110000, total: 110000, type: 'instalacion' },
+        { id: 'mat-2', concept: 'SOPORTE Y KIT DE ANCLAJE MURO', quantity: 1, unitPrice: 18500, total: 18500, type: 'material' },
+        { id: 'mat-3', concept: 'CANALETA Y ACCESORIOS ESTETICOS', quantity: 1, unitPrice: 15000, total: 15000, type: 'material' },
+        { id: 'mat-4', concept: 'MATERIALES ELECTRICOS Y TERMICO', quantity: 1, unitPrice: 12000, total: 12000, type: 'material' },
+      ];
+    }
+    return [
+      { id: 'mat-1', concept: 'MANO DE OBRA DE INSTALACION', quantity: 1, unitPrice: 80000, total: 80000, type: 'instalacion' },
+      { id: 'mat-2', concept: 'BASE DE CONDENSADO', quantity: 1, unitPrice: 15000, total: 15000, type: 'material' },
+      { id: 'mat-3', concept: 'PROTECTOR DE VOLTAJE', quantity: 1, unitPrice: 16000, total: 16000, type: 'material' },
+      { id: 'mat-4', concept: 'BREAKER', quantity: 1, unitPrice: 15500, total: 15500, type: 'material' },
+      { id: 'mat-5', concept: 'TORNILLERIA Y ANCLAJES', quantity: 1, unitPrice: 5000, total: 5000, type: 'material' },
+      { id: 'mat-6', concept: 'DURETAN Y SELLOS', quantity: 1, unitPrice: 7000, total: 7000, type: 'material' },
+      { id: 'mat-7', concept: 'CABLE 3X12 USO RUDO (Metros)', quantity: 10, unitPrice: 1700, total: 17000, type: 'material' },
+    ];
+  });
 
   const currentEquipment = availableEquipments.find(e => e.id === selectedEquipId) || defaultEquip;
 
@@ -156,6 +195,77 @@ export function ProformaModalAir({
     window.print();
   };
 
+  const handleCopyImageToWhatsApp = async () => {
+    const el = document.getElementById('printable-proforma');
+    if (!el) return;
+    setIsGeneratingImage(true);
+    try {
+      const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          toast.error('No se pudo generar la imagen');
+          setIsGeneratingImage(false);
+          return;
+        }
+        try {
+          const data = [new ClipboardItem({ 'image/png': blob })];
+          await navigator.clipboard.write(data);
+          toast.success('¡Imagen copiada al portapapeles! Ahora presiona Ctrl + V en WhatsApp', { duration: 6000 });
+
+          // Abrir WhatsApp con texto resumen
+          const phone = clientPhone.replace(/\D/g, '');
+          const msg = `*PROFORMA OFICIAL DE CLIMATIZACIÓN* ❄️\n` +
+            `*Folio:* ${proformaFolio}\n` +
+            `*Cliente:* ${clientName}\n\n` +
+            `📦 *Equipo Cotizado:* ${currentEquipment?.name || 'Split Inverter'}\n` +
+            `• Cantidad: ${equipmentQty} un.\n` +
+            `• Precio Equipo: ${formatAirPrice(subtotalEquipos, currencySymbol, countryCode)}\n\n` +
+            `🔧 *Instalación y Materiales:* ${formatAirPrice(subtotalInstalacion, currencySymbol, countryCode)}\n` +
+            `──────────────────\n` +
+            `*Subtotal:* ${formatAirPrice(subTotalDirecto, currencySymbol, countryCode)}\n` +
+            `*IVA (${taxRatePercent}%):* ${formatAirPrice(montoIva, currencySymbol, countryCode)}\n` +
+            `*TOTAL FINAL:* ${formatAirPrice(precioVentaTotal, currencySymbol, countryCode)}\n\n` +
+            `📋 *Te adjunto la proforma oficial en imagen (Presiona Ctrl + V para pegarla).*`;
+
+          const url = `https://wa.me/${phone ? (phone.length <= 8 && !isChile ? `506${phone}` : (isChile && !phone.startsWith('56') ? `56${phone}` : phone)) : ''}?text=${encodeURIComponent(msg)}`;
+          window.open(url, '_blank');
+        } catch (err) {
+          console.error('Clipboard write error', err);
+          const link = document.createElement('a');
+          link.download = `proforma-${proformaFolio}.png`;
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+          toast('No se pudo copiar directamente al portapapeles. Se descargó el PNG para que lo adjuntes.', { icon: '📎' });
+        } finally {
+          setIsGeneratingImage(false);
+        }
+      }, 'image/png');
+    } catch (e) {
+      console.error(e);
+      toast.error('Error al generar la imagen de la proforma');
+      setIsGeneratingImage(false);
+    }
+  };
+
+  const handleDownloadImage = async () => {
+    const el = document.getElementById('printable-proforma');
+    if (!el) return;
+    setIsGeneratingImage(true);
+    try {
+      const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+      const link = document.createElement('a');
+      link.download = `proforma-${proformaFolio}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      toast.success('Proforma descargada como PNG');
+    } catch (e) {
+      console.error(e);
+      toast.error('Error al exportar PNG');
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
+
   const handleSendWhatsApp = () => {
     const phone = clientPhone.replace(/\D/g, '');
     const msg = `*PROFORMA OFICIAL DE CLIMATIZACIÓN* ❄️\n` +
@@ -163,16 +273,16 @@ export function ProformaModalAir({
       `*Cliente:* ${clientName}\n\n` +
       `📦 *Equipo Cotizado:* ${currentEquipment?.name || 'Split Inverter'}\n` +
       `• Cantidad: ${equipmentQty} un.\n` +
-      `• Precio Equipo: ${currencySymbol}${subtotalEquipos.toLocaleString('es-CR')}\n\n` +
-      `🔧 *Instalación y Materiales:* ${currencySymbol}${subtotalInstalacion.toLocaleString('es-CR')}\n` +
+      `• Precio Equipo: ${formatAirPrice(subtotalEquipos, currencySymbol, countryCode)}\n\n` +
+      `🔧 *Instalación y Materiales:* ${formatAirPrice(subtotalInstalacion, currencySymbol, countryCode)}\n` +
       `──────────────────\n` +
-      `*Subtotal:* ${currencySymbol}${subTotalDirecto.toLocaleString('es-CR')}\n` +
-      `*IVA (${taxRatePercent}%):* ${currencySymbol}${montoIva.toLocaleString('es-CR')}\n` +
-      `*TOTAL FINAL:* ${currencySymbol}${precioVentaTotal.toLocaleString('es-CR')}\n\n` +
+      `*Subtotal:* ${formatAirPrice(subTotalDirecto, currencySymbol, countryCode)}\n` +
+      `*IVA (${taxRatePercent}%):* ${formatAirPrice(montoIva, currencySymbol, countryCode)}\n` +
+      `*TOTAL FINAL:* ${formatAirPrice(precioVentaTotal, currencySymbol, countryCode)}\n\n` +
       `_Validez: 30 días. Incluye garantía de instalación._\n` +
       `${settings?.fantasy_name || settings?.company_name || 'Climatización Profesional'}`;
 
-    const url = `https://wa.me/${phone ? (phone.length <= 8 ? `506${phone}` : phone) : ''}?text=${encodeURIComponent(msg)}`;
+    const url = `https://wa.me/${phone ? (phone.length <= 8 && !isChile ? `506${phone}` : (isChile && !phone.startsWith('56') ? `56${phone}` : phone)) : ''}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
   };
 
@@ -218,7 +328,7 @@ export function ProformaModalAir({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
         
         {/* Top Control Bar (Hidden when printing) */}
-        <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white shrink-0 print:hidden">
+        <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white shrink-0 print:hidden flex-wrap gap-2">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-cyan-500 text-slate-950 flex items-center justify-center font-black">
               <FileText className="w-4 h-4" />
@@ -228,7 +338,25 @@ export function ProformaModalAir({
               <p className="text-[11px] text-slate-400">Documento listo para evaluación corporativa o cliente residencial</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleCopyImageToWhatsApp}
+              disabled={isGeneratingImage}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors shadow-xs disabled:opacity-50"
+              title="Copia la proforma como imagen y abre WhatsApp para pegarla con Ctrl+V"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>{isGeneratingImage ? 'Generando...' : 'Copiar Imagen WhatsApp (Ctrl + V)'}</span>
+            </button>
+            <button
+              onClick={handleDownloadImage}
+              disabled={isGeneratingImage}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-bold border border-slate-700 transition-colors"
+              title="Descargar imagen PNG de la proforma"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Descargar PNG</span>
+            </button>
             <button
               onClick={handlePrint}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-bold border border-slate-700 transition-colors"
@@ -239,10 +367,11 @@ export function ProformaModalAir({
             </button>
             <button
               onClick={handleSendWhatsApp}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold border border-slate-700 transition-colors"
+              title="Enviar solo texto por WhatsApp"
             >
               <Share2 className="w-3.5 h-3.5" />
-              <span>WhatsApp</span>
+              <span>Texto WA</span>
             </button>
             {onCreateOrder && (
               <button
@@ -262,8 +391,8 @@ export function ProformaModalAir({
           </div>
         </div>
 
-        {/* Proforma Sheet Content (Clean, Professional Print Layout matching Costa Rica specimen) */}
-        <div className="p-6 sm:p-8 overflow-y-auto flex-1 space-y-6 bg-white text-slate-800">
+        {/* Proforma Sheet Content (Clean, Professional Print Layout matching specimen) */}
+        <div id="printable-proforma" className="p-6 sm:p-8 overflow-y-auto flex-1 space-y-6 bg-white text-slate-800">
           
           {/* Header Row: Logo/Brand & Document Badge */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-6 border-slate-200">
@@ -310,11 +439,33 @@ export function ProformaModalAir({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* DATOS DEL CLIENTE */}
             <div className="border border-blue-200 rounded-xl overflow-hidden bg-blue-50/20">
-              <div className="bg-blue-600 text-white px-3.5 py-1.5 font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5" />
-                DATOS DEL CLIENTE
+              <div className="bg-blue-600 text-white px-3.5 py-1.5 font-bold text-xs uppercase tracking-wider flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5" />
+                  <span>DATOS DEL CLIENTE</span>
+                </div>
+                {customers.length > 0 && (
+                  <span className="text-[10px] font-normal opacity-90 print:hidden">Selecciona de la lista o escribe</span>
+                )}
               </div>
               <div className="p-3.5 space-y-2 text-xs">
+                {customers.length > 0 && (
+                  <div className="flex items-center gap-2 pb-2 border-b border-blue-100 print:hidden">
+                    <span className="w-20 text-blue-700 font-bold shrink-0">Buscar:</span>
+                    <select
+                      value={selectedCustomerId}
+                      onChange={e => handleSelectCustomer(e.target.value)}
+                      className="flex-1 text-xs font-semibold text-slate-800 bg-white border border-blue-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">-- Seleccionar cliente registrado --</option>
+                      {customers.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} {c.phone ? `(${c.phone})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="flex items-center gap-2">
                   <span className="w-20 text-slate-500 font-semibold shrink-0">Nombre:</span>
                   <input
@@ -332,7 +483,7 @@ export function ProformaModalAir({
                     value={clientIdNumber}
                     onChange={e => setClientIdNumber(e.target.value)}
                     className="flex-1 text-slate-800 border-b border-dashed border-slate-300 bg-transparent px-1 focus:outline-none focus:border-blue-500"
-                    placeholder="Cédula Física / Jurídica..."
+                    placeholder="Cédula Física / Jurídica / RUT..."
                   />
                 </div>
                 <div className="flex items-center gap-2">
@@ -389,7 +540,7 @@ export function ProformaModalAir({
           <div className="space-y-4">
             <div className="bg-blue-600 text-white px-4 py-2 font-black text-sm uppercase tracking-wider rounded-lg flex items-center justify-between">
               <span>Detalle de Costos y Precios</span>
-              <span className="text-[11px] font-normal opacity-90">Moneda: {currencySymbol} ({settings?.country || 'Costa Rica'})</span>
+              <span className="text-[11px] font-normal opacity-90">Moneda: {currencySymbol} ({countryCode === 'CL' ? 'Chile' : (settings?.country || 'Costa Rica')})</span>
             </div>
 
             {/* 1. Venta de Equipos de Aire Acondicionado */}
@@ -409,7 +560,7 @@ export function ProformaModalAir({
                 >
                   {availableEquipments.map(eq => (
                     <option key={eq.id} value={eq.id}>
-                      {eq.name} — {currencySymbol}{(eq.sale_price || 0).toLocaleString('es-CR')}
+                      {eq.name} — {formatAirPrice(eq.sale_price || 0, currencySymbol, countryCode)}
                     </option>
                   ))}
                 </select>
@@ -451,12 +602,12 @@ export function ProformaModalAir({
                       </div>
                     </td>
                     <td className="p-3 text-right font-mono font-bold text-slate-900">
-                      {currencySymbol}{subtotalEquipos.toLocaleString('es-CR')}
+                      {formatAirPrice(subtotalEquipos, currencySymbol, countryCode)}
                     </td>
                   </tr>
                   <tr className="bg-slate-50/90 font-bold border-t border-slate-200">
                     <td colSpan={3} className="p-2.5 text-right uppercase text-slate-700">Subtotal Equipos:</td>
-                    <td className="p-2.5 text-right font-mono text-slate-900">{currencySymbol}{subtotalEquipos.toLocaleString('es-CR')}</td>
+                    <td className="p-2.5 text-right font-mono text-slate-900">{formatAirPrice(subtotalEquipos, currencySymbol, countryCode)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -519,7 +670,7 @@ export function ProformaModalAir({
                         </div>
                       </td>
                       <td className="p-2.5 text-right font-mono font-semibold text-slate-800">
-                        {currencySymbol}{(item.total || 0).toLocaleString('es-CR')}
+                        {formatAirPrice(item.total || 0, currencySymbol, countryCode)}
                       </td>
                       <td className="p-2.5 text-center print:hidden">
                         <button
@@ -535,7 +686,7 @@ export function ProformaModalAir({
                   ))}
                   <tr className="bg-slate-50/90 font-bold border-t border-slate-200">
                     <td colSpan={3} className="p-2.5 text-right uppercase text-slate-700">Subtotal Instalación:</td>
-                    <td className="p-2.5 text-right font-mono text-slate-900">{currencySymbol}{subtotalInstalacion.toLocaleString('es-CR')}</td>
+                    <td className="p-2.5 text-right font-mono text-slate-900">{formatAirPrice(subtotalInstalacion, currencySymbol, countryCode)}</td>
                     <td className="print:hidden"></td>
                   </tr>
                 </tbody>
@@ -547,15 +698,15 @@ export function ProformaModalAir({
               <div className="w-full sm:w-80 border border-slate-300 rounded-xl overflow-hidden shadow-xs">
                 <div className="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center text-xs">
                   <span className="font-bold text-slate-700 uppercase">Sub Total</span>
-                  <span className="font-mono font-bold text-slate-900">{currencySymbol}{subTotalDirecto.toLocaleString('es-CR')}</span>
+                  <span className="font-mono font-bold text-slate-900">{formatAirPrice(subTotalDirecto, currencySymbol, countryCode)}</span>
                 </div>
                 <div className="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center text-xs">
                   <span className="font-bold text-slate-700 uppercase">IVA ({taxRatePercent}% sobre Costo Directo)</span>
-                  <span className="font-mono font-bold text-slate-900">{currencySymbol}{montoIva.toLocaleString('es-CR')}</span>
+                  <span className="font-mono font-bold text-slate-900">{formatAirPrice(montoIva, currencySymbol, countryCode)}</span>
                 </div>
                 <div className="p-4 bg-blue-600 text-white flex justify-between items-center text-sm font-black">
                   <span className="uppercase tracking-wide">Precio de Venta Total</span>
-                  <span className="font-mono text-lg">{currencySymbol}{precioVentaTotal.toLocaleString('es-CR')}</span>
+                  <span className="font-mono text-lg">{formatAirPrice(precioVentaTotal, currencySymbol, countryCode)}</span>
                 </div>
               </div>
             </div>

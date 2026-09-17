@@ -20,10 +20,11 @@ import {
   Award, 
   Filter,
   CheckCircle2,
-  HardHat
+  HardHat,
+  Sparkles
 } from 'lucide-react';
 import { formatAirPrice } from '../lib/countries';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 
 interface TechniciansAirProps {
   technicians: Technician[];
@@ -52,13 +53,19 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
   // Form State para Agregar
   const [name, setName] = useState('');
   const [rut, setRut] = useState('');
-  const [phone, setPhone] = useState('+56 9 ');
+  const [phone, setPhone] = useState('+506 ');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'tecnico' | 'ayudante'>('tecnico');
   const [secCertified, setSecCertified] = useState(true);
   const [certNumber, setCertNumber] = useState('SEC-HVAC-');
-  const [commissionType, setCommissionType] = useState<'percentage' | 'fixed'>('percentage');
-  const [commissionValue, setCommissionValue] = useState<number>(15);
+
+  // Comisiones diferenciadas por tipo de trabajo (NK-012)
+  const [commMantType, setCommMantType] = useState<'fixed' | 'percentage'>('fixed');
+  const [commMantVal, setCommMantVal] = useState<number>(20000);
+  const [commInstType, setCommInstType] = useState<'fixed' | 'percentage'>('fixed');
+  const [commInstVal, setCommInstVal] = useState<number>(35000);
+  const [commRepType, setCommRepType] = useState<'fixed' | 'percentage'>('fixed');
+  const [commRepVal, setCommRepVal] = useState<number>(15000);
 
   // Form State para Editar
   const [editName, setEditName] = useState('');
@@ -68,9 +75,14 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
   const [editRole, setEditRole] = useState<'tecnico' | 'ayudante'>('tecnico');
   const [editSecCertified, setEditSecCertified] = useState(false);
   const [editCertNumber, setEditCertNumber] = useState('');
-  const [editCommissionType, setEditCommissionType] = useState<'percentage' | 'fixed'>('percentage');
-  const [editCommissionValue, setEditCommissionValue] = useState<number>(15);
   const [editStatus, setEditStatus] = useState<'disponible' | 'en_servicio' | 'vacaciones' | 'inactivo'>('disponible');
+
+  const [editCommMantType, setEditCommMantType] = useState<'fixed' | 'percentage'>('fixed');
+  const [editCommMantVal, setEditCommMantVal] = useState<number>(20000);
+  const [editCommInstType, setEditCommInstType] = useState<'fixed' | 'percentage'>('fixed');
+  const [editCommInstVal, setEditCommInstVal] = useState<number>(35000);
+  const [editCommRepType, setEditCommRepType] = useState<'fixed' | 'percentage'>('fixed');
+  const [editCommRepVal, setEditCommRepVal] = useState<number>(15000);
 
   // Filtro de mes para liquidaciones (por defecto mes actual: YYYY-MM)
   const currentMonthStr = useMemo(() => format(new Date(), 'yyyy-MM'), []);
@@ -85,14 +97,14 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
     return technicians.filter(t => (t.role || 'tecnico') === roleFilter);
   }, [technicians, roleFilter]);
 
-  // Cálculo de liquidaciones y comisiones por técnico para el mes seleccionado
+  // Cálculo de liquidaciones y comisiones por colaborador para el mes seleccionado
   const techSettlementMap = useMemo(() => {
     const map = new Map<string, {
       completedCount: number;
-      totalBilled: number;
       totalCommission: number;
       services: {
         order: ServiceOrder;
+        serviceName: string;
         roleInService: 'Técnico Líder' | 'Ayudante';
         commissionEarned: number;
       }[];
@@ -101,7 +113,6 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
     technicians.forEach(t => {
       map.set(t.id, {
         completedCount: 0,
-        totalBilled: 0,
         totalCommission: 0,
         services: []
       });
@@ -114,25 +125,48 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
       if (!orderDate.startsWith(selectedMonth)) return;
 
       const orderTotal = order.total || 0;
+      const sType = order.service_type || 'mantencion_preventiva';
+      const prettyServiceName = 
+        sType === 'mantencion_preventiva' ? 'Mantención Preventiva' :
+        sType === 'instalacion' ? 'Instalación de Equipo' :
+        sType === 'reparacion' ? 'Reparación / Corrección' :
+        sType === 'recaptacion' ? 'Recaptación 6M' :
+        sType.replace('_', ' ');
 
       // Si es el técnico líder asignado
       if (order.assigned_technician_id && map.has(order.assigned_technician_id)) {
         const item = map.get(order.assigned_technician_id)!;
+        const tech = technicians.find(t => t.id === order.assigned_technician_id);
         let comm = 0;
-        const pType = order.technician_payout_type || 'percentage';
-        const pVal = order.technician_payout_value ?? 15;
 
-        if (pType === 'percentage') {
-          comm = Math.round((orderTotal * pVal) / 100);
-        } else {
-          comm = pVal;
+        // Si la orden trae valor explícito asignado
+        if (order.technician_payout_value !== undefined && order.technician_payout_value > 0) {
+          const pType = order.technician_payout_type || 'fixed';
+          comm = pType === 'percentage'
+            ? Math.round((orderTotal * order.technician_payout_value) / 100)
+            : order.technician_payout_value;
+        } else if (tech) {
+          // Si no, tomar la comisión pactada por tipo de servicio
+          if (sType === 'instalacion') {
+            const pType = tech.commission_instalacion_type || 'fixed';
+            const val = tech.commission_instalacion_value ?? 35000;
+            comm = pType === 'percentage' ? Math.round((orderTotal * val) / 100) : val;
+          } else if (sType === 'mantencion_preventiva' || sType === 'recaptacion') {
+            const pType = tech.commission_mantencion_type || 'fixed';
+            const val = tech.commission_mantencion_value ?? 20000;
+            comm = pType === 'percentage' ? Math.round((orderTotal * val) / 100) : val;
+          } else {
+            const pType = tech.commission_reparacion_type || tech.default_commission_type || 'fixed';
+            const val = tech.commission_reparacion_value ?? tech.default_commission_value ?? 15000;
+            comm = pType === 'percentage' ? Math.round((orderTotal * val) / 100) : val;
+          }
         }
 
         item.completedCount += 1;
-        item.totalBilled += orderTotal;
         item.totalCommission += comm;
         item.services.push({
           order,
+          serviceName: prettyServiceName,
           roleInService: 'Técnico Líder',
           commissionEarned: comm
         });
@@ -141,21 +175,35 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
       // Si es el ayudante asignado
       if (order.assigned_assistant_id && map.has(order.assigned_assistant_id)) {
         const item = map.get(order.assigned_assistant_id)!;
+        const asst = technicians.find(t => t.id === order.assigned_assistant_id);
         let comm = 0;
-        const pType = order.assistant_payout_type || 'percentage';
-        const pVal = order.assistant_payout_value ?? 8;
 
-        if (pType === 'percentage') {
-          comm = Math.round((orderTotal * pVal) / 100);
-        } else {
-          comm = pVal;
+        if (order.assistant_payout_value !== undefined && order.assistant_payout_value > 0) {
+          const pType = order.assistant_payout_type || 'fixed';
+          comm = pType === 'percentage'
+            ? Math.round((orderTotal * order.assistant_payout_value) / 100)
+            : order.assistant_payout_value;
+        } else if (asst) {
+          if (sType === 'instalacion') {
+            const pType = asst.commission_instalacion_type || 'fixed';
+            const val = asst.commission_instalacion_value ?? 25000;
+            comm = pType === 'percentage' ? Math.round((orderTotal * val) / 100) : val;
+          } else if (sType === 'mantencion_preventiva' || sType === 'recaptacion') {
+            const pType = asst.commission_mantencion_type || 'fixed';
+            const val = asst.commission_mantencion_value ?? 10000;
+            comm = pType === 'percentage' ? Math.round((orderTotal * val) / 100) : val;
+          } else {
+            const pType = asst.commission_reparacion_type || asst.default_commission_type || 'fixed';
+            const val = asst.commission_reparacion_value ?? asst.default_commission_value ?? 8000;
+            comm = pType === 'percentage' ? Math.round((orderTotal * val) / 100) : val;
+          }
         }
 
         item.completedCount += 1;
-        item.totalBilled += orderTotal;
         item.totalCommission += comm;
         item.services.push({
           order,
+          serviceName: prettyServiceName,
           roleInService: 'Ayudante',
           commissionEarned: comm
         });
@@ -190,9 +238,16 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
     setEditRole(t.role || 'tecnico');
     setEditSecCertified(Boolean(t.sec_certified));
     setEditCertNumber(t.certification_number || '');
-    setEditCommissionType(t.default_commission_type || 'percentage');
-    setEditCommissionValue(t.default_commission_value ?? (t.role === 'ayudante' ? 8 : 15));
     setEditStatus(t.status || 'disponible');
+
+    // Tarifas
+    const isAyud = t.role === 'ayudante';
+    setEditCommMantType(t.commission_mantencion_type || 'fixed');
+    setEditCommMantVal(t.commission_mantencion_value ?? (isAyud ? 10000 : 20000));
+    setEditCommInstType(t.commission_instalacion_type || 'fixed');
+    setEditCommInstVal(t.commission_instalacion_value ?? (isAyud ? 25000 : 35000));
+    setEditCommRepType(t.commission_reparacion_type || 'fixed');
+    setEditCommRepVal(t.commission_reparacion_value ?? (isAyud ? 8000 : 15000));
   };
 
   // Submit Agregar
@@ -206,8 +261,14 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
       role,
       sec_certified: role === 'tecnico' ? secCertified : false,
       certification_number: role === 'tecnico' && secCertified ? certNumber : undefined,
-      default_commission_type: commissionType,
-      default_commission_value: commissionValue,
+      default_commission_type: commMantType,
+      default_commission_value: commMantVal,
+      commission_mantencion_type: commMantType,
+      commission_mantencion_value: commMantVal,
+      commission_instalacion_type: commInstType,
+      commission_instalacion_value: commInstVal,
+      commission_reparacion_type: commRepType,
+      commission_reparacion_value: commRepVal,
       status: 'disponible',
     });
     setIsAddModalOpen(false);
@@ -229,8 +290,14 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
       role: editRole,
       sec_certified: editRole === 'tecnico' ? editSecCertified : false,
       certification_number: editRole === 'tecnico' && editSecCertified ? editCertNumber : undefined,
-      default_commission_type: editCommissionType,
-      default_commission_value: editCommissionValue,
+      default_commission_type: editCommMantType,
+      default_commission_value: editCommMantVal,
+      commission_mantencion_type: editCommMantType,
+      commission_mantencion_value: editCommMantVal,
+      commission_instalacion_type: editCommInstType,
+      commission_instalacion_value: editCommInstVal,
+      commission_reparacion_type: editCommRepType,
+      commission_reparacion_value: editCommRepVal,
       status: editStatus,
     });
     setEditingTech(null);
@@ -245,19 +312,18 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
     }
   };
 
-  // Generar WhatsApp de liquidación
+  // Generar WhatsApp de liquidación (SIN MOSTRAR EL TOTAL FACTURADO AL CLIENTE - NK-012)
   const handleSendWhatsAppSettlement = (t: Technician) => {
     const settlement = techSettlementMap.get(t.id);
     if (!settlement) return;
 
-    const message = `*LIQUIDACIÓN MENSUAL DE SERVICIOS HVAC*\n` +
-      `👤 Colaborador: *${t.name}* (${t.role === 'ayudante' ? 'Ayudante' : 'Técnico'})\n` +
+    const message = `*LIQUIDACIÓN DE PAGO DE SERVICIOS HVAC* ❄️\n` +
+      `👤 Colaborador: *${t.name}* (${t.role === 'ayudante' ? 'Ayudante' : 'Técnico Líder'})\n` +
       `📅 Período: *${selectedMonth}*\n` +
-      `🔧 Servicios Finalizados: *${settlement.completedCount}*\n` +
-      `💰 Facturación Atendida: *${formatAirPrice(settlement.totalBilled, currencySymbol, countryCode)}*\n` +
-      `💵 *TOTAL COMISIÓN A PAGAR: ${formatAirPrice(settlement.totalCommission, currencySymbol, countryCode)}*\n\n` +
-      `*Detalle de Servicios:*\n` +
-      settlement.services.map((s, i) => `${i + 1}. #${s.order.ticket_number} - ${s.order.service_type.replace('_', ' ')} (${formatAirPrice(s.commissionEarned, currencySymbol, countryCode)})`).join('\n') +
+      `🔧 Servicios Realizados: *${settlement.completedCount}*\n` +
+      `💵 *TOTAL LIQUIDACIÓN A PAGAR: ${formatAirPrice(settlement.totalCommission, currencySymbol, countryCode)}*\n\n` +
+      `*Detalle de Trabajos Realizados:*\n` +
+      settlement.services.map((s, i) => `${i + 1}. #${s.order.ticket_number} • ${s.serviceName}\n   Cliente: ${s.order.customer?.name || 'Cliente Particular'}\n   Pago Asignado: *${formatAirPrice(s.commissionEarned, currencySymbol, countryCode)}*`).join('\n\n') +
       `\n\n_Generado por ${settings?.company_name || 'Nexus Air'}_`;
 
     const cleanPhone = t.phone.replace(/[^0-9]/g, '');
@@ -275,7 +341,7 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
           <div>
             <h2 className="text-lg font-bold text-slate-900">Equipo Técnico & Ayudantes HVAC</h2>
             <p className="text-xs text-slate-500">
-              Control de personal operativo, certificaciones SEC y liquidación de comisiones
+              Control de personal operativo, tarifas por tipo de servicio y liquidación de pagos
             </p>
           </div>
         </div>
@@ -284,6 +350,9 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
           <button
             onClick={() => {
               setRole('tecnico');
+              setCommMantVal(20000);
+              setCommInstVal(35000);
+              setCommRepVal(15000);
               setIsAddModalOpen(true);
             }}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#00d2ff] to-[#2563eb] hover:from-[#38bdf8] hover:to-[#1d4ed8] text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all cursor-pointer"
@@ -300,7 +369,7 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
           <div className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-cyan-400" />
             <h3 className="font-bold text-sm text-white">
-              Resumen Acumulado de Comisiones por Servicios Técnicos
+              Resumen Acumulado de Liquidaciones Técnicas
             </h3>
           </div>
 
@@ -324,14 +393,14 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
           </div>
 
           <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-            <span className="text-[11px] text-slate-400 block font-medium">Servicios Técnicos Completados</span>
+            <span className="text-[11px] text-slate-400 block font-medium">Servicios Técnicos Realizados</span>
             <span className="text-xl sm:text-2xl font-black text-emerald-400 font-mono">
               {monthGlobalStats.totalOrders} órdenes
             </span>
           </div>
 
           <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-            <span className="text-[11px] text-slate-400 block font-medium">Personal Activo con Liquidación</span>
+            <span className="text-[11px] text-slate-400 block font-medium">Personal con Liquidación Activa</span>
             <span className="text-xl sm:text-2xl font-black text-white font-mono">
               {monthGlobalStats.activeWorkers} colaboradores
             </span>
@@ -381,8 +450,11 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
       {/* Grid de Técnicos y Ayudantes */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {filteredTechnicians.map((t) => {
-          const settlement = techSettlementMap.get(t.id) || { completedCount: 0, totalBilled: 0, totalCommission: 0, services: [] };
+          const settlement = techSettlementMap.get(t.id) || { completedCount: 0, totalCommission: 0, services: [] };
           const isAyudante = t.role === 'ayudante';
+
+          const mantVal = t.commission_mantencion_value ?? (isAyudante ? 10000 : 20000);
+          const instVal = t.commission_instalacion_value ?? (isAyudante ? 25000 : 35000);
 
           return (
             <div
@@ -411,7 +483,7 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                   <button
                     onClick={() => handleOpenEdit(t)}
                     className="p-1 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
-                    title="Editar datos"
+                    title="Editar tarifas y datos"
                   >
                     <Edit className="w-3.5 h-3.5" />
                   </button>
@@ -442,10 +514,10 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                 <div className="p-2.5 rounded-xl bg-amber-50/60 border border-amber-200 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2 text-amber-800">
                     <HardHat className="w-4 h-4 text-amber-600" />
-                    <span className="font-bold">Asistente en Terreno</span>
+                    <span className="font-bold">Asistente Operativo</span>
                   </div>
                   <span className="text-[11px] text-amber-900 font-bold">
-                    Apoyo Operativo HVAC
+                    Apoyo en Terreno HVAC
                   </span>
                 </div>
               )}
@@ -464,24 +536,39 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                 )}
               </div>
 
-              {/* Configuración de Comisión */}
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
-                <span className="text-slate-500 font-medium">Comisión pactada:</span>
-                <span className="font-bold text-slate-900 font-mono">
-                  {t.default_commission_type === 'fixed'
-                    ? `${formatAirPrice(t.default_commission_value || 0, currencySymbol, countryCode)} fijo / orden`
-                    : `${t.default_commission_value ?? (isAyudante ? 8 : 15)}% del total`}
+              {/* Tarifas pactadas por tipo de servicio (NK-012) */}
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5 text-xs">
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">
+                  Tarifas Pactadas por Servicio:
                 </span>
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  <div className="bg-white p-1.5 rounded-lg border border-slate-200">
+                    <span className="text-slate-500 block">Mantención:</span>
+                    <strong className="text-slate-900 font-mono">
+                      {t.commission_mantencion_type === 'percentage'
+                        ? `${mantVal}%`
+                        : formatAirPrice(mantVal, currencySymbol, countryCode)}
+                    </strong>
+                  </div>
+                  <div className="bg-white p-1.5 rounded-lg border border-slate-200">
+                    <span className="text-slate-500 block">Instalación:</span>
+                    <strong className="text-cyan-800 font-mono">
+                      {t.commission_instalacion_type === 'percentage'
+                        ? `${instVal}%`
+                        : formatAirPrice(instVal, currencySymbol, countryCode)}
+                    </strong>
+                  </div>
+                </div>
               </div>
 
               {/* Resumen de Liquidación del Mes (NK-012) */}
               <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-50/50 to-blue-50/30 border border-cyan-200/80 space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-cyan-800 font-bold">Acumulado ({selectedMonth}):</span>
+                  <span className="text-cyan-800 font-bold">Liquidación ({selectedMonth}):</span>
                   <span className="text-[11px] text-slate-500">{settlement.completedCount} servicios</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-600">Comisión a Pagar:</span>
+                  <span className="text-xs text-slate-600">Total a Pagar:</span>
                   <span className="font-mono font-black text-sm text-cyan-900">
                     {formatAirPrice(settlement.totalCommission, currencySymbol, countryCode)}
                   </span>
@@ -499,7 +586,7 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                     onClick={() => handleSendWhatsAppSettlement(t)}
                     disabled={settlement.completedCount === 0}
                     className="p-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white transition-colors cursor-pointer shadow-2xs"
-                    title="Enviar liquidación por WhatsApp"
+                    title="Enviar liquidación al colaborador por WhatsApp"
                   >
                     <Share2 className="w-3.5 h-3.5" />
                   </button>
@@ -510,10 +597,10 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
         })}
       </div>
 
-      {/* Modal Agregar Personal (NK-029) */}
+      {/* Modal Agregar Personal (NK-029 & NK-012) */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+          <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xl my-6">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-bold text-slate-900 text-base">Registrar Colaborador HVAC</h3>
               <button onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-slate-700">
@@ -530,7 +617,9 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                     type="button"
                     onClick={() => {
                       setRole('tecnico');
-                      setCommissionValue(15);
+                      setCommMantVal(20000);
+                      setCommInstVal(35000);
+                      setCommRepVal(15000);
                     }}
                     className={`py-2 px-3 rounded-xl font-bold border text-center transition-all cursor-pointer ${
                       role === 'tecnico'
@@ -545,7 +634,9 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                     type="button"
                     onClick={() => {
                       setRole('ayudante');
-                      setCommissionValue(8);
+                      setCommMantVal(10000);
+                      setCommInstVal(25000);
+                      setCommRepVal(8000);
                     }}
                     className={`py-2 px-3 rounded-xl font-bold border text-center transition-all cursor-pointer ${
                       role === 'ayudante'
@@ -572,12 +663,12 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-slate-700 font-medium">RUT / Identificación</label>
+                  <label className="text-slate-700 font-medium">Identificación / Cédula</label>
                   <input
                     type="text"
                     value={rut}
                     onChange={(e) => setRut(e.target.value)}
-                    placeholder="12.345.678-9"
+                    placeholder="1-1234-0567"
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 mt-1"
                     required
                   />
@@ -629,31 +720,59 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                 </div>
               )}
 
-              {/* Esquema de Comisiones Predeterminado */}
-              <div className="p-3 rounded-xl bg-cyan-50/50 border border-cyan-200 space-y-2">
-                <label className="font-bold text-cyan-900 block">
-                  Comisión Predeterminada por Servicio
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-slate-600 text-[11px]">Tipo de Pago</label>
-                    <select
-                      value={commissionType}
-                      onChange={(e) => setCommissionType(e.target.value as 'percentage' | 'fixed')}
-                      className="w-full p-1.5 bg-white border border-slate-300 rounded-lg text-xs mt-0.5 text-slate-900"
-                    >
-                      <option value="percentage">Porcentaje (%)</option>
-                      <option value="fixed">Monto Fijo ({currencySymbol})</option>
-                    </select>
+              {/* Tarifas Diferenciadas por Tipo de Trabajo (NK-012) */}
+              <div className="p-3.5 rounded-xl bg-cyan-50/60 border border-cyan-200 space-y-3">
+                <div>
+                  <label className="font-bold text-cyan-950 block text-xs">
+                    Tarifas Pactadas por Tipo de Trabajo
+                  </label>
+                  <p className="text-[10px] text-slate-500">
+                    Define montos fijos o % independientes para mantenciones e instalaciones
+                  </p>
+                </div>
+
+                {/* Mantención */}
+                <div className="bg-white p-2.5 rounded-lg border border-slate-200 space-y-1">
+                  <div className="flex justify-between items-center text-[11px] font-bold text-slate-800">
+                    <span>🔧 Mantenciones Preventivas</span>
                   </div>
-                  <div>
-                    <label className="text-slate-600 text-[11px]">Valor de Comisión</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      value={commMantType}
+                      onChange={(e) => setCommMantType(e.target.value as any)}
+                      className="p-1.5 bg-slate-50 border border-slate-300 rounded-md text-xs"
+                    >
+                      <option value="fixed">Monto Fijo ({currencySymbol})</option>
+                      <option value="percentage">Porcentaje (%)</option>
+                    </select>
                     <input
                       type="number"
-                      value={commissionValue}
-                      onChange={(e) => setCommissionValue(Number(e.target.value))}
-                      className="w-full p-1.5 bg-white border border-slate-300 rounded-lg text-xs mt-0.5 text-slate-900 font-mono"
-                      min={0}
+                      value={commMantVal}
+                      onChange={(e) => setCommMantVal(Number(e.target.value))}
+                      className="p-1.5 bg-slate-50 border border-slate-300 rounded-md text-xs font-mono font-bold"
+                    />
+                  </div>
+                </div>
+
+                {/* Instalación */}
+                <div className="bg-white p-2.5 rounded-lg border border-slate-200 space-y-1">
+                  <div className="flex justify-between items-center text-[11px] font-bold text-slate-800">
+                    <span>❄️ Instalación de Equipos</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      value={commInstType}
+                      onChange={(e) => setCommInstType(e.target.value as any)}
+                      className="p-1.5 bg-slate-50 border border-slate-300 rounded-md text-xs"
+                    >
+                      <option value="fixed">Monto Fijo ({currencySymbol})</option>
+                      <option value="percentage">Porcentaje (%)</option>
+                    </select>
+                    <input
+                      type="number"
+                      value={commInstVal}
+                      onChange={(e) => setCommInstVal(Number(e.target.value))}
+                      className="p-1.5 bg-slate-50 border border-slate-300 rounded-md text-xs font-mono font-bold"
                     />
                   </div>
                 </div>
@@ -679,10 +798,10 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
         </div>
       )}
 
-      {/* Modal Editar Personal (NK-029) */}
+      {/* Modal Editar Personal (NK-029 & NK-012) */}
       {editingTech && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+          <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xl my-6">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-bold text-slate-900 text-base">Editar Colaborador HVAC</h3>
               <button onClick={() => setEditingTech(null)} className="text-slate-400 hover:text-slate-700">
@@ -733,7 +852,7 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-slate-700 font-medium">RUT / Identificación</label>
+                  <label className="text-slate-700 font-medium">Identificación / Cédula</label>
                   <input
                     type="text"
                     value={editRut}
@@ -802,29 +921,55 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                 </div>
               )}
 
-              <div className="p-3 rounded-xl bg-cyan-50/50 border border-cyan-200 space-y-2">
-                <label className="font-bold text-cyan-900 block">
-                  Comisión Predeterminada por Servicio
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-slate-600 text-[11px]">Tipo</label>
+              {/* Tarifas Diferenciadas por Tipo de Trabajo (NK-012) */}
+              <div className="p-3.5 rounded-xl bg-cyan-50/60 border border-cyan-200 space-y-3">
+                <div>
+                  <label className="font-bold text-cyan-950 block text-xs">
+                    Tarifas Pactadas por Tipo de Trabajo
+                  </label>
+                  <p className="text-[10px] text-slate-500">
+                    Ajusta montos fijos o % independientes para mantenciones e instalaciones
+                  </p>
+                </div>
+
+                {/* Mantención */}
+                <div className="bg-white p-2.5 rounded-lg border border-slate-200 space-y-1">
+                  <span className="text-[11px] font-bold text-slate-800 block">🔧 Mantenciones Preventivas</span>
+                  <div className="grid grid-cols-2 gap-2">
                     <select
-                      value={editCommissionType}
-                      onChange={(e) => setEditCommissionType(e.target.value as any)}
-                      className="w-full p-1.5 bg-white border border-slate-300 rounded-lg text-xs mt-0.5 text-slate-900"
+                      value={editCommMantType}
+                      onChange={(e) => setEditCommMantType(e.target.value as any)}
+                      className="p-1.5 bg-slate-50 border border-slate-300 rounded-md text-xs"
                     >
-                      <option value="percentage">Porcentaje (%)</option>
                       <option value="fixed">Monto Fijo ({currencySymbol})</option>
+                      <option value="percentage">Porcentaje (%)</option>
                     </select>
-                  </div>
-                  <div>
-                    <label className="text-slate-600 text-[11px]">Valor</label>
                     <input
                       type="number"
-                      value={editCommissionValue}
-                      onChange={(e) => setEditCommissionValue(Number(e.target.value))}
-                      className="w-full p-1.5 bg-white border border-slate-300 rounded-lg text-xs mt-0.5 text-slate-900 font-mono"
+                      value={editCommMantVal}
+                      onChange={(e) => setEditCommMantVal(Number(e.target.value))}
+                      className="p-1.5 bg-slate-50 border border-slate-300 rounded-md text-xs font-mono font-bold"
+                    />
+                  </div>
+                </div>
+
+                {/* Instalación */}
+                <div className="bg-white p-2.5 rounded-lg border border-slate-200 space-y-1">
+                  <span className="text-[11px] font-bold text-slate-800 block">❄️ Instalación de Equipos</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      value={editCommInstType}
+                      onChange={(e) => setEditCommInstType(e.target.value as any)}
+                      className="p-1.5 bg-slate-50 border border-slate-300 rounded-md text-xs"
+                    >
+                      <option value="fixed">Monto Fijo ({currencySymbol})</option>
+                      <option value="percentage">Porcentaje (%)</option>
+                    </select>
+                    <input
+                      type="number"
+                      value={editCommInstVal}
+                      onChange={(e) => setEditCommInstVal(Number(e.target.value))}
+                      className="p-1.5 bg-slate-50 border border-slate-300 rounded-md text-xs font-mono font-bold"
                     />
                   </div>
                 </div>
@@ -850,7 +995,7 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
         </div>
       )}
 
-      {/* Modal Liquidación & Resumen Detallado (NK-012) */}
+      {/* Modal Liquidación & Resumen Detallado (NK-012) - SIN MOSTRAR FACTURACIÓN TOTAL AL CLIENTE */}
       {selectedTechForSettlement && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
           <div className="w-full max-w-2xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden my-8">
@@ -858,7 +1003,7 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
             <div className="p-6 bg-slate-900 text-white flex items-center justify-between">
               <div>
                 <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">
-                  Liquidación de Servicios HVAC • {selectedMonth}
+                  Liquidación de Mano de Obra • {selectedMonth}
                 </span>
                 <h3 className="text-xl font-black text-white flex items-center gap-2">
                   {selectedTechForSettlement.name}
@@ -871,13 +1016,13 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                   </span>
                 </h3>
                 <p className="text-xs text-slate-400">
-                  RUT: {selectedTechForSettlement.rut} • Tel: {selectedTechForSettlement.phone}
+                  ID: {selectedTechForSettlement.rut} • Tel: {selectedTechForSettlement.phone}
                 </p>
               </div>
 
               <button
                 onClick={() => setSelectedTechForSettlement(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -885,77 +1030,90 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
 
             {/* Contenido Imprimible */}
             <div className="p-6 space-y-6 text-xs text-slate-900" id="settlement-print-sheet">
-              {/* Tarjeta de Resumen */}
+              {/* Tarjeta de Resumen (Sin facturación del cliente) */}
               {(() => {
-                const s = techSettlementMap.get(selectedTechForSettlement.id) || { completedCount: 0, totalBilled: 0, totalCommission: 0, services: [] };
+                const s = techSettlementMap.get(selectedTechForSettlement.id) || { completedCount: 0, totalCommission: 0, services: [] };
+                const avgPerService = s.completedCount > 0 ? Math.round(s.totalCommission / s.completedCount) : 0;
+
                 return (
                   <>
                     <div className="grid grid-cols-3 gap-3 p-4 rounded-xl bg-slate-50 border border-slate-200">
                       <div>
-                        <span className="text-slate-500 font-medium block">Servicios del Mes</span>
-                        <strong className="text-lg text-slate-900 font-mono">{s.completedCount}</strong>
+                        <span className="text-slate-500 font-medium block">Servicios Realizados</span>
+                        <strong className="text-lg text-slate-900 font-mono">{s.completedCount} órdenes</strong>
                       </div>
                       <div>
-                        <span className="text-slate-500 font-medium block">Facturación Atendida</span>
+                        <span className="text-slate-500 font-medium block">Promedio por Servicio</span>
                         <strong className="text-lg text-slate-900 font-mono">
-                          {formatAirPrice(s.totalBilled, currencySymbol, countryCode)}
+                          {formatAirPrice(avgPerService, currencySymbol, countryCode)}
                         </strong>
                       </div>
-                      <div className="bg-cyan-100/60 p-2 rounded-lg border border-cyan-200">
-                        <span className="text-cyan-900 font-bold block">Total a Liquidar</span>
-                        <strong className="text-lg text-cyan-900 font-mono font-black">
+                      <div className="bg-cyan-100/70 p-2.5 rounded-xl border border-cyan-200">
+                        <span className="text-cyan-950 font-bold block text-[11px]">Total a Liquidar</span>
+                        <strong className="text-xl text-cyan-950 font-mono font-black">
                           {formatAirPrice(s.totalCommission, currencySymbol, countryCode)}
                         </strong>
                       </div>
                     </div>
 
-                    {/* Tabla de Servicios */}
+                    {/* Tabla de Servicios (Solo muestra datos técnicos y pago del colaborador, NUNCA el cobro al cliente) */}
                     <div className="space-y-2">
-                      <h4 className="font-bold text-slate-800 text-sm">Desglose de Órdenes Realizadas</h4>
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-slate-800 text-sm">Desglose de Servicios & Pagos</h4>
+                        <span className="text-[11px] text-slate-500">Comisiones aprobadas</span>
+                      </div>
+
                       {s.services.length === 0 ? (
                         <div className="p-6 text-center text-slate-400 bg-slate-50 rounded-xl border border-slate-200">
                           No hay órdenes completadas para este colaborador en el mes {selectedMonth}.
                         </div>
                       ) : (
-                        <div className="border border-slate-200 rounded-xl overflow-hidden">
-                          <table className="w-full text-left border-collapse">
+                        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                          <table className="w-full text-left border-collapse text-xs">
                             <thead>
-                              <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                              <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 text-[11px]">
                                 <th className="p-2.5">Ticket</th>
                                 <th className="p-2.5">Fecha</th>
                                 <th className="p-2.5">Cliente</th>
+                                <th className="p-2.5">Servicio Realizado</th>
                                 <th className="p-2.5">Rol</th>
-                                <th className="p-2.5 text-right">Total Orden</th>
-                                <th className="p-2.5 text-right">Comisión</th>
+                                <th className="p-2.5 text-right">Pago Asignado</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                               {s.services.map((item, idx) => (
                                 <tr key={idx} className="hover:bg-slate-50">
-                                  <td className="p-2.5 font-mono font-bold text-cyan-700">{item.order.ticket_number}</td>
-                                  <td className="p-2.5 font-mono text-slate-600">{item.order.completed_at?.split('T')[0] || item.order.scheduled_date}</td>
-                                  <td className="p-2.5 text-slate-800 font-medium">{item.order.customer?.name || 'Cliente'}</td>
+                                  <td className="p-2.5 font-mono font-bold text-cyan-800">{item.order.ticket_number}</td>
+                                  <td className="p-2.5 font-mono text-slate-600">
+                                    {item.order.completed_at?.split('T')[0] || item.order.scheduled_date}
+                                  </td>
+                                  <td className="p-2.5 text-slate-800 font-medium">
+                                    {item.order.customer?.name || 'Cliente Particular'}
+                                  </td>
+                                  <td className="p-2.5 text-slate-700 font-medium">
+                                    {item.serviceName}
+                                  </td>
                                   <td className="p-2.5">
-                                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-700">
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                                      item.roleInService === 'Ayudante'
+                                        ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                        : 'bg-cyan-50 text-cyan-800 border border-cyan-200'
+                                    }`}>
                                       {item.roleInService}
                                     </span>
                                   </td>
-                                  <td className="p-2.5 text-right font-mono text-slate-600">
-                                    {formatAirPrice(item.order.total, currencySymbol, countryCode)}
-                                  </td>
-                                  <td className="p-2.5 text-right font-mono font-bold text-emerald-700">
+                                  <td className="p-2.5 text-right font-mono font-black text-emerald-700 text-sm">
                                     +{formatAirPrice(item.commissionEarned, currencySymbol, countryCode)}
                                   </td>
                                 </tr>
                               ))}
                             </tbody>
                             <tfoot>
-                              <tr className="bg-slate-50 font-bold border-t border-slate-200">
-                                <td colSpan={4} className="p-2.5 text-slate-700">TOTAL COMISIONES</td>
-                                <td className="p-2.5 text-right font-mono text-slate-900">
-                                  {formatAirPrice(s.totalBilled, currencySymbol, countryCode)}
+                              <tr className="bg-slate-100 font-bold border-t border-slate-200">
+                                <td colSpan={5} className="p-2.5 text-slate-800 uppercase tracking-wide">
+                                  TOTAL LIQUIDACIÓN DEL MES:
                                 </td>
-                                <td className="p-2.5 text-right font-mono text-emerald-800 text-sm">
+                                <td className="p-2.5 text-right font-mono text-emerald-800 text-base font-black">
                                   {formatAirPrice(s.totalCommission, currencySymbol, countryCode)}
                                 </td>
                               </tr>
@@ -973,7 +1131,7 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                 <button
                   type="button"
                   onClick={() => handleSendWhatsAppSettlement(selectedTechForSettlement)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 font-bold cursor-pointer"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 font-bold cursor-pointer transition-all"
                 >
                   <Share2 className="w-4 h-4 text-emerald-600" />
                   <span>Enviar por WhatsApp</span>
@@ -983,7 +1141,7 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                   <button
                     type="button"
                     onClick={() => window.print()}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold cursor-pointer"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold cursor-pointer transition-all"
                   >
                     <Printer className="w-4 h-4" />
                     <span>Imprimir Resumen</span>
@@ -991,7 +1149,7 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                   <button
                     type="button"
                     onClick={() => setSelectedTechForSettlement(null)}
-                    className="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 cursor-pointer transition-all"
                   >
                     Cerrar
                   </button>

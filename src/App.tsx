@@ -14,13 +14,13 @@ import { SettingsAir } from './components/SettingsAir';
 import { AddServiceOrderModal } from './components/AddServiceOrderModal';
 import { EditServiceOrderModal } from './components/EditServiceOrderModal';
 import { InspeccionHVACModal } from './components/InspeccionHVACModal';
-import { PublicBookingModal } from './components/PublicBookingModal';
+import { PublicBookingModal, BookingPrefill } from './components/PublicBookingModal';
 import { ReceiptModalAir } from './components/ReceiptModalAir';
 import { LandingNexusAir } from './components/LandingNexusAir';
 import { LandingTenantAir } from './components/LandingTenantAir';
 import { LoginAir } from './components/LoginAir';
 import { CustomerPortalAir } from './components/CustomerPortalAir';
-import { ViewTab, ServiceOrder, AirSettings } from './types';
+import { ViewTab, ServiceOrder, AirSettings, Customer, AirEquipment, ServiceType } from './types';
 import { Toaster, toast } from 'react-hot-toast';
 
 type MainView = 'landing' | 'tenant_landing' | 'login' | 'customer' | 'dashboard';
@@ -125,6 +125,12 @@ export default function App() {
   const [isEditOrderModalOpen, setIsEditOrderModalOpen] = useState(false);
   const [isInspectionModalOpen, setIsInspectionModalOpen] = useState(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [bookingPrefill, setBookingPrefill] = useState<BookingPrefill | null>(null);
+
+  const handleOpenBooking = (customer?: Customer, equipment?: AirEquipment, serviceType?: ServiceType, notes?: string) => {
+    setBookingPrefill({ customer, equipment, serviceType, notes });
+    setIsBookingModalOpen(true);
+  };
 
   // Selected Order for Editing / Inspection / Receipt
   const [selectedOrder, setSelectedOrder] = useState<ServiceOrder | null>(null);
@@ -217,14 +223,19 @@ export default function App() {
         <Toaster position="top-right" />
         <LandingTenantAir
           settings={currentSettings}
-          onOpenBooking={() => setIsBookingModalOpen(true)}
+          onOpenBooking={() => handleOpenBooking()}
           onOpenPortal={() => setView('customer')}
           onAdminAccess={() => setView('login')}
         />
         <PublicBookingModal
           isOpen={isBookingModalOpen}
-          onClose={() => setIsBookingModalOpen(false)}
+          onClose={() => {
+            setIsBookingModalOpen(false);
+            setBookingPrefill(null);
+          }}
           settings={currentSettings}
+          customers={customers}
+          prefill={bookingPrefill}
           onConfirmBooking={handleConfirmPublicBooking}
         />
       </>
@@ -238,14 +249,19 @@ export default function App() {
         <Toaster position="top-right" />
         <LandingNexusAir
           settings={settings}
-          onOpenBooking={() => setIsBookingModalOpen(true)}
+          onOpenBooking={() => handleOpenBooking()}
           onOpenPortal={() => setView('customer')}
           onAdminAccess={() => setView('login')}
         />
         <PublicBookingModal
           isOpen={isBookingModalOpen}
-          onClose={() => setIsBookingModalOpen(false)}
+          onClose={() => {
+            setIsBookingModalOpen(false);
+            setBookingPrefill(null);
+          }}
           settings={settings}
+          customers={customers}
+          prefill={bookingPrefill}
           onConfirmBooking={handleConfirmPublicBooking}
         />
       </>
@@ -262,13 +278,17 @@ export default function App() {
           onQuickDemoAccess={() => setView('dashboard')}
           onBackToLanding={() => setView(tenantSlug ? 'tenant_landing' : 'landing')}
           onOpenCustomerPortal={() => setView('customer')}
-          onOpenBooking={() => setIsBookingModalOpen(true)}
+          onOpenBooking={() => handleOpenBooking()}
         />
         <PublicBookingModal
           isOpen={isBookingModalOpen}
-          onClose={() => setIsBookingModalOpen(false)}
+          onClose={() => {
+            setIsBookingModalOpen(false);
+            setBookingPrefill(null);
+          }}
           settings={tenantSettings || settings}
           customers={customers}
+          prefill={bookingPrefill}
           onConfirmBooking={handleConfirmPublicBooking}
         />
       </>
@@ -286,13 +306,17 @@ export default function App() {
           orders={orders}
           settings={tenantSettings || settings}
           onBackToApp={() => setView(user ? 'dashboard' : (tenantSlug ? 'tenant_landing' : 'landing'))}
-          onOpenBooking={() => setIsBookingModalOpen(true)}
+          onOpenBooking={(cust, eq) => handleOpenBooking(cust, eq, 'mantencion_preventiva')}
         />
         <PublicBookingModal
           isOpen={isBookingModalOpen}
-          onClose={() => setIsBookingModalOpen(false)}
+          onClose={() => {
+            setIsBookingModalOpen(false);
+            setBookingPrefill(null);
+          }}
           settings={tenantSettings || settings}
           customers={customers}
+          prefill={bookingPrefill}
           onConfirmBooking={handleConfirmPublicBooking}
         />
       </>
@@ -452,9 +476,13 @@ export default function App() {
 
       <PublicBookingModal
         isOpen={isBookingModalOpen}
-        onClose={() => setIsBookingModalOpen(false)}
+        onClose={() => {
+          setIsBookingModalOpen(false);
+          setBookingPrefill(null);
+        }}
         settings={tenantSettings || settings}
         customers={customers}
+        prefill={bookingPrefill}
         onConfirmBooking={handleConfirmPublicBooking}
       />
 
