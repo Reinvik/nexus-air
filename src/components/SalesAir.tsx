@@ -1,12 +1,17 @@
 import React, { useMemo } from 'react';
-import { ServiceOrder } from '../types';
+import { ServiceOrder, AirSettings } from '../types';
+import { formatAirPrice } from '../lib/countries';
 import { TrendingUp, DollarSign, Calendar, CheckCircle2, ShieldCheck, Layers, CreditCard } from 'lucide-react';
 
 interface SalesAirProps {
   orders: ServiceOrder[];
+  settings?: AirSettings;
 }
 
-export const SalesAir: React.FC<SalesAirProps> = ({ orders }) => {
+export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings }) => {
+  const currencySymbol = settings?.currency_symbol || '₡';
+  const countryCode = settings?.country_code || 'CR';
+
   const stats = useMemo(() => {
     let totalIngresos = 0;
     let mantencionesTotal = 0;
@@ -56,7 +61,7 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders }) => {
             <DollarSign className="w-4 h-4 text-white" />
           </div>
           <p className="text-3xl font-black font-mono tracking-tight">
-            ${stats.totalIngresos.toLocaleString('es-CL')}
+            {formatAirPrice(stats.totalIngresos, currencySymbol, countryCode)}
           </p>
           <p className="text-[11px] text-white/80">Monto total con IVA</p>
         </div>
@@ -68,7 +73,7 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders }) => {
             <ShieldCheck className="w-4 h-4 text-white" />
           </div>
           <p className="text-3xl font-black font-mono tracking-tight">
-            ${stats.mantencionesTotal.toLocaleString('es-CL')}
+            {formatAirPrice(stats.mantencionesTotal, currencySymbol, countryCode)}
           </p>
           <p className="text-[11px] text-white/80">Ingreso recurrente semestral</p>
         </div>
@@ -80,7 +85,7 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders }) => {
             <Layers className="w-4 h-4 text-white" />
           </div>
           <p className="text-3xl font-black font-mono tracking-tight">
-            ${stats.instalacionesTotal.toLocaleString('es-CL')}
+            {formatAirPrice(stats.instalacionesTotal, currencySymbol, countryCode)}
           </p>
           <p className="text-[11px] text-white/80">Equipos nuevos montados</p>
         </div>
@@ -92,7 +97,7 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders }) => {
             <CreditCard className="w-4 h-4 text-white" />
           </div>
           <p className="text-3xl font-black font-mono tracking-tight">
-            ${stats.ticketPromedio.toLocaleString('es-CL')}
+            {formatAirPrice(stats.ticketPromedio, currencySymbol, countryCode)}
           </p>
           <p className="text-[11px] text-white/80">Por orden de servicio</p>
         </div>
@@ -138,7 +143,7 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders }) => {
                     </span>
                   </td>
                   <td className="py-3 px-4 text-right font-mono font-black text-slate-900 text-sm">
-                    ${o.total.toLocaleString('es-CL')}
+                    {formatAirPrice(o.total, currencySymbol, countryCode)}
                   </td>
                 </tr>
               ))}

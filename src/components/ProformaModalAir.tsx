@@ -18,6 +18,7 @@ import {
   Snowflake
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { getTaxPercentage } from '../lib/countries';
 
 export interface ProformaItem {
   id: string;
@@ -52,7 +53,7 @@ export function ProformaModalAir({
   onCreateOrder,
 }: ProformaModalAirProps) {
   const currencySymbol = settings?.currency_symbol || '₡';
-  const taxRatePercent = settings?.tax_rate !== undefined ? settings.tax_rate : 13; // 13% en Costa Rica
+  const taxRatePercent = getTaxPercentage(settings?.tax_rate);
 
   // Datos del Cliente en la proforma
   const [clientName, setClientName] = useState('Cliente Empresa / Particular');

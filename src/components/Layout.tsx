@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ViewTab, AirSettings } from '../types';
 import { 
   Kanban, 
@@ -19,7 +19,9 @@ import {
   AlertTriangle,
   Camera,
   RefreshCw,
-  LogOut
+  LogOut,
+  Menu,
+  X
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -49,6 +51,8 @@ export const Layout: React.FC<LayoutProps> = ({
   onLogout,
   children,
 }) => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   const mainNav: { id: ViewTab; label: string; icon: React.ElementType; badge?: number; badgeColor?: string }[] = [
     { id: 'dashboard', label: 'Tablero Órdenes', icon: Kanban, badge: activeOrdersCount },
     { 
@@ -72,28 +76,52 @@ export const Layout: React.FC<LayoutProps> = ({
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
+      {/* Mobile Drawer Overlay Backdrop */}
+      {isMobileMenuOpen && (
+        <div
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden animate-fade-in cursor-pointer"
+        />
+      )}
+
       {/* Smartlean / Nexus Dark Sidebar */}
-      <aside className="w-[270px] bg-[#050811] border-r border-white/[0.04] flex flex-col justify-between shrink-0 shadow-2xl z-30">
+      <aside className={`w-[270px] bg-[#050811] border-r border-white/[0.04] flex flex-col justify-between shrink-0 shadow-2xl z-50 fixed inset-y-0 left-0 transition-transform duration-300 ease-in-out md:static md:translate-x-0 ${
+        isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}>
         <div className="flex flex-col flex-1 overflow-y-auto">
           {/* Brand Header */}
           <div className="p-5 pb-3">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[rgba(0,210,255,0.1)] border border-[rgba(0,210,255,0.3)] flex items-center justify-center text-[#00d2ff] shadow-[0_0_15px_rgba(0,210,255,0.25)] transition-transform hover:scale-105">
-                <Wind className="w-5 h-5" />
-              </div>
-              <div className="flex flex-col">
-                <div className="text-[20px] font-black tracking-[-0.04em] text-white flex items-center leading-none">
-                  NEXUS<span className="text-[#00d2ff]">AIR</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-[rgba(0,210,255,0.1)] border border-[rgba(0,210,255,0.3)] flex items-center justify-center text-[#00d2ff] shadow-[0_0_15px_rgba(0,210,255,0.25)] transition-transform hover:scale-105">
+                  <Wind className="w-5 h-5" />
                 </div>
-                <span className="text-[9px] font-extrabold text-[#00d2ff] tracking-[0.16em] uppercase mt-1">
-                  BY SMARTLEAN
-                </span>
+                <div className="flex flex-col">
+                  <div className="text-[20px] font-black tracking-[-0.04em] text-white flex items-center leading-none">
+                    NEXUS<span className="text-[#00d2ff]">AIR</span>
+                  </div>
+                  <span className="text-[9px] font-extrabold text-[#00d2ff] tracking-[0.16em] uppercase mt-1">
+                    BY SMARTLEAN
+                  </span>
+                </div>
               </div>
+
+              {/* Close Button on Mobile */}
+              <button
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.06] md:hidden transition-colors cursor-pointer"
+                title="Cerrar menú"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
             {/* Quick Action Button - Smartlean Gradient */}
             <button
-              onClick={onOpenNewOrder}
+              onClick={() => {
+                onOpenNewOrder();
+                setIsMobileMenuOpen(false);
+              }}
               className="w-full mt-4 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-gradient-to-r from-[#00d2ff] to-[#2563eb] hover:from-[#38bdf8] hover:to-[#1d4ed8] text-white font-bold text-xs shadow-[0_6px_20px_rgba(37,99,235,0.35)] transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4 stroke-[3]" />
@@ -115,7 +143,10 @@ export const Layout: React.FC<LayoutProps> = ({
                   return (
                     <button
                       key={item.id}
-                      onClick={() => setActiveTab(item.id)}
+                      onClick={() => {
+                        setActiveTab(item.id);
+                        setIsMobileMenuOpen(false);
+                      }}
                       className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold nexus-sidebar-item cursor-pointer ${
                         isActive
                           ? 'active text-white font-bold'
@@ -153,7 +184,10 @@ export const Layout: React.FC<LayoutProps> = ({
                   return (
                     <button
                       key={item.id}
-                      onClick={() => setActiveTab(item.id)}
+                      onClick={() => {
+                        setActiveTab(item.id);
+                        setIsMobileMenuOpen(false);
+                      }}
                       className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold nexus-sidebar-item cursor-pointer ${
                         isActive
                           ? 'active text-white font-bold'
@@ -231,49 +265,59 @@ export const Layout: React.FC<LayoutProps> = ({
       {/* Main Content Area - CRISP LIGHT CONTRAST (Estilo Nexus Lean) */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50">
         {/* Top Navbar */}
-        <header className="h-16 border-b border-slate-200/80 bg-white/90 backdrop-blur-md px-8 flex items-center justify-between shrink-0 shadow-xs">
-          <div className="flex items-center gap-4">
+        <header className="h-16 border-b border-slate-200/80 bg-white/90 backdrop-blur-md px-4 sm:px-8 flex items-center justify-between shrink-0 shadow-xs">
+          <div className="flex items-center gap-3 sm:gap-4">
+            {/* Hamburger Button for Mobile */}
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="p-2 -ml-1.5 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100 md:hidden transition-colors cursor-pointer"
+              title="Abrir menú"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
             <div>
-              <h1 className="text-lg font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+              <h1 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
                 {[...mainNav, ...manageNav].find(i => i.id === activeTab)?.label || 'Panel de Climatización'}
               </h1>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[10px] sm:text-[11px] text-slate-500 truncate max-w-[180px] sm:max-w-none">
                 {settings.company_name} • Mantenimiento Preventivo Semestral
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {overdueRecaptacionCount > 0 && (
               <button
                 onClick={() => setActiveTab('recaptacion')}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-800 text-xs font-bold hover:bg-amber-100 transition-all cursor-pointer shadow-xs"
+                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-800 text-[11px] sm:text-xs font-bold hover:bg-amber-100 transition-all cursor-pointer shadow-xs"
               >
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                <span>{overdueRecaptacionCount} Equipos por Recaptar (6M)</span>
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span className="hidden sm:inline">{overdueRecaptacionCount} Equipos por Recaptar (6M)</span>
+                <span className="sm:hidden">{overdueRecaptacionCount}</span>
               </button>
             )}
 
             <button
               onClick={onOpenPortal}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 hover:text-slate-900 transition-all cursor-pointer shadow-xs"
+              className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 hover:text-slate-900 transition-all cursor-pointer shadow-xs"
             >
               <UserCheck className="w-4 h-4 text-cyan-600" />
-              <span className="hidden sm:inline">Portal Cliente</span>
+              <span className="hidden md:inline">Portal Cliente</span>
             </button>
 
             <button
               onClick={onOpenLanding}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 hover:text-slate-900 transition-all cursor-pointer shadow-xs"
+              className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 hover:text-slate-900 transition-all cursor-pointer shadow-xs"
             >
               <ExternalLink className="w-4 h-4 text-cyan-600" />
-              <span className="hidden sm:inline">Landing Pública</span>
+              <span className="hidden md:inline">Landing Pública</span>
             </button>
           </div>
         </header>
 
         {/* Tab Viewport */}
-        <main className="flex-1 overflow-y-auto bg-slate-50 p-8">
+        <main className="flex-1 overflow-y-auto bg-slate-50 p-4 sm:p-6 lg:p-8">
           {children}
         </main>
       </div>

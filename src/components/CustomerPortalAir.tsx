@@ -23,6 +23,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatAirPrice } from '../lib/countries';
 
 interface CustomerPortalAirProps {
   customers: Customer[];
@@ -138,37 +139,59 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
           </div>
         </div>
 
-        {/* SECCIÓN EN VIVO: TÉCNICO EN RUTA (GPS TRACKING) */}
-        {clientOrders.some(o => o.status === 'en_ruta' || o.status === 'en_proceso') && (
-          <div className="p-6 rounded-3xl bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 border border-cyan-500/40 text-white shadow-xl space-y-4">
-            {clientOrders.filter(o => o.status === 'en_ruta' || o.status === 'en_proceso').map((liveOrd) => {
+        {/* SECCIÓN EN VIVO: SEGUIMIENTO DE TRABAJO (STEPPER EN VIVO & GPS - NK-025) */}
+        {clientOrders.some(o => o.status !== 'cancelado') && (
+          <div className="space-y-4">
+            {clientOrders.filter(o => o.status !== 'cancelado').slice(0, 1).map((liveOrd) => {
               const techName = liveOrd.assigned_technician?.name || 'Técnico Especialista';
               const isEnRuta = liveOrd.status === 'en_ruta';
+              const isEnProceso = liveOrd.status === 'en_proceso';
+              const isQA = liveOrd.status === 'pruebas_qa';
+              const isCompleted = liveOrd.status === 'completado';
               const loc = liveOrd.technician_location;
 
+              const stages = [
+                { id: 'ingresado', step: 1, label: 'Agendado', desc: 'Confirmado', icon: '📝' },
+                { id: 'en_ruta', step: 2, label: 'En Camino', desc: 'Trayecto GPS', icon: '🚐' },
+                { id: 'en_proceso', step: 3, label: 'En Terreno', desc: 'Servicio HVAC', icon: '🛠️' },
+                { id: 'pruebas_qa', step: 4, label: 'Pruebas QA', desc: 'Salto Térmico', icon: '🧪' },
+                { id: 'completado', step: 5, label: 'Finalizado', desc: 'Garantía Activa', icon: '✅' },
+              ];
+
+              const currentStepIdx = stages.findIndex(s => s.id === liveOrd.status);
+
               return (
-                <div key={`live-${liveOrd.id}`} className="space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+                <div key={`live-${liveOrd.id}`} className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 border border-cyan-500/40 text-white shadow-xl space-y-6">
+                  {/* Encabezado del Servicio en Vivo */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
                     <div className="flex items-center gap-3">
                       <div className="relative">
-                        <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-400 text-cyan-400 flex items-center justify-center">
-                          <Navigation className="w-5 h-5 animate-pulse" />
+                        <div className="w-11 h-11 rounded-2xl bg-cyan-500/20 border border-cyan-400 text-cyan-400 flex items-center justify-center">
+                          {isCompleted ? <CheckCircle2 className="w-6 h-6 text-emerald-400" /> : <Navigation className="w-5 h-5 animate-pulse" />}
                         </div>
-                        <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-400 ring-2 ring-slate-900 animate-ping" />
+                        {!isCompleted && (
+                          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-400 ring-2 ring-slate-900 animate-ping" />
+                        )}
                       </div>
                       <div>
-                        <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider">
-                          {isEnRuta ? '🚐 Técnico en Camino a tu Domicilio' : '🛠️ Técnico en Terreno Trabajando'}
-                        </span>
-                        <h3 className="text-lg font-black text-white">{techName}</h3>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider">
+                            {isCompleted ? '✅ Servicio Técnico Finalizado' :
+                             isEnRuta ? '🚐 Técnico en Camino a tu Domicilio' :
+                             isEnProceso ? '🛠️ Técnico en Terreno Realizando Servicio' :
+                             isQA ? '🧪 Pruebas de Calidad y Rendimiento HVAC' :
+                             '📅 Orden Técnica Agendada'}
+                          </span>
+                        </div>
+                        <h3 className="text-lg sm:text-xl font-black text-white">{techName}</h3>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <span className="text-xs px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 font-mono">
+                      <span className="text-xs px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 font-mono font-bold">
                         Orden #{liveOrd.ticket_number}
                       </span>
-                      {liveOrd.assigned_technician?.phone && (
+                      {liveOrd.assigned_technician?.phone && !isCompleted && (
                         <a
                           href={`https://wa.me/${liveOrd.assigned_technician.phone.replace(/[^0-9]/g, '')}?text=Hola%20${encodeURIComponent(techName)}%2C%20te%20escribo%20del%20domicilio%20por%20la%20orden%20${liveOrd.ticket_number}`}
                           target="_blank"
@@ -182,69 +205,122 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
                     </div>
                   </div>
 
-                  {/* Mapa Interactivo / Radar de Trayecto */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                    <div className="md:col-span-2 relative h-48 bg-slate-950/80 rounded-2xl border border-slate-800 overflow-hidden flex flex-col justify-between p-4">
-                      {/* Simulación visual de mapa y ruta */}
-                      <div className="absolute inset-0 opacity-20 pointer-events-none bg-[radial-gradient(#00d2ff_1px,transparent_1px)] [background-size:16px_16px]" />
-                      <div className="flex items-center justify-between z-10">
-                        <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
-                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
-                          GPS Satelital Activo (watchPosition)
-                        </span>
-                        {loc?.updated_at && (
-                          <span className="text-[10px] text-cyan-300/80 font-mono">
-                            Última actualización: hace unos segundos
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Indicadores de ruta */}
-                      <div className="flex items-center justify-around py-4 z-10">
-                        <div className="flex flex-col items-center gap-1 text-center">
-                          <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-400 text-blue-300 flex items-center justify-center shadow-lg">
-                            🚐
-                          </div>
-                          <span className="text-[11px] font-bold text-white">{techName.split(' ')[0]}</span>
-                          <span className="text-[9px] text-cyan-300">En ruta</span>
-                        </div>
-
-                        <div className="flex-1 mx-4 flex flex-col items-center">
-                          <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden relative">
-                            <div className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 w-2/3 animate-pulse" />
-                          </div>
-                          <span className="text-[10px] text-cyan-400 mt-1 font-bold">Tiempo estimado: 10 - 15 min</span>
-                        </div>
-
-                        <div className="flex flex-col items-center gap-1 text-center">
-                          <div className="w-10 h-10 rounded-xl bg-emerald-600/30 border border-emerald-400 text-emerald-300 flex items-center justify-center shadow-lg">
-                            📍
-                          </div>
-                          <span className="text-[11px] font-bold text-white">Tu Domicilio</span>
-                          <span className="text-[9px] text-slate-400">{matchedCustomer?.commune}</span>
-                        </div>
-                      </div>
-
-                      <div className="z-10 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-800/80 pt-2">
-                        <span>Dirección de destino: <strong className="text-white">{matchedCustomer?.address}</strong></span>
-                        {loc && (
-                          <span className="font-mono text-[10px] text-cyan-300">
-                            Lat: {loc.lat.toFixed(4)} • Lng: {loc.lng.toFixed(4)}
-                          </span>
-                        )}
-                      </div>
+                  {/* STEPPER EN VIVO (NK-025) */}
+                  <div className="p-4 sm:p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-300 flex items-center gap-1.5">
+                        <Clock className="w-4 h-4 text-cyan-400" />
+                        Estado del Proceso en Tiempo Real
+                      </span>
+                      <span className="text-[11px] text-cyan-400 font-mono font-bold">
+                        Etapa {currentStepIdx + 1} de 5
+                      </span>
                     </div>
 
-                    {/* Estado y Recomendaciones de Espera */}
-                    <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2 text-xs">
-                      <strong className="text-cyan-300 block">ℹ️ Al momento de la llegada:</strong>
-                      <ul className="space-y-1.5 text-[11px] text-slate-300">
-                        <li>• Mantén despejada el área cercana al equipo split interior o condensador exterior.</li>
-                        <li>• Si vives en edificio, autoriza el ingreso en conserjería para evitar demoras.</li>
-                        <li>• El técnico cuenta con implementos de seguridad y acreditación SEC.</li>
-                      </ul>
+                    {/* Barra Visual de Etapas */}
+                    <div className="grid grid-cols-5 gap-1 sm:gap-2 pt-2">
+                      {stages.map((stg, idx) => {
+                        const isPast = idx < currentStepIdx;
+                        const isCurrent = idx === currentStepIdx;
+
+                        return (
+                          <div key={stg.id} className="flex flex-col items-center text-center space-y-1.5">
+                            <div className="w-full flex items-center">
+                              <div className={`h-1.5 w-full rounded-full transition-all ${
+                                isPast ? 'bg-emerald-400' :
+                                isCurrent ? 'bg-cyan-400 animate-pulse' :
+                                'bg-slate-700'
+                              }`} />
+                            </div>
+
+                            <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-sm font-bold transition-all ${
+                              isPast ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20' :
+                              isCurrent ? 'bg-cyan-400 text-slate-950 ring-4 ring-cyan-400/30 scale-105 font-black shadow-lg shadow-cyan-400/30' :
+                              'bg-slate-800 text-slate-400 border border-slate-700'
+                            }`}>
+                              {isPast ? '✓' : stg.icon}
+                            </div>
+
+                            <div className="hidden sm:block">
+                              <span className={`text-[11px] font-bold block leading-tight ${
+                                isCurrent ? 'text-cyan-300' : isPast ? 'text-emerald-300' : 'text-slate-400'
+                              }`}>
+                                {stg.label}
+                              </span>
+                              <span className="text-[9px] text-slate-400 block">{stg.desc}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
+
+                  {/* Si está en ruta o en proceso: Radar GPS y Mapa */}
+                  {(isEnRuta || isEnProceso) && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center pt-2">
+                      <div className="md:col-span-2 relative h-48 bg-slate-950/80 rounded-2xl border border-slate-800 overflow-hidden flex flex-col justify-between p-4">
+                        <div className="absolute inset-0 opacity-20 pointer-events-none bg-[radial-gradient(#00d2ff_1px,transparent_1px)] [background-size:16px_16px]" />
+                        <div className="flex items-center justify-between z-10">
+                          <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                            GPS Satelital Activo (watchPosition)
+                          </span>
+                          {loc?.updated_at && (
+                            <span className="text-[10px] text-cyan-300/80 font-mono">
+                              Actualizado en vivo
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Indicadores de ruta */}
+                        <div className="flex items-center justify-around py-4 z-10">
+                          <div className="flex flex-col items-center gap-1 text-center">
+                            <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-400 text-blue-300 flex items-center justify-center shadow-lg">
+                              🚐
+                            </div>
+                            <span className="text-[11px] font-bold text-white">{techName.split(' ')[0]}</span>
+                            <span className="text-[9px] text-cyan-300">{isEnRuta ? 'En trayecto' : 'En tu domicilio'}</span>
+                          </div>
+
+                          <div className="flex-1 mx-4 flex flex-col items-center">
+                            <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden relative">
+                              <div className={`h-full bg-gradient-to-r from-cyan-400 to-emerald-400 ${isEnRuta ? 'w-2/3 animate-pulse' : 'w-full'}`} />
+                            </div>
+                            <span className="text-[10px] text-cyan-400 mt-1 font-bold">
+                              {isEnRuta ? 'Tiempo estimado: 10 - 15 min' : 'Técnico trabajando en terreno'}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-col items-center gap-1 text-center">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-600/30 border border-emerald-400 text-emerald-300 flex items-center justify-center shadow-lg">
+                              📍
+                            </div>
+                            <span className="text-[11px] font-bold text-white">Tu Domicilio</span>
+                            <span className="text-[9px] text-slate-400">{matchedCustomer?.commune}</span>
+                          </div>
+                        </div>
+
+                        <div className="z-10 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-800/80 pt-2">
+                          <span>Destino: <strong className="text-white">{matchedCustomer?.address}</strong></span>
+                          {loc && (
+                            <span className="font-mono text-[10px] text-cyan-300">
+                              Lat: {loc.lat.toFixed(4)} • Lng: {loc.lng.toFixed(4)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Recomendaciones de Espera */}
+                      <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2 text-xs">
+                        <strong className="text-cyan-300 block">ℹ️ Al momento de la visita:</strong>
+                        <ul className="space-y-1.5 text-[11px] text-slate-300">
+                          <li>• Mantén despejada el área cercana al equipo split interior o condensador.</li>
+                          <li>• Si vives en edificio, autoriza el ingreso en conserjería para evitar demoras.</li>
+                          <li>• El técnico cuenta con implementos de seguridad y acreditación SEC.</li>
+                        </ul>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -446,7 +522,7 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
                       Fecha de atención: {ord.scheduled_date}
                     </span>
                     <span className="font-mono font-bold text-slate-900">
-                      Total: ${ord.total.toLocaleString('es-CL')}
+                      Total: {formatAirPrice(ord.total, settings?.currency_symbol, settings?.country_code)}
                     </span>
                   </div>
                 </div>

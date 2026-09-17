@@ -19,6 +19,7 @@ interface KanbanBoardAirProps {
   onEditOrder: (order: ServiceOrder) => void;
   onOpenInspection: (order: ServiceOrder) => void;
   onUpdateStatus: (orderId: string, status: OrderStatus) => void;
+  onOpenReceipt?: (order: ServiceOrder) => void;
 }
 
 const COLUMNS: { id: OrderStatus; title: string; icon: React.ElementType; color: string; badgeColor: string }[] = [
@@ -36,6 +37,7 @@ export const KanbanBoardAir: React.FC<KanbanBoardAirProps> = ({
   onEditOrder,
   onOpenInspection,
   onUpdateStatus,
+  onOpenReceipt,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
@@ -153,6 +155,7 @@ export const KanbanBoardAir: React.FC<KanbanBoardAirProps> = ({
                       onEdit={onEditOrder}
                       onOpenInspection={onOpenInspection}
                       onUpdateStatus={onUpdateStatus}
+                      onOpenReceipt={onOpenReceipt}
                     />
                   ))
                 )}

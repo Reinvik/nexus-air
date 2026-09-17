@@ -65,6 +65,7 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
   // New Equipment Form State
   const [eqBrand, setEqBrand] = useState('Anwo');
   const [eqModel, setEqModel] = useState('Inverter Eco 12k');
+  const [eqSerial, setEqSerial] = useState('');
   const [eqBtu, setEqBtu] = useState(12000);
   const [eqType, setEqType] = useState<EquipmentType>('split_muro');
   const [eqTech, setEqTech] = useState<'inverter' | 'on_off'>('inverter');
@@ -109,6 +110,7 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
       customer_id: selectedCustomer.id,
       brand: eqBrand,
       model: eqModel,
+      serial_number: eqSerial.trim() || undefined,
       btu: eqBtu,
       type: eqType,
       technology: eqTech,
@@ -117,6 +119,7 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
       last_maintenance_date: eqLastDate,
     });
 
+    setEqSerial('');
     setIsAddEqModalOpen(false);
   };
 
@@ -321,6 +324,12 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
                             📍 Ubicación: <span className="text-slate-900 font-bold">{eq.location_in_property}</span>
                           </div>
                           {eq.model && <div className="text-[11px] text-slate-400">Modelo: {eq.model}</div>}
+                          {eq.serial_number && (
+                            <div className="text-[11px] text-cyan-800 font-mono font-bold flex items-center gap-1.5 pt-0.5">
+                              <span className="text-slate-500 font-sans font-medium">Serial / Serie:</span>
+                              <span className="bg-cyan-50 text-cyan-700 px-1.5 py-0.5 rounded border border-cyan-200">{eq.serial_number}</span>
+                            </div>
+                          )}
                         </div>
 
                         <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[11px]">
@@ -485,6 +494,29 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
                     <option value="24000">24.000 BTU</option>
                     <option value="36000">36.000 BTU</option>
                   </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-slate-700 font-medium">Modelo</label>
+                  <input
+                    type="text"
+                    value={eqModel}
+                    placeholder="Ej: Inverter Eco 12k"
+                    onChange={(e) => setEqModel(e.target.value)}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-700 font-medium">N° de Serial / Serie</label>
+                  <input
+                    type="text"
+                    value={eqSerial}
+                    placeholder="Ej: SN-2026-X88392"
+                    onChange={(e) => setEqSerial(e.target.value)}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 mt-1 font-mono uppercase"
+                  />
                 </div>
               </div>
 

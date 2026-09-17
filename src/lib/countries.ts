@@ -267,7 +267,13 @@ export function findCountry(codeOrName?: string): LatinCountry {
   );
 }
 
-export function formatAirPrice(amount: number, currencySymbol: string = '$'): string {
-  const formatted = new Intl.NumberFormat('es-CL').format(amount);
-  return `${currencySymbol} ${formatted}`;
+export function getTaxPercentage(taxRate?: number): number {
+  if (taxRate === undefined || taxRate === null) return 13;
+  return taxRate <= 1 ? Math.round(taxRate * 100) : Math.round(taxRate);
+}
+
+export function formatAirPrice(amount: number, currencySymbol: string = '₡', countryCode?: string): string {
+  const locale = countryCode === 'CR' ? 'es-CR' : countryCode === 'CL' ? 'es-CL' : 'es-CR';
+  const formatted = new Intl.NumberFormat(locale).format(amount);
+  return `${currencySymbol}${formatted}`;
 }

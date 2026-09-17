@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { AirPart } from '../types';
+import { AirPart, AirSettings } from '../types';
+import { formatAirPrice } from '../lib/countries';
 import { 
   Boxes, 
   Search, 
@@ -13,6 +14,7 @@ import {
 
 interface InventoryAirProps {
   parts: AirPart[];
+  settings?: AirSettings;
   onAddPart: (part: Omit<AirPart, 'id'>) => void;
   onUpdatePart: (id: string, updates: Partial<AirPart>) => void;
   onDeletePart: (id: string) => void;
@@ -20,10 +22,13 @@ interface InventoryAirProps {
 
 export const InventoryAir: React.FC<InventoryAirProps> = ({
   parts,
+  settings,
   onAddPart,
   onUpdatePart,
   onDeletePart,
 }) => {
+  const currencySymbol = settings?.currency_symbol || '₡';
+  const countryCode = settings?.country_code || 'CR';
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -235,11 +240,11 @@ export const InventoryAir: React.FC<InventoryAirProps> = ({
                         </div>
                       </td>
                       <td className="py-3.5 px-4 font-mono text-slate-500">
-                        ${p.cost_price.toLocaleString('es-CL')}
+                        {formatAirPrice(p.cost_price, currencySymbol, countryCode)}
                       </td>
                       <td className="py-3.5 px-4 font-mono">
                         <div className="font-bold text-slate-900 text-sm">
-                          ${p.sale_price.toLocaleString('es-CL')}
+                          {formatAirPrice(p.sale_price, currencySymbol, countryCode)}
                         </div>
                         <div className="text-[10px] text-emerald-600 font-semibold">Margen: {margin}%</div>
                       </td>
@@ -377,7 +382,7 @@ export const InventoryAir: React.FC<InventoryAirProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Costo ($ CLP)</label>
+                  <label className="font-semibold text-slate-700">Costo ({currencySymbol} {settings?.currency_code || 'CRC'})</label>
                   <input
                     type="number"
                     value={costPrice}
@@ -386,7 +391,7 @@ export const InventoryAir: React.FC<InventoryAirProps> = ({
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Precio Venta ($ CLP)</label>
+                  <label className="font-semibold text-slate-700">Precio Venta ({currencySymbol} {settings?.currency_code || 'CRC'})</label>
                   <input
                     type="number"
                     value={salePrice}

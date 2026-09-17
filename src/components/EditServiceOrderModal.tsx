@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { ServiceOrder, Technician, OrderStatus, ServiceType } from '../types';
-import { X, Save, Trash2, Calendar, Clock, Wrench, DollarSign, CheckCircle, Navigation, Radio, MapPin, Users, Percent, Check } from 'lucide-react';
+import { ServiceOrder, Technician, OrderStatus, ServiceType, AirSettings } from '../types';
+import { X, Save, Trash2, Calendar, Clock, Wrench, DollarSign, CheckCircle, Navigation, Radio, MapPin, Users, Percent, Check, FileText } from 'lucide-react';
 
 interface EditServiceOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   order: ServiceOrder | null;
   technicians: Technician[];
+  settings?: AirSettings;
   onUpdateOrder: (id: string, updates: Partial<ServiceOrder>) => void;
   onDeleteOrder: (id: string) => void;
+  onOpenReceipt?: (order: ServiceOrder) => void;
 }
 
 export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
@@ -16,8 +18,10 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
   onClose,
   order,
   technicians,
+  settings,
   onUpdateOrder,
   onDeleteOrder,
+  onOpenReceipt,
 }) => {
   if (!isOpen || !order) return null;
 
@@ -433,7 +437,7 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
 
           {/* Total */}
           <div className="space-y-1.5">
-            <label className="font-semibold text-slate-700">Total Facturado ($ CLP)</label>
+            <label className="font-semibold text-slate-700">Total Facturado ({settings?.currency_symbol || '₡'} {settings?.currency_code || 'CRC'})</label>
             <input
               type="number"
               value={total}
@@ -443,21 +447,32 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
           </div>
 
           {/* Footer Actions */}
-          <div className="pt-4 flex items-center justify-between border-t border-slate-200">
+          <div className="pt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200">
             <button
               type="button"
               onClick={handleDelete}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 transition-colors"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 transition-colors cursor-pointer"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>Eliminar Orden</span>
             </button>
 
             <div className="flex items-center gap-2">
+              {onOpenReceipt && (
+                <button
+                  type="button"
+                  onClick={() => onOpenReceipt(order)}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold transition-all cursor-pointer shadow-xs"
+                >
+                  <FileText className="w-4 h-4 text-emerald-600" />
+                  <span>Ver Comprobante</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+                className="px-4 py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 Cancelar
               </button>

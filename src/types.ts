@@ -61,8 +61,11 @@ export interface Technician {
   rut: string;
   phone: string;
   email?: string;
+  role?: 'tecnico' | 'ayudante';
   sec_certified: boolean;
   certification_number?: string;
+  default_commission_type?: 'fixed' | 'percentage';
+  default_commission_value?: number;
   status: 'disponible' | 'en_servicio' | 'vacaciones' | 'inactivo';
   avatar_url?: string;
   active_orders_count?: number;

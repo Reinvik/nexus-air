@@ -15,6 +15,7 @@ import { AddServiceOrderModal } from './components/AddServiceOrderModal';
 import { EditServiceOrderModal } from './components/EditServiceOrderModal';
 import { InspeccionHVACModal } from './components/InspeccionHVACModal';
 import { PublicBookingModal } from './components/PublicBookingModal';
+import { ReceiptModalAir } from './components/ReceiptModalAir';
 import { LandingNexusAir } from './components/LandingNexusAir';
 import { LandingTenantAir } from './components/LandingTenantAir';
 import { LoginAir } from './components/LoginAir';
@@ -48,6 +49,7 @@ export default function App() {
     deleteEquipment,
     addTechnician,
     updateTechnician,
+    deleteTechnician,
     addPart,
     updatePart,
     deletePart,
@@ -124,8 +126,9 @@ export default function App() {
   const [isInspectionModalOpen, setIsInspectionModalOpen] = useState(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
 
-  // Selected Order for Editing / Inspection
+  // Selected Order for Editing / Inspection / Receipt
   const [selectedOrder, setSelectedOrder] = useState<ServiceOrder | null>(null);
+  const [receiptOrder, setReceiptOrder] = useState<ServiceOrder | null>(null);
 
   // Overdue count for alert badge
   const overdueCount = reminders.filter(r => r.status === 'vencido' || r.status === 'por_vencer').length;
@@ -141,18 +144,24 @@ export default function App() {
     setIsInspectionModalOpen(true);
   };
 
-  // Handler for booking from public modal
+  // Handler for booking from public modal (NK-024)
   const handleConfirmPublicBooking = async (bookingData: any) => {
-    let cust = customers.find(c => c.phone.includes(bookingData.phone.replace(/[^0-9]/g, '')));
+    const cleanPhone = (bookingData.phone || '').replace(/\D/g, '');
+    let cust = customers.find(c => {
+      const matchRut = bookingData.rut && c.rut && c.rut.toLowerCase() === bookingData.rut.trim().toLowerCase();
+      const matchPhone = cleanPhone && (c.phone || '').replace(/\D/g, '').includes(cleanPhone);
+      return matchRut || matchPhone;
+    });
+
     if (!cust) {
       cust = await addCustomer({
         name: bookingData.name,
-        rut: 'S/RUT',
+        rut: bookingData.rut?.trim() || 'S/RUT',
         phone: bookingData.phone,
         email: '',
         address: bookingData.address,
         commune: bookingData.commune,
-        city: 'Santiago',
+        city: settings.country_code === 'CR' ? 'San José' : 'Santiago',
         customer_type: 'residencial',
         notes: bookingData.notes,
       });
@@ -259,6 +268,7 @@ export default function App() {
           isOpen={isBookingModalOpen}
           onClose={() => setIsBookingModalOpen(false)}
           settings={tenantSettings || settings}
+          customers={customers}
           onConfirmBooking={handleConfirmPublicBooking}
         />
       </>
@@ -282,6 +292,7 @@ export default function App() {
           isOpen={isBookingModalOpen}
           onClose={() => setIsBookingModalOpen(false)}
           settings={tenantSettings || settings}
+          customers={customers}
           onConfirmBooking={handleConfirmPublicBooking}
         />
       </>
@@ -323,6 +334,7 @@ export default function App() {
             onEditOrder={handleOpenEdit}
             onOpenInspection={handleOpenInspection}
             onUpdateStatus={updateOrderStatus}
+            onOpenReceipt={(ord) => setReceiptOrder(ord)}
           />
         )}
 
@@ -358,6 +370,7 @@ export default function App() {
         {activeTab === 'inventory' && (
           <InventoryAir
             parts={parts}
+            settings={tenantSettings || settings}
             onAddPart={addPart}
             onUpdatePart={updatePart}
             onDeletePart={deletePart}
@@ -379,13 +392,19 @@ export default function App() {
         {activeTab === 'technicians' && (
           <TechniciansAir
             technicians={technicians}
+            orders={orders}
+            settings={tenantSettings || settings}
             onAddTechnician={addTechnician}
             onUpdateTechnician={updateTechnician}
+            onDeleteTechnician={deleteTechnician}
           />
         )}
 
         {activeTab === 'sales' && (
-          <SalesAir orders={orders} />
+          <SalesAir 
+            orders={orders} 
+            settings={tenantSettings || settings}
+          />
         )}
 
         {activeTab === 'settings' && (
@@ -415,6 +434,8 @@ export default function App() {
         }}
         order={selectedOrder}
         technicians={technicians}
+        settings={tenantSettings || settings}
+        onOpenReceipt={(ord) => setReceiptOrder(ord)}
         onUpdateOrder={updateOrder}
         onDeleteOrder={deleteOrder}
       />
@@ -433,7 +454,15 @@ export default function App() {
         isOpen={isBookingModalOpen}
         onClose={() => setIsBookingModalOpen(false)}
         settings={tenantSettings || settings}
+        customers={customers}
         onConfirmBooking={handleConfirmPublicBooking}
+      />
+
+      <ReceiptModalAir
+        isOpen={Boolean(receiptOrder)}
+        onClose={() => setReceiptOrder(null)}
+        order={receiptOrder}
+        settings={tenantSettings || settings}
       />
     </>
   );

@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ServiceType, AirSettings, ServiceOrder, Customer } from '../types';
-import { X, Calendar, Clock, MapPin, Phone, User, CheckCircle2, Wind, Sparkles } from 'lucide-react';
+import { X, Calendar, Clock, MapPin, Phone, User, CheckCircle2, Wind, Sparkles, ShieldCheck, Search } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 
 interface PublicBookingModalProps {
   isOpen: boolean;
   onClose: () => void;
   settings: AirSettings;
+  customers?: Customer[];
   onConfirmBooking: (bookingData: {
     name: string;
+    rut?: string;
     phone: string;
     address: string;
     commune: string;
@@ -23,10 +25,12 @@ export const PublicBookingModal: React.FC<PublicBookingModalProps> = ({
   isOpen,
   onClose,
   settings,
+  customers = [],
   onConfirmBooking,
 }) => {
   if (!isOpen) return null;
 
+  const [rut, setRut] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('+56 9 ');
   const [address, setAddress] = useState('');
@@ -35,12 +39,67 @@ export const PublicBookingModal: React.FC<PublicBookingModalProps> = ({
   const [scheduledDate, setScheduledDate] = useState(format(addDays(new Date(), 1), 'yyyy-MM-dd'));
   const [scheduledSlot, setScheduledSlot] = useState('09:00 - 11:00');
   const [notes, setNotes] = useState('');
+  const [matchedCustomer, setMatchedCustomer] = useState<Customer | null>(null);
   const [confirmedOrder, setConfirmedOrder] = useState<ServiceOrder | null>(null);
+
+  // Auto-fill from URL params (NK-024)
+  useEffect(() => {
+    if (!isOpen) return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const urlRut = params.get('rut') || params.get('id');
+      const urlPhone = params.get('phone') || params.get('tel');
+
+      if (urlRut && customers.length > 0) {
+        const cleanRut = urlRut.trim().toLowerCase();
+        setRut(urlRut);
+        const match = customers.find(c => (c.rut || '').toLowerCase().includes(cleanRut));
+        if (match) {
+          applyMatchedCustomer(match);
+        }
+      } else if (urlPhone && customers.length > 0) {
+        setPhone(urlPhone);
+        const cleanPhone = urlPhone.replace(/\D/g, '');
+        const match = customers.find(c => (c.phone || '').replace(/\D/g, '').includes(cleanPhone));
+        if (match) {
+          applyMatchedCustomer(match);
+        }
+      }
+    } catch (e) {
+      console.warn('URL param parse error:', e);
+    }
+  }, [isOpen, customers]);
+
+  const applyMatchedCustomer = (cust: Customer) => {
+    setMatchedCustomer(cust);
+    if (cust.name) setName(cust.name);
+    if (cust.rut) setRut(cust.rut);
+    if (cust.phone) setPhone(cust.phone);
+    if (cust.address) setAddress(cust.address);
+    if (cust.commune) setCommune(cust.commune);
+  };
+
+  const handleLookupCustomer = (inputRutOrPhone: string) => {
+    const term = inputRutOrPhone.trim().toLowerCase();
+    const cleanDigits = term.replace(/\D/g, '');
+    if (!term || term.length < 4) return;
+
+    const match = customers.find(c => {
+      const cRut = (c.rut || '').toLowerCase();
+      const cPhone = (c.phone || '').replace(/\D/g, '');
+      return (cRut && cRut.includes(term)) || (cleanDigits.length >= 6 && cPhone.includes(cleanDigits));
+    });
+
+    if (match) {
+      applyMatchedCustomer(match);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const order = onConfirmBooking({
       name,
+      rut: rut.trim() || undefined,
       phone,
       address,
       commune,
@@ -120,19 +179,60 @@ export const PublicBookingModal: React.FC<PublicBookingModalProps> = ({
         ) : (
           /* Form State */
           <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
-            <div className="space-y-1">
-              <label className="font-semibold text-slate-700 flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-cyan-600" />
-                Tu Nombre Completo
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Ej: Marcelo Morales"
-                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-colors"
-                required
-              />
+            {matchedCustomer && (
+              <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 flex items-center justify-between text-xs animate-in fade-in">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <div>
+                    <span className="font-bold">¡Hola de nuevo, {matchedCustomer.name}!</span>
+                    <p className="text-[11px] text-emerald-700">
+                      Tus datos de contacto y domicilio han sido precargados automáticamente.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMatchedCustomer(null)}
+                  className="text-[10px] text-emerald-700 hover:text-emerald-900 underline font-bold cursor-pointer"
+                >
+                  Cambiar
+                </button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-700 flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-cyan-600" />
+                  Tu Nombre Completo
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ej: Marcelo Morales"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-colors"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-700 flex items-center justify-between">
+                  <span>{settings.tax_id_label || 'RUT / Cédula'}</span>
+                  <span className="text-[10px] text-slate-400 font-normal">Autocompleta si ya eres cliente</span>
+                </label>
+                <input
+                  type="text"
+                  value={rut}
+                  onChange={(e) => {
+                    setRut(e.target.value);
+                    handleLookupCustomer(e.target.value);
+                  }}
+                  onBlur={(e) => handleLookupCustomer(e.target.value)}
+                  placeholder={settings.tax_id_label ? `Ej: ${settings.tax_id_label}` : '12.345.678-9'}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-colors"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -144,7 +244,11 @@ export const PublicBookingModal: React.FC<PublicBookingModalProps> = ({
                 <input
                   type="text"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    handleLookupCustomer(e.target.value);
+                  }}
+                  onBlur={(e) => handleLookupCustomer(e.target.value)}
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-colors"
                   required
                 />

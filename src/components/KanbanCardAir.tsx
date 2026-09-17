@@ -8,7 +8,11 @@ import {
   ClipboardCheck, 
   ArrowRight, 
   Thermometer, 
-  Gauge
+  Gauge,
+  Truck,
+  Camera,
+  CheckCircle2,
+  FileText
 } from 'lucide-react';
 
 interface KanbanCardAirProps {
@@ -16,6 +20,7 @@ interface KanbanCardAirProps {
   onEdit: (order: ServiceOrder) => void;
   onOpenInspection: (order: ServiceOrder) => void;
   onUpdateStatus: (orderId: string, status: OrderStatus) => void;
+  onOpenReceipt?: (order: ServiceOrder) => void;
 }
 
 export const KanbanCardAir: React.FC<KanbanCardAirProps> = ({
@@ -23,6 +28,7 @@ export const KanbanCardAir: React.FC<KanbanCardAirProps> = ({
   onEdit,
   onOpenInspection,
   onUpdateStatus,
+  onOpenReceipt,
 }) => {
   const nextStatusMap: Record<OrderStatus, OrderStatus | null> = {
     ingresado: 'en_ruta',
@@ -128,33 +134,102 @@ export const KanbanCardAir: React.FC<KanbanCardAirProps> = ({
         )}
       </div>
 
-      {/* Actions */}
-      <div className="pt-2 flex items-center gap-2">
-        <button
-          onClick={() => onOpenInspection(order)}
-          title="Ficha Técnica & Checklist HVAC"
-          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer border border-slate-200"
-        >
-          <ClipboardCheck className="w-3.5 h-3.5 text-cyan-600" />
-          <span>Ficha HVAC</span>
-        </button>
-
-        <button
-          onClick={() => onEdit(order)}
-          className="py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer border border-slate-200"
-        >
-          Editar
-        </button>
-
-        {nextStatus && (
+      {/* Workflow Quick Advance Buttons (NK-023) */}
+      <div className="pt-2 border-t border-slate-100 space-y-2">
+        {order.status === 'ingresado' && (
           <button
-            onClick={() => onUpdateStatus(order.id, nextStatus)}
-            title={nextStatusLabels[order.status]}
-            className="p-1.5 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-300 transition-all cursor-pointer"
+            onClick={() => onUpdateStatus(order.id, 'en_ruta')}
+            className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
           >
-            <ArrowRight className="w-4 h-4" />
+            <Truck className="w-4 h-4" />
+            <span>🚐 Iniciar Trayecto</span>
           </button>
         )}
+
+        {order.status === 'en_ruta' && (
+          <button
+            onClick={() => onUpdateStatus(order.id, 'en_proceso')}
+            className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
+          >
+            <MapPin className="w-4 h-4" />
+            <span>📍 Llegué a Terreno</span>
+          </button>
+        )}
+
+        {order.status === 'en_proceso' && (
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              onClick={() => onOpenInspection(order)}
+              className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
+            >
+              <Camera className="w-3.5 h-3.5 text-amber-600" />
+              <span>📸 Subir Evidencia</span>
+            </button>
+            <button
+              onClick={() => onUpdateStatus(order.id, 'pruebas_qa')}
+              className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
+            >
+              <Gauge className="w-3.5 h-3.5" />
+              <span>🧪 A Pruebas QA</span>
+            </button>
+          </div>
+        )}
+
+        {order.status === 'pruebas_qa' && (
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              onClick={() => onOpenInspection(order)}
+              className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold transition-all cursor-pointer"
+            >
+              <ClipboardCheck className="w-3.5 h-3.5 text-cyan-600" />
+              <span>Revisar Ficha</span>
+            </button>
+            <button
+              onClick={() => onUpdateStatus(order.id, 'completado')}
+              className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>✅ Finalizado</span>
+            </button>
+          </div>
+        )}
+
+        {order.status === 'completado' && (
+          <div className="flex items-center justify-between p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-xs">
+            <div className="flex items-center gap-1 text-emerald-800 font-bold">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Servicio Finalizado</span>
+            </div>
+            {onOpenReceipt && (
+              <button
+                onClick={() => onOpenReceipt(order)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-[11px] font-bold transition-all cursor-pointer shadow-2xs"
+              >
+                <FileText className="w-3 h-3 text-emerald-600" />
+                <span>Recibo</span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Secondary Actions: Ficha & Editar */}
+        <div className="flex items-center gap-1.5 pt-1">
+          <button
+            onClick={() => onOpenInspection(order)}
+            title="Ficha Técnica & Checklist HVAC"
+            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-medium transition-colors cursor-pointer border border-slate-200"
+          >
+            <ClipboardCheck className="w-3.5 h-3.5 text-cyan-600" />
+            <span>Ficha HVAC</span>
+          </button>
+
+          <button
+            onClick={() => onEdit(order)}
+            className="py-1.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-medium transition-colors cursor-pointer border border-slate-200"
+          >
+            Editar
+          </button>
+        </div>
       </div>
     </div>
   );
