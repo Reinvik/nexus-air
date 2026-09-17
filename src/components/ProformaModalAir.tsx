@@ -720,15 +720,52 @@ export function ProformaModalAir({
           </div>
         </div>
 
-        {/* Footer info in Modal */}
-        <div className="px-6 py-3.5 bg-slate-100 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 print:hidden">
-          <span>💡 Puedes editar cualquier cantidad o precio directamente en la tabla antes de imprimir o enviar.</span>
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold transition-colors"
-          >
-            Cerrar
-          </button>
+        {/* Footer actions in Modal (always in reach - hidden when printing) */}
+        <div className="px-6 py-3.5 bg-slate-100 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0 print:hidden z-20">
+          <div className="flex items-center gap-3">
+            <span className="text-slate-600 font-medium hidden sm:inline">
+              💡 Precios editables en la tabla
+            </span>
+            <span className="text-slate-900 font-bold">
+              Total: <strong className="font-mono text-sm text-blue-700">{formatAirPrice(precioVentaTotal, currencySymbol, countryCode)}</strong>
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleCopyImageToWhatsApp}
+              disabled={isGeneratingImage}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors shadow-xs disabled:opacity-50 cursor-pointer active:scale-95"
+              title="Copia la proforma como imagen y abre WhatsApp para pegarla con Ctrl+V"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>Copiar WhatsApp (Ctrl + V)</span>
+            </button>
+
+            <button
+              onClick={handleDownloadImage}
+              disabled={isGeneratingImage}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-colors shadow-xs disabled:opacity-50 cursor-pointer active:scale-95"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Descargar PNG</span>
+            </button>
+
+            <button
+              onClick={handlePrint}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors shadow-xs cursor-pointer active:scale-95"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Imprimir / PDF</span>
+            </button>
+
+            <button
+              onClick={onClose}
+              className="px-3.5 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold transition-colors cursor-pointer"
+            >
+              Cerrar
+            </button>
+          </div>
         </div>
       </div>
     </div>

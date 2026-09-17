@@ -164,17 +164,22 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-xs overflow-y-auto print:p-0 print:bg-white print:static">
-      <div className="w-full max-w-3xl bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden my-4 text-slate-900 print:border-none print:shadow-none print:rounded-none print:my-0">
-        {/* Modal Toolbar (hidden when printing) */}
-        <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 print:hidden">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-cyan-50 border border-cyan-200 text-cyan-600 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/75 backdrop-blur-xs overflow-y-auto print:p-0 print:bg-white print:static">
+      <div className="w-full max-w-5xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] my-auto text-slate-900 print:border-none print:shadow-none print:rounded-none print:my-0 print:max-h-none print:max-w-none">
+        {/* Modal Toolbar (Sticky Header - hidden when printing) */}
+        <div className="px-5 sm:px-6 py-3.5 bg-slate-900 text-white border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0 print:hidden z-20">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-400 flex items-center justify-center font-bold">
               <FileText className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-bold text-sm text-slate-900">Comprobante / Recibo de Servicio</h3>
-              <p className="text-[11px] text-slate-500">Orden #{order.ticket_number}</p>
+              <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                Comprobante / Recibo de Servicio
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 font-mono font-bold">
+                  REC-{order.ticket_number}
+                </span>
+              </h3>
+              <p className="text-[11px] text-slate-400">{order.customer?.name} • {order.scheduled_date}</p>
             </div>
           </div>
 
@@ -204,17 +209,17 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
             <button
               type="button"
               onClick={handleSendWhatsApp}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all shadow-xs cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-all shadow-xs cursor-pointer"
               title="Enviar como texto a WhatsApp"
             >
-              <Share2 className="w-3.5 h-3.5 text-emerald-600" />
+              <Share2 className="w-3.5 h-3.5 text-emerald-400" />
               <span>Texto WhatsApp</span>
             </button>
 
             <button
               type="button"
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold border border-slate-700 transition-all shadow-xs cursor-pointer active:scale-95"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Imprimir / PDF</span>
@@ -223,15 +228,17 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* PRINTABLE RECEIPT CONTENT */}
-        <div className="p-6 sm:p-8 space-y-6 text-xs bg-white" id="printable-receipt">
+        {/* Scrollable Document Container */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-100/70 print:bg-white print:p-0">
+          {/* PRINTABLE RECEIPT CONTENT */}
+          <div className="max-w-3xl mx-auto p-6 sm:p-8 space-y-6 text-xs bg-white rounded-2xl shadow-sm border border-slate-200/80 print:max-w-none print:border-none print:shadow-none print:p-0 print:rounded-none" id="printable-receipt">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-slate-200 pb-5">
             <div className="space-y-1">
@@ -501,6 +508,63 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Sticky Bottom Actions Bar (always in reach - hidden when printing) */}
+      <div className="px-5 sm:px-6 py-3 bg-slate-50/95 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0 print:hidden z-20">
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-slate-600 font-medium">
+            Total Comprobante: <strong className="text-slate-900 font-mono text-sm">{formatAirPrice(order.total, currencySymbol, countryCode)}</strong>
+          </span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+            order.payment_status === 'pagado'
+              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+              : 'bg-amber-100 text-amber-800 border border-amber-300'
+          }`}>
+            {order.payment_status}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={isCapturing}
+            onClick={handleCopyImageToWhatsApp}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+            title="Copia la imagen y abre WhatsApp para pegar con Ctrl+V"
+          >
+            <Copy className="w-3.5 h-3.5" />
+            <span>Copiar WhatsApp (Ctrl + V)</span>
+          </button>
+
+          <button
+            type="button"
+            disabled={isCapturing}
+            onClick={handleDownloadImage}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Descargar PNG</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>Imprimir / PDF</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3.5 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-200 transition-colors text-xs font-medium cursor-pointer"
+          >
+            Cerrar
+          </button>
+        </div>
+      </div>
     </div>
-  );
+  </div>
+);
 };
