@@ -171,10 +171,10 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-      <div className="w-full max-w-2xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col my-8 text-slate-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+      <div className="w-full max-w-5xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] my-auto text-slate-900">
         {/* Header */}
-        <div className="px-6 py-4 bg-slate-50/90 border-b border-slate-200 flex items-center justify-between">
+        <div className="px-6 py-3.5 bg-slate-50/95 border-b border-slate-200 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center border border-cyan-200 shadow-xs">
               <ClipboardCheck className="w-5 h-5" />
@@ -193,418 +193,399 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
-          {/* Checklist Protocol */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-700 flex items-center gap-2">
-              <Wind className="w-4 h-4 text-cyan-600" />
-              Protocolo de Limpieza y Mantención Preventiva
-            </h4>
+        {/* Content Body */}
+        <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4 text-xs">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            {/* COLUMNA IZQUIERDA: Checklist, Mediciones y Observaciones */}
+            <div className="lg:col-span-6 space-y-4">
+              {/* Checklist Protocol */}
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-700 flex items-center gap-2">
+                  <Wind className="w-4 h-4 text-cyan-600" />
+                  Protocolo de Limpieza y Mantención Preventiva
+                </h4>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-              {[
-                { key: 'clean_filters', label: 'Limpieza y lavado de filtros electrostáticos' },
-                { key: 'clean_evaporator_coil', label: 'Desincrustado químico de serpentín interior' },
-                { key: 'clean_turbine_fan', label: 'Limpieza de turbina y rotor centrífugo' },
-                { key: 'sanitize_bactericide', label: 'Sanitización con bactericida ClimaCare' },
-                { key: 'clean_condenser_coil', label: 'Hidrolavado / soplado unidad exterior' },
-                { key: 'check_condensate_drain', label: 'Prueba de desagüe libre y desinfección bandeja' },
-                { key: 'check_electrical_connections', label: 'Reapriete de borneras y cable de interconexión' },
-              ].map(({ key, label }) => {
-                const checked = (checklist as any)[key] as boolean;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => handleToggle(key as keyof HVACInspectionChecklist)}
-                    className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                      checked
-                        ? 'bg-cyan-50 border-cyan-300 text-cyan-950 font-medium'
-                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-100/50'
-                    }`}
-                  >
-                    {checked ? (
-                      <CheckSquare className="w-4 h-4 text-cyan-600 shrink-0 mt-0.5" />
-                    ) : (
-                      <Square className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                    )}
-                    <span className="text-xs font-medium leading-relaxed">{label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+                <div className="space-y-2">
+                  {[
+                    { key: 'clean_filters', label: 'Limpieza y lavado de filtros electrostáticos' },
+                    { key: 'clean_evaporator_coil', label: 'Desincrustado químico de serpentín interior' },
+                    { key: 'clean_turbine_fan', label: 'Limpieza de turbina y rotor centrífugo' },
+                    { key: 'sanitize_bactericide', label: 'Sanitización con bactericida ClimaCare' },
+                    { key: 'clean_condenser_coil', label: 'Hidrolavado / soplado unidad exterior' },
+                    { key: 'check_condensate_drain', label: 'Prueba de desagüe libre y desinfección bandeja' },
+                    { key: 'check_electrical_connections', label: 'Reapriete de borneras y cable de interconexión' },
+                  ].map(({ key, label }) => {
+                    const checked = (checklist as any)[key] as boolean;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => handleToggle(key as keyof HVACInspectionChecklist)}
+                        className={`w-full flex items-start gap-2.5 p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                          checked
+                            ? 'bg-cyan-50 border-cyan-300 text-cyan-950 font-medium shadow-2xs'
+                            : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        {checked ? (
+                          <CheckSquare className="w-4 h-4 text-cyan-600 shrink-0 mt-0.5" />
+                        ) : (
+                          <Square className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                        )}
+                        <span className="text-[11px] font-medium leading-tight">{label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-          {/* Thermodynamic Measurements */}
-          <div className="space-y-3 pt-4 border-t border-slate-200">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-700 flex items-center gap-2">
-              <Gauge className="w-4 h-4 text-cyan-600" />
-              Medición de Parámetros Termodinámicos y Eléctricos
-            </h4>
+              {/* Thermodynamic Measurements */}
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-700 flex items-center gap-2">
+                  <Gauge className="w-4 h-4 text-cyan-600" />
+                  Medición de Parámetros Termodinámicos y Eléctricos
+                </h4>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* Delta T */}
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
-                  <Thermometer className="w-3.5 h-3.5 text-cyan-600" />
-                  Salto Térmico ΔT (°C)
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Delta T */}
+                  <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-2">
+                    <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
+                      <Thermometer className="w-3.5 h-3.5 text-cyan-600" />
+                      Salto Térmico ΔT
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={checklist.delta_t_celsius || ''}
+                        onChange={(e) => setChecklist(prev => ({ ...prev, delta_t_celsius: parseFloat(e.target.value) || 0 }))}
+                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
+                      />
+                      <span className="text-xs text-slate-500">°C</span>
+                    </div>
+                    <div className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${deltaTStatus.color}`}>
+                      {deltaTStatus.text}
+                    </div>
+                  </div>
+
+                  {/* Suction Pressure PSI */}
+                  <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-2">
+                    <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
+                      <Gauge className="w-3.5 h-3.5 text-blue-600" />
+                      Presión Succión
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        step="1"
+                        value={checklist.suction_pressure_psi || ''}
+                        onChange={(e) => setChecklist(prev => ({ ...prev, suction_pressure_psi: parseFloat(e.target.value) || 0 }))}
+                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
+                      />
+                      <span className="text-xs text-slate-500">PSI</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-tight">R410A: 110-130 / R32: 120-135</p>
+                  </div>
+
+                  {/* Amperage */}
+                  <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-2">
+                    <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
+                      <Zap className="w-3.5 h-3.5 text-amber-500" />
+                      Consumo Eléctrico
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={checklist.amperage_amps || ''}
+                        onChange={(e) => setChecklist(prev => ({ ...prev, amperage_amps: parseFloat(e.target.value) || 0 }))}
+                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
+                      />
+                      <span className="text-xs text-slate-500">A</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-tight">Verificar placa compresor</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Observations and Notes */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">
+                  Observaciones del Técnico para el Informe del Cliente:
                 </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={checklist.delta_t_celsius || ''}
-                    onChange={(e) => setChecklist(prev => ({ ...prev, delta_t_celsius: parseFloat(e.target.value) || 0 }))}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 font-mono font-bold focus:border-cyan-500 focus:outline-none"
-                  />
-                  <span className="text-xs text-slate-500">°C</span>
-                </div>
-                <div className={`text-[10px] px-2 py-1 rounded-lg border font-medium ${deltaTStatus.color}`}>
-                  {deltaTStatus.text}
-                </div>
-              </div>
-
-              {/* Suction Pressure PSI */}
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
-                  <Gauge className="w-3.5 h-3.5 text-blue-600" />
-                  Presión de Succión (PSI)
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    step="1"
-                    value={checklist.suction_pressure_psi || ''}
-                    onChange={(e) => setChecklist(prev => ({ ...prev, suction_pressure_psi: parseFloat(e.target.value) || 0 }))}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 font-mono font-bold focus:border-cyan-500 focus:outline-none"
-                  />
-                  <span className="text-xs text-slate-500">PSI</span>
-                </div>
-                <p className="text-[10px] text-slate-500">R410A: 110-130 PSI / R32: 120-135 PSI</p>
-              </div>
-
-              {/* Amperage */}
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
-                  <Zap className="w-3.5 h-3.5 text-amber-500" />
-                  Consumo Eléctrico (A)
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={checklist.amperage_amps || ''}
-                    onChange={(e) => setChecklist(prev => ({ ...prev, amperage_amps: parseFloat(e.target.value) || 0 }))}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 font-mono font-bold focus:border-cyan-500 focus:outline-none"
-                  />
-                  <span className="text-xs text-slate-500">A</span>
-                </div>
-                <p className="text-[10px] text-slate-500">Verificar con placa del compresor</p>
+                <textarea
+                  rows={3}
+                  value={checklist.technician_notes || ''}
+                  onChange={(e) => setChecklist(prev => ({ ...prev, technician_notes: e.target.value }))}
+                  placeholder="Ej: Se realizó prueba de calor y frío. Desagüe libre de sarro. Se recomienda próxima mantención preventiva en 6 meses antes de verano..."
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none leading-relaxed transition-colors"
+                />
               </div>
             </div>
-          </div>
 
-          {/* SECCIÓN MULTIMEDIA ANTES Y DESPUÉS */}
-          <div className="space-y-4 pt-4 border-t border-slate-200">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-800 flex items-center gap-2">
-                <Camera className="w-4 h-4 text-cyan-600" />
-                Evidencia Multimedia (Fotos y Videos Antes / Después)
-              </h4>
-              <span className="text-[11px] text-slate-500 font-medium">
-                Toma fotos directas desde el celular con la cámara o súbelas de la galería
-              </span>
-            </div>
-
-            {/* 1. SECCIÓN ANTES DEL SERVICIO */}
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-3 shadow-xs">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                  <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wide">
-                    1. Estado Inicial (Antes del Servicio)
-                  </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold">
-                    {((checklist.photos_before?.length || 0) + (checklist.videos_before?.length || 0))} archivos
-                  </span>
-                </div>
-
-                {/* Botones de acción Antes */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <label className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold cursor-pointer transition-all shadow-xs active:scale-95">
-                    <Camera className="w-3.5 h-3.5" />
-                    <span>📷 Tomar Foto</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      className="hidden"
-                      onChange={(e) => handleFileUpload(e, 'photo', 'before')}
-                    />
-                  </label>
-
-                  <label className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 hover:border-blue-400 text-slate-700 text-[11px] font-bold cursor-pointer transition-all shadow-xs active:scale-95">
-                    <ImageIcon className="w-3.5 h-3.5 text-blue-600" />
-                    <span>🖼️ Galería</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={(e) => handleFileUpload(e, 'photo', 'before')}
-                    />
-                  </label>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDriveUrlInput('');
-                      setDriveModalTarget('before');
-                    }}
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-800 text-[11px] font-bold cursor-pointer transition-all shadow-xs active:scale-95"
-                    title="Enlazar video desde Google Drive sin saturar el servidor"
-                  >
-                    <Video className="w-3.5 h-3.5 text-blue-600" />
-                    <span>📁 Google Drive Video</span>
-                  </button>
-
-                  <label className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 hover:border-purple-400 text-slate-700 text-[11px] font-bold cursor-pointer transition-all shadow-xs active:scale-95">
-                    <Video className="w-3.5 h-3.5 text-purple-600" />
-                    <span>🎥 Clip Corto</span>
-                    <input
-                      type="file"
-                      accept="video/*"
-                      capture="environment"
-                      className="hidden"
-                      onChange={(e) => handleFileUpload(e, 'video', 'before')}
-                    />
-                  </label>
-
-                  <button
-                    type="button"
-                    onClick={() => handleAddMedia('photo', 'before')}
-                    className="px-2 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-[11px] font-medium transition-colors"
-                    title="Agregar foto por URL web"
-                  >
-                    + URL Foto
-                  </button>
-                </div>
+            {/* COLUMNA DERECHA: Evidencia Multimedia (Antes y Después) */}
+            <div className="lg:col-span-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-800 flex items-center gap-2">
+                  <Camera className="w-4 h-4 text-cyan-600" />
+                  Evidencia Multimedia (Fotos y Videos)
+                </h4>
+                <span className="text-[10px] text-slate-500 font-medium">
+                  Cámara o Galería
+                </span>
               </div>
 
-              {/* Grid Fotos y Videos Antes */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                {(checklist.photos_before || []).map((url, i) => (
-                  <div key={`pb-${i}`} className="relative group rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video flex items-center justify-center shadow-xs">
-                    <img src={url} alt={`Antes ${i + 1}`} className="w-full h-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveMedia('before', 'photo', i)}
-                      className="absolute top-1.5 right-1.5 p-1 rounded-md bg-rose-600 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-md"
-                      title="Eliminar foto"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                    <span className="absolute bottom-1 left-1 bg-black/75 text-white text-[9px] px-1.5 py-0.5 rounded font-mono">
-                      Antes #{i + 1}
+              {/* 1. SECCIÓN ANTES DEL SERVICIO */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 space-y-3 shadow-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wide">
+                      1. Estado Inicial (Antes)
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold">
+                      {((checklist.photos_before?.length || 0) + (checklist.videos_before?.length || 0))}
                     </span>
                   </div>
-                ))}
 
-                {(checklist.videos_before || []).map((url, i) => {
-                  const vInfo = parseVideoUrl(url);
-                  return (
-                    <div key={`vb-${i}`} className="relative group rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video flex items-center justify-center shadow-xs">
-                      {vInfo.isEmbed ? (
-                        <iframe
-                          src={vInfo.embedUrl}
-                          className="w-full h-full border-0"
-                          allow="autoplay; encrypted-media"
-                          allowFullScreen
-                          title={`Video Antes ${i + 1}`}
-                        />
-                      ) : (
-                        <video src={url} controls className="w-full h-full object-cover" />
-                      )}
+                  {/* Botones de acción Antes */}
+                  <div className="flex flex-wrap items-center gap-1">
+                    <label className="flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold cursor-pointer transition-all shadow-xs active:scale-95">
+                      <Camera className="w-3 h-3" />
+                      <span>📷 Foto</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={(e) => handleFileUpload(e, 'photo', 'before')}
+                      />
+                    </label>
+
+                    <label className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-slate-300 hover:border-blue-400 text-slate-700 text-[10px] font-bold cursor-pointer transition-all shadow-xs active:scale-95">
+                      <ImageIcon className="w-3 h-3 text-blue-600" />
+                      <span>Galería</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => handleFileUpload(e, 'photo', 'before')}
+                      />
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDriveUrlInput('');
+                        setDriveModalTarget('before');
+                      }}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-800 text-[10px] font-bold cursor-pointer transition-all shadow-xs active:scale-95"
+                      title="Enlazar video desde Google Drive sin saturar el servidor"
+                    >
+                      <Video className="w-3 h-3 text-blue-600" />
+                      <span>Drive Video</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleAddMedia('photo', 'before')}
+                      className="px-1.5 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-medium transition-colors"
+                      title="Agregar foto por URL web"
+                    >
+                      + URL
+                    </button>
+                  </div>
+                </div>
+
+                {/* Grid Fotos y Videos Antes */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+                  {(checklist.photos_before || []).map((url, i) => (
+                    <div key={`pb-${i}`} className="relative group rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video flex items-center justify-center shadow-xs">
+                      <img src={url} alt={`Antes ${i + 1}`} className="w-full h-full object-cover" />
                       <button
                         type="button"
-                        onClick={() => handleRemoveMedia('before', 'video', i)}
-                        className="absolute top-1.5 right-1.5 p-1 rounded-md bg-rose-600 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-md z-10"
-                        title="Eliminar video"
+                        onClick={() => handleRemoveMedia('before', 'photo', i)}
+                        className="absolute top-1 right-1 p-1 rounded bg-rose-600 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-md"
+                        title="Eliminar foto"
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
-                      <span className="absolute bottom-1 left-1 bg-purple-900/90 text-white text-[9px] px-1.5 py-0.5 rounded flex items-center gap-0.5 font-mono z-10 pointer-events-none">
-                        <Video className="w-2.5 h-2.5" /> Video #{i + 1} {vInfo.isDrive && '(Drive)'}
+                      <span className="absolute bottom-1 left-1 bg-black/75 text-white text-[9px] px-1 py-0.5 rounded font-mono">
+                        #{i + 1}
                       </span>
                     </div>
-                  );
-                })}
+                  ))}
 
-                {(!checklist.photos_before?.length && !checklist.videos_before?.length) && (
-                  <div className="col-span-full py-4 text-center text-xs text-slate-400 border border-dashed border-slate-300 rounded-xl bg-white/50">
-                    No se han registrado fotos ni videos del estado inicial.
-                  </div>
-                )}
-              </div>
-            </div>
+                  {(checklist.videos_before || []).map((url, i) => {
+                    const vInfo = parseVideoUrl(url);
+                    return (
+                      <div key={`vb-${i}`} className="relative group rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video flex items-center justify-center shadow-xs">
+                        {vInfo.isEmbed ? (
+                          <iframe
+                            src={vInfo.embedUrl}
+                            className="w-full h-full border-0"
+                            allow="autoplay; encrypted-media"
+                            allowFullScreen
+                            title={`Video Antes ${i + 1}`}
+                          />
+                        ) : (
+                          <video src={url} controls className="w-full h-full object-cover" />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMedia('before', 'video', i)}
+                          className="absolute top-1 right-1 p-1 rounded bg-rose-600 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-md z-10"
+                          title="Eliminar video"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                        <span className="absolute bottom-1 left-1 bg-purple-900/90 text-white text-[9px] px-1 py-0.5 rounded flex items-center gap-0.5 font-mono z-10 pointer-events-none">
+                          <Video className="w-2.5 h-2.5" /> #{i + 1} {vInfo.isDrive && '(Drive)'}
+                        </span>
+                      </div>
+                    );
+                  })}
 
-            {/* 2. SECCIÓN DESPUÉS DEL SERVICIO */}
-            <div className="p-4 rounded-2xl bg-emerald-50/50 border-2 border-emerald-300 space-y-3 shadow-xs">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200 pb-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-xs font-extrabold text-emerald-900 uppercase tracking-wide">
-                    2. Trabajo Terminado (Después del Servicio / Entrega)
-                  </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-800 font-bold">
-                    {((checklist.photos_after?.length || 0) + (checklist.videos_after?.length || 0))} archivos
-                  </span>
-                </div>
-
-                {/* Botones de acción Después */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <label className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold cursor-pointer transition-all shadow-xs active:scale-95">
-                    <Camera className="w-3.5 h-3.5" />
-                    <span>📷 Tomar Foto</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      className="hidden"
-                      onChange={(e) => handleFileUpload(e, 'photo', 'after')}
-                    />
-                  </label>
-
-                  <label className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white border border-emerald-300 hover:border-emerald-500 text-emerald-800 text-[11px] font-bold cursor-pointer transition-all shadow-xs active:scale-95">
-                    <ImageIcon className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>🖼️ Galería</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={(e) => handleFileUpload(e, 'photo', 'after')}
-                    />
-                  </label>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDriveUrlInput('');
-                      setDriveModalTarget('after');
-                    }}
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 text-emerald-900 text-[11px] font-bold cursor-pointer transition-all shadow-xs active:scale-95"
-                    title="Enlazar video desde Google Drive sin saturar el servidor"
-                  >
-                    <Video className="w-3.5 h-3.5 text-emerald-700" />
-                    <span>📁 Google Drive Video</span>
-                  </button>
-
-                  <label className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white border border-emerald-300 hover:border-purple-400 text-slate-700 text-[11px] font-bold cursor-pointer transition-all shadow-xs active:scale-95">
-                    <Video className="w-3.5 h-3.5 text-purple-600" />
-                    <span>🎥 Clip Corto</span>
-                    <input
-                      type="file"
-                      accept="video/*"
-                      capture="environment"
-                      className="hidden"
-                      onChange={(e) => handleFileUpload(e, 'video', 'after')}
-                    />
-                  </label>
-
-                  <button
-                    type="button"
-                    onClick={() => handleAddMedia('photo', 'after')}
-                    className="px-2 py-1.5 rounded-lg bg-emerald-200/80 hover:bg-emerald-300 text-emerald-900 text-[11px] font-medium transition-colors"
-                    title="Agregar foto por URL web"
-                  >
-                    + URL Foto
-                  </button>
+                  {(!checklist.photos_before?.length && !checklist.videos_before?.length) && (
+                    <div className="col-span-full py-3 text-center text-[11px] text-slate-400 border border-dashed border-slate-200 rounded-xl bg-white">
+                      Sin archivos del estado inicial
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Grid Fotos y Videos Después */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                {(checklist.photos_after || []).map((url, i) => (
-                  <div key={`pa-${i}`} className="relative group rounded-xl overflow-hidden border border-emerald-300 bg-black aspect-video flex items-center justify-center shadow-xs">
-                    <img src={url} alt={`Después ${i + 1}`} className="w-full h-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveMedia('after', 'photo', i)}
-                      className="absolute top-1.5 right-1.5 p-1 rounded-md bg-rose-600 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-md"
-                      title="Eliminar foto"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                    <span className="absolute bottom-1 left-1 bg-emerald-900/90 text-white text-[9px] px-1.5 py-0.5 rounded font-mono">
-                      Después #{i + 1}
+              {/* 2. SECCIÓN DESPUÉS DEL SERVICIO */}
+              <div className="p-3.5 rounded-xl bg-emerald-50/40 border-2 border-emerald-300/80 space-y-3 shadow-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-xs font-extrabold text-emerald-900 uppercase tracking-wide">
+                      2. Trabajo Terminado (Entrega)
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-200 text-emerald-800 font-bold">
+                      {((checklist.photos_after?.length || 0) + (checklist.videos_after?.length || 0))}
                     </span>
                   </div>
-                ))}
 
-                {(checklist.videos_after || []).map((url, i) => {
-                  const vInfo = parseVideoUrl(url);
-                  return (
-                    <div key={`va-${i}`} className="relative group rounded-xl overflow-hidden border border-emerald-300 bg-black aspect-video flex items-center justify-center shadow-xs">
-                      {vInfo.isEmbed ? (
-                        <iframe
-                          src={vInfo.embedUrl}
-                          className="w-full h-full border-0"
-                          allow="autoplay; encrypted-media"
-                          allowFullScreen
-                          title={`Video Después ${i + 1}`}
-                        />
-                      ) : (
-                        <video src={url} controls className="w-full h-full object-cover" />
-                      )}
+                  {/* Botones de acción Después */}
+                  <div className="flex flex-wrap items-center gap-1">
+                    <label className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold cursor-pointer transition-all shadow-xs active:scale-95">
+                      <Camera className="w-3 h-3" />
+                      <span>📷 Foto</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={(e) => handleFileUpload(e, 'photo', 'after')}
+                      />
+                    </label>
+
+                    <label className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-emerald-300 hover:border-emerald-500 text-emerald-800 text-[10px] font-bold cursor-pointer transition-all shadow-xs active:scale-95">
+                      <ImageIcon className="w-3 h-3 text-emerald-600" />
+                      <span>Galería</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => handleFileUpload(e, 'photo', 'after')}
+                      />
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDriveUrlInput('');
+                        setDriveModalTarget('after');
+                      }}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 text-emerald-900 text-[10px] font-bold cursor-pointer transition-all shadow-xs active:scale-95"
+                      title="Enlazar video desde Google Drive sin saturar el servidor"
+                    >
+                      <Video className="w-3 h-3 text-emerald-700" />
+                      <span>Drive Video</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleAddMedia('photo', 'after')}
+                      className="px-1.5 py-1 rounded-lg bg-emerald-200/80 hover:bg-emerald-300 text-emerald-900 text-[10px] font-medium transition-colors"
+                      title="Agregar foto por URL web"
+                    >
+                      + URL
+                    </button>
+                  </div>
+                </div>
+
+                {/* Grid Fotos y Videos Después */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+                  {(checklist.photos_after || []).map((url, i) => (
+                    <div key={`pa-${i}`} className="relative group rounded-xl overflow-hidden border border-emerald-300 bg-black aspect-video flex items-center justify-center shadow-xs">
+                      <img src={url} alt={`Después ${i + 1}`} className="w-full h-full object-cover" />
                       <button
                         type="button"
-                        onClick={() => handleRemoveMedia('after', 'video', i)}
-                        className="absolute top-1.5 right-1.5 p-1 rounded-md bg-rose-600 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-md z-10"
-                        title="Eliminar video"
+                        onClick={() => handleRemoveMedia('after', 'photo', i)}
+                        className="absolute top-1 right-1 p-1 rounded bg-rose-600 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-md"
+                        title="Eliminar foto"
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
-                      <span className="absolute bottom-1 left-1 bg-purple-900/90 text-white text-[9px] px-1.5 py-0.5 rounded flex items-center gap-0.5 font-mono z-10 pointer-events-none">
-                        <Video className="w-2.5 h-2.5" /> Video #{i + 1} {vInfo.isDrive && '(Drive)'}
+                      <span className="absolute bottom-1 left-1 bg-emerald-900/90 text-white text-[9px] px-1 py-0.5 rounded font-mono">
+                        #{i + 1}
                       </span>
                     </div>
-                  );
-                })}
+                  ))}
 
-                {(!checklist.photos_after?.length && !checklist.videos_after?.length) && (
-                  <div className="col-span-full py-4 text-center text-xs text-emerald-700 border border-dashed border-emerald-300 rounded-xl bg-white/50">
-                    Aquí se cargan las fotos y videos del trabajo terminado (serpentín limpio, presiones y pruebas).
-                  </div>
-                )}
+                  {(checklist.videos_after || []).map((url, i) => {
+                    const vInfo = parseVideoUrl(url);
+                    return (
+                      <div key={`va-${i}`} className="relative group rounded-xl overflow-hidden border border-emerald-300 bg-black aspect-video flex items-center justify-center shadow-xs">
+                        {vInfo.isEmbed ? (
+                          <iframe
+                            src={vInfo.embedUrl}
+                            className="w-full h-full border-0"
+                            allow="autoplay; encrypted-media"
+                            allowFullScreen
+                            title={`Video Después ${i + 1}`}
+                          />
+                        ) : (
+                          <video src={url} controls className="w-full h-full object-cover" />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMedia('after', 'video', i)}
+                          className="absolute top-1 right-1 p-1 rounded bg-rose-600 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-md z-10"
+                          title="Eliminar video"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                        <span className="absolute bottom-1 left-1 bg-purple-900/90 text-white text-[9px] px-1 py-0.5 rounded flex items-center gap-0.5 font-mono z-10 pointer-events-none">
+                          <Video className="w-2.5 h-2.5" /> #{i + 1} {vInfo.isDrive && '(Drive)'}
+                        </span>
+                      </div>
+                    );
+                  })}
+
+                  {(!checklist.photos_after?.length && !checklist.videos_after?.length) && (
+                    <div className="col-span-full py-3 text-center text-[11px] text-emerald-700 border border-dashed border-emerald-300 rounded-xl bg-white">
+                      Fotos y videos del trabajo terminado (serpentín, turbina y pruebas)
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-
-          {/* Observations and Notes */}
-          <div className="space-y-2 pt-2">
-            <label className="text-xs font-semibold text-slate-700">
-              Observaciones del Técnico para el Informe del Cliente:
-            </label>
-            <textarea
-              rows={3}
-              value={checklist.technician_notes || ''}
-              onChange={(e) => setChecklist(prev => ({ ...prev, technician_notes: e.target.value }))}
-              placeholder="Ej: Se realizó prueba de calor y frío. Desagüe libre de sarro. Se recomienda próxima mantención preventiva en 6 meses antes de verano..."
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none leading-relaxed transition-colors"
-            />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-slate-50/90 border-t border-slate-200 flex items-center justify-between">
+        <div className="px-6 py-3.5 bg-slate-50/95 border-t border-slate-200 flex items-center justify-between shrink-0">
           <div className="text-[11px] text-slate-500">
             Los datos se sincronizan con el informe de entrega y el portal del cliente.
           </div>
@@ -612,7 +593,7 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+              className="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
             >
               Cancelar
             </button>
