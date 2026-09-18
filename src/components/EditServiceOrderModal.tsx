@@ -38,28 +38,26 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen || !order) return null;
+  const [status, setStatus] = useState<OrderStatus>(order?.status || 'ingresado');
+  const [technicianId, setTechnicianId] = useState(order?.assigned_technician_id || '');
+  const [assistantId, setAssistantId] = useState(order?.assigned_assistant_id || '');
+  const [techPayoutType, setTechPayoutType] = useState<'fixed' | 'percentage'>(order?.technician_payout_type || 'fixed');
+  const [techPayoutValue, setTechPayoutValue] = useState<number>(order?.technician_payout_value ?? 20000);
+  const [assistantPayoutType, setAssistantPayoutType] = useState<'fixed' | 'percentage'>(order?.assistant_payout_type || 'fixed');
+  const [assistantPayoutValue, setAssistantPayoutValue] = useState<number>(order?.assistant_payout_value ?? 10000);
 
-  const [status, setStatus] = useState<OrderStatus>(order.status);
-  const [technicianId, setTechnicianId] = useState(order.assigned_technician_id || '');
-  const [assistantId, setAssistantId] = useState(order.assigned_assistant_id || '');
-  const [techPayoutType, setTechPayoutType] = useState<'fixed' | 'percentage'>(order.technician_payout_type || 'fixed');
-  const [techPayoutValue, setTechPayoutValue] = useState<number>(order.technician_payout_value ?? 20000);
-  const [assistantPayoutType, setAssistantPayoutType] = useState<'fixed' | 'percentage'>(order.assistant_payout_type || 'fixed');
-  const [assistantPayoutValue, setAssistantPayoutValue] = useState<number>(order.assistant_payout_value ?? 10000);
-
-  const [scheduledDate, setScheduledDate] = useState(order.scheduled_date);
-  const [scheduledSlot, setScheduledSlot] = useState(order.scheduled_time_slot);
-  const [description, setDescription] = useState(order.description);
-  const [diagnosis, setDiagnosis] = useState(order.diagnosis || '');
-  const [resolution, setResolution] = useState(order.resolution || '');
-  const [paymentStatus, setPaymentStatus] = useState(order.payment_status);
-  const [total, setTotal] = useState(order.total);
+  const [scheduledDate, setScheduledDate] = useState(order?.scheduled_date || '');
+  const [scheduledSlot, setScheduledSlot] = useState(order?.scheduled_time_slot || '');
+  const [description, setDescription] = useState(order?.description || '');
+  const [diagnosis, setDiagnosis] = useState(order?.diagnosis || '');
+  const [resolution, setResolution] = useState(order?.resolution || '');
+  const [paymentStatus, setPaymentStatus] = useState(order?.payment_status || 'pendiente');
+  const [total, setTotal] = useState(order?.total || 0);
 
   // GPS Live Tracking State
-  const [isTrackingGps, setIsTrackingGps] = useState(order.status === 'en_ruta' && !!order.technician_location?.is_active);
+  const [isTrackingGps, setIsTrackingGps] = useState(order?.status === 'en_ruta' && !!order?.technician_location?.is_active);
   const [lastCoords, setLastCoords] = useState<{ lat: number; lng: number } | null>(
-    order.technician_location ? { lat: order.technician_location.lat, lng: order.technician_location.lng } : null
+    order?.technician_location ? { lat: order.technician_location.lat, lng: order.technician_location.lng } : null
   );
   const [geoWatchId, setGeoWatchId] = useState<number | null>(null);
   const [routeEta, setRouteEta] = useState<RouteETA | null>(null);
@@ -87,7 +85,7 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
 
   // Cálculo Dinámico de Ruta OSRM hacia el Cliente
   useEffect(() => {
-    if (!lastCoords) return;
+    if (!lastCoords || !order) return;
     const dest = getCustomerCoordinates(
       order.customer?.commune,
       order.customer?.city,
@@ -102,7 +100,9 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
     }).catch((err) => {
       console.warn('Error calculando ETA en modal:', err);
     });
-  }, [lastCoords?.lat, lastCoords?.lng, order.customer?.commune, order.customer?.address]);
+  }, [lastCoords?.lat, lastCoords?.lng, order?.customer?.commune, order?.customer?.address]);
+
+  if (!isOpen || !order) return null;
 
   const calculatedTechPayout = techPayoutType === 'percentage' 
     ? Math.round((total * techPayoutValue) / 100) 

@@ -37,8 +37,6 @@ export const PublicBookingModal: React.FC<PublicBookingModalProps> = ({
   prefill = null,
   onConfirmBooking,
 }) => {
-  if (!isOpen) return null;
-
   const defaultPrefix = settings?.phone_prefix || '+56 9 ';
   const defaultCity = settings?.sample_cities?.[0] || 'Las Condes';
 
@@ -135,6 +133,8 @@ export const PublicBookingModal: React.FC<PublicBookingModalProps> = ({
     if (isOpen) window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

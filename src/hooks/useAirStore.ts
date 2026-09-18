@@ -404,15 +404,38 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
             description: o.description || '',
             diagnosis: o.diagnosis,
             resolution: o.resolution,
-            checklist: o.checklist || {
-              clean_filters: false,
-              clean_evaporator_coil: false,
-              clean_turbine_fan: false,
-              sanitize_bactericide: false,
-              clean_condenser_coil: false,
-              check_electrical_connections: false,
-              check_condensate_drain: false
-            },
+            checklist: (() => {
+              const defaultCl = {
+                clean_filters: false,
+                clean_evaporator_coil: false,
+                clean_turbine_fan: false,
+                sanitize_bactericide: false,
+                clean_condenser_coil: false,
+                check_electrical_connections: false,
+                check_condensate_drain: false,
+                delta_t_celsius: 12.0,
+                suction_pressure_psi: 120,
+                discharge_pressure_psi: 350,
+                amperage_amps: 4.5,
+                technician_notes: '',
+                photos_before: [],
+                photos_after: [],
+                videos_before: [],
+                videos_after: [],
+              };
+              if (!o.checklist) return defaultCl;
+              if (typeof o.checklist === 'string') {
+                try {
+                  return { ...defaultCl, ...JSON.parse(o.checklist) };
+                } catch {
+                  return defaultCl;
+                }
+              }
+              if (typeof o.checklist === 'object') {
+                return { ...defaultCl, ...o.checklist };
+              }
+              return defaultCl;
+            })(),
             items: Array.isArray(o.items) ? o.items : [],
             subtotal: orderSubtotal,
             tax: orderTax,

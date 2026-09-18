@@ -51,25 +51,23 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen || !order) return null;
-
   const [checklist, setChecklist] = useState<HVACInspectionChecklist>(() => ({
-    clean_evaporator_coil: order.checklist?.clean_evaporator_coil || false,
-    clean_turbine_fan: order.checklist?.clean_turbine_fan || false,
-    sanitize_bactericide: order.checklist?.sanitize_bactericide || false,
-    clean_condenser_coil: order.checklist?.clean_condenser_coil || false,
-    check_electrical_connections: order.checklist?.check_electrical_connections || false,
-    check_condensate_drain: order.checklist?.check_condensate_drain || false,
-    clean_filters: order.checklist?.clean_filters || false,
-    delta_t_celsius: order.checklist?.delta_t_celsius || 12.0,
-    suction_pressure_psi: order.checklist?.suction_pressure_psi || 120,
-    discharge_pressure_psi: order.checklist?.discharge_pressure_psi || 350,
-    amperage_amps: order.checklist?.amperage_amps || 4.5,
-    technician_notes: order.checklist?.technician_notes || '',
-    photos_before: order.checklist?.photos_before || [],
-    photos_after: order.checklist?.photos_after || [],
-    videos_before: order.checklist?.videos_before || [],
-    videos_after: order.checklist?.videos_after || [],
+    clean_evaporator_coil: order?.checklist?.clean_evaporator_coil || false,
+    clean_turbine_fan: order?.checklist?.clean_turbine_fan || false,
+    sanitize_bactericide: order?.checklist?.sanitize_bactericide || false,
+    clean_condenser_coil: order?.checklist?.clean_condenser_coil || false,
+    check_electrical_connections: order?.checklist?.check_electrical_connections || false,
+    check_condensate_drain: order?.checklist?.check_condensate_drain || false,
+    clean_filters: order?.checklist?.clean_filters || false,
+    delta_t_celsius: order?.checklist?.delta_t_celsius ?? 12.0,
+    suction_pressure_psi: order?.checklist?.suction_pressure_psi ?? 120,
+    discharge_pressure_psi: order?.checklist?.discharge_pressure_psi ?? 350,
+    amperage_amps: order?.checklist?.amperage_amps ?? 4.5,
+    technician_notes: order?.checklist?.technician_notes || '',
+    photos_before: Array.isArray(order?.checklist?.photos_before) ? order!.checklist.photos_before : [],
+    photos_after: Array.isArray(order?.checklist?.photos_after) ? order!.checklist.photos_after : [],
+    videos_before: Array.isArray(order?.checklist?.videos_before) ? order!.checklist.videos_before : [],
+    videos_after: Array.isArray(order?.checklist?.videos_after) ? order!.checklist.videos_after : [],
   }));
 
   useEffect(() => {
@@ -82,15 +80,15 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
         check_electrical_connections: order.checklist?.check_electrical_connections || false,
         check_condensate_drain: order.checklist?.check_condensate_drain || false,
         clean_filters: order.checklist?.clean_filters || false,
-        delta_t_celsius: order.checklist?.delta_t_celsius || 12.0,
-        suction_pressure_psi: order.checklist?.suction_pressure_psi || 120,
-        discharge_pressure_psi: order.checklist?.discharge_pressure_psi || 350,
-        amperage_amps: order.checklist?.amperage_amps || 4.5,
+        delta_t_celsius: order.checklist?.delta_t_celsius ?? 12.0,
+        suction_pressure_psi: order.checklist?.suction_pressure_psi ?? 120,
+        discharge_pressure_psi: order.checklist?.discharge_pressure_psi ?? 350,
+        amperage_amps: order.checklist?.amperage_amps ?? 4.5,
         technician_notes: order.checklist?.technician_notes || '',
-        photos_before: order.checklist?.photos_before || [],
-        photos_after: order.checklist?.photos_after || [],
-        videos_before: order.checklist?.videos_before || [],
-        videos_after: order.checklist?.videos_after || [],
+        photos_before: Array.isArray(order.checklist?.photos_before) ? order.checklist.photos_before : [],
+        photos_after: Array.isArray(order.checklist?.photos_after) ? order.checklist.photos_after : [],
+        videos_before: Array.isArray(order.checklist?.videos_before) ? order.checklist.videos_before : [],
+        videos_after: Array.isArray(order.checklist?.videos_after) ? order.checklist.videos_after : [],
       });
     }
   }, [order?.id]);
@@ -99,6 +97,8 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
   const [activeMediaTab, setActiveMediaTab] = useState<'before' | 'after'>('before');
   const [driveModalTarget, setDriveModalTarget] = useState<'before' | 'after' | null>(null);
   const [driveUrlInput, setDriveUrlInput] = useState('');
+
+  if (!isOpen || !order) return null;
 
   const handleConfirmDriveVideo = () => {
     if (!driveUrlInput.trim() || !driveModalTarget) return;
@@ -189,6 +189,12 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
     onClose();
   };
 
+  // Safe media arrays
+  const photosBefore = Array.isArray(checklist.photos_before) ? checklist.photos_before.filter(Boolean) : [];
+  const videosBefore = Array.isArray(checklist.videos_before) ? checklist.videos_before.filter(Boolean) : [];
+  const photosAfter = Array.isArray(checklist.photos_after) ? checklist.photos_after.filter(Boolean) : [];
+  const videosAfter = Array.isArray(checklist.videos_after) ? checklist.videos_after.filter(Boolean) : [];
+
   // Evaluación de Salto Térmico (Delta T)
   const deltaT = checklist.delta_t_celsius || 0;
   let deltaTStatus = {
@@ -230,11 +236,11 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
               <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
                 Ficha Técnica & Checklist HVAC
                 <span className="text-xs px-2.5 py-0.5 rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200 font-mono font-bold">
-                  {order.ticket_number}
+                  {order.ticket_number || 'S/N'}
                 </span>
               </h3>
               <p className="text-xs text-slate-500">
-                {order.customer?.name} • {order.equipment ? `${order.equipment.brand} ${order.equipment.btu} BTU (${order.equipment.refrigerant})` : 'Equipo HVAC'}
+                {order.customer?.name || 'Cliente'} • {order.equipment ? `${order.equipment.brand || ''} ${order.equipment.btu || ''} BTU (${order.equipment.refrigerant || ''})` : 'Equipo HVAC'}
               </p>
             </div>
           </div>
@@ -402,7 +408,7 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
                       1. Estado Inicial (Antes)
                     </span>
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold">
-                      {((checklist.photos_before?.length || 0) + (checklist.videos_before?.length || 0))}
+                      {(photosBefore.length + videosBefore.length)}
                     </span>
                   </div>
 
@@ -458,7 +464,7 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
 
                 {/* Grid Fotos y Videos Antes */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
-                  {(checklist.photos_before || []).map((url, i) => (
+                  {photosBefore.map((url, i) => (
                     <div key={`pb-${i}`} className="relative group rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video flex items-center justify-center shadow-xs">
                       <img src={url} alt={`Antes ${i + 1}`} className="w-full h-full object-cover" />
                       <button
@@ -475,7 +481,7 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
                     </div>
                   ))}
 
-                  {(checklist.videos_before || []).map((url, i) => {
+                  {videosBefore.map((url, i) => {
                     const vInfo = parseVideoUrl(url);
                     return (
                       <div key={`vb-${i}`} className="relative group rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video flex items-center justify-center shadow-xs">
@@ -505,7 +511,7 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
                     );
                   })}
 
-                  {(!checklist.photos_before?.length && !checklist.videos_before?.length) && (
+                  {(!photosBefore.length && !videosBefore.length) && (
                     <div className="col-span-full py-3 text-center text-[11px] text-slate-400 border border-dashed border-slate-200 rounded-xl bg-white">
                       Sin archivos del estado inicial
                     </div>
@@ -522,7 +528,7 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
                       2. Trabajo Terminado (Entrega)
                     </span>
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-200 text-emerald-800 font-bold">
-                      {((checklist.photos_after?.length || 0) + (checklist.videos_after?.length || 0))}
+                      {(photosAfter.length + videosAfter.length)}
                     </span>
                   </div>
 
@@ -578,7 +584,7 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
 
                 {/* Grid Fotos y Videos Después */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
-                  {(checklist.photos_after || []).map((url, i) => (
+                  {photosAfter.map((url, i) => (
                     <div key={`pa-${i}`} className="relative group rounded-xl overflow-hidden border border-emerald-300 bg-black aspect-video flex items-center justify-center shadow-xs">
                       <img src={url} alt={`Después ${i + 1}`} className="w-full h-full object-cover" />
                       <button
@@ -595,7 +601,7 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
                     </div>
                   ))}
 
-                  {(checklist.videos_after || []).map((url, i) => {
+                  {videosAfter.map((url, i) => {
                     const vInfo = parseVideoUrl(url);
                     return (
                       <div key={`va-${i}`} className="relative group rounded-xl overflow-hidden border border-emerald-300 bg-black aspect-video flex items-center justify-center shadow-xs">
@@ -625,7 +631,7 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
                     );
                   })}
 
-                  {(!checklist.photos_after?.length && !checklist.videos_after?.length) && (
+                  {(!photosAfter.length && !videosAfter.length) && (
                     <div className="col-span-full py-3 text-center text-[11px] text-emerald-700 border border-dashed border-emerald-300 rounded-xl bg-white">
                       Fotos y videos del trabajo terminado (serpentín, turbina y pruebas)
                     </div>

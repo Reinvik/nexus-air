@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Helper para procesar URLs de video (Google Drive, YouTube, Vimeo, directos)
  * para evitar saturar el servidor y base de datos con archivos pesados.
  */
@@ -9,8 +9,8 @@ export interface VideoEmbedInfo {
   rawUrl: string;
 }
 
-export function parseVideoUrl(url: string): VideoEmbedInfo {
-  if (!url) {
+export function parseVideoUrl(url: any): VideoEmbedInfo {
+  if (!url || typeof url !== 'string') {
     return { isEmbed: false, embedUrl: '', isDrive: false, rawUrl: '' };
   }
 

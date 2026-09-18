@@ -36,8 +36,6 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
-
   const [customerId, setCustomerId] = useState(customers[0]?.id || '');
   const [equipmentId, setEquipmentId] = useState('');
   const [serviceType, setServiceType] = useState<ServiceType>('mantencion_preventiva');
@@ -99,6 +97,8 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
         ? Math.round((totalPrice * assistantPayoutValue) / 100) 
         : assistantPayoutValue)
     : 0;
+
+  if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

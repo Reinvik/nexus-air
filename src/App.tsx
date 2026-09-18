@@ -232,17 +232,19 @@ export default function App() {
           onOpenPortal={() => setView('customer')}
           onAdminAccess={() => setView('login')}
         />
-        <PublicBookingModal
-          isOpen={isBookingModalOpen}
-          onClose={() => {
-            setIsBookingModalOpen(false);
-            setBookingPrefill(null);
-          }}
-          settings={currentSettings}
-          customers={customers}
-          prefill={bookingPrefill}
-          onConfirmBooking={handleConfirmPublicBooking}
-        />
+        {isBookingModalOpen && (
+          <PublicBookingModal
+            isOpen={isBookingModalOpen}
+            onClose={() => {
+              setIsBookingModalOpen(false);
+              setBookingPrefill(null);
+            }}
+            settings={currentSettings}
+            customers={customers}
+            prefill={bookingPrefill}
+            onConfirmBooking={handleConfirmPublicBooking}
+          />
+        )}
       </>
     );
   }
@@ -446,61 +448,71 @@ export default function App() {
       </Layout>
 
       {/* Modales Globales */}
-      <AddServiceOrderModal
-        isOpen={isAddOrderModalOpen}
-        onClose={() => setIsAddOrderModalOpen(false)}
-        customers={customers}
-        equipments={equipments}
-        technicians={technicians}
-        settings={tenantSettings || settings}
-        onAddOrder={addOrder}
-      />
+      {isAddOrderModalOpen && (
+        <AddServiceOrderModal
+          isOpen={isAddOrderModalOpen}
+          onClose={() => setIsAddOrderModalOpen(false)}
+          customers={customers}
+          equipments={equipments}
+          technicians={technicians}
+          settings={tenantSettings || settings}
+          onAddOrder={addOrder}
+        />
+      )}
 
-      <EditServiceOrderModal
-        isOpen={isEditOrderModalOpen}
-        onClose={() => {
-          setIsEditOrderModalOpen(false);
-          setSelectedOrder(null);
-        }}
-        order={selectedOrder}
-        technicians={technicians}
-        settings={tenantSettings || settings}
-        onOpenReceipt={(ord) => {
-          setIsEditOrderModalOpen(false);
-          setReceiptOrder(ord);
-        }}
-        onUpdateOrder={updateOrder}
-        onDeleteOrder={deleteOrder}
-      />
+      {isEditOrderModalOpen && selectedOrder && (
+        <EditServiceOrderModal
+          isOpen={isEditOrderModalOpen}
+          onClose={() => {
+            setIsEditOrderModalOpen(false);
+            setSelectedOrder(null);
+          }}
+          order={selectedOrder}
+          technicians={technicians}
+          settings={tenantSettings || settings}
+          onOpenReceipt={(ord) => {
+            setIsEditOrderModalOpen(false);
+            setReceiptOrder(ord);
+          }}
+          onUpdateOrder={updateOrder}
+          onDeleteOrder={deleteOrder}
+        />
+      )}
 
-      <InspeccionHVACModal
-        isOpen={isInspectionModalOpen}
-        onClose={() => {
-          setIsInspectionModalOpen(false);
-          setSelectedOrder(null);
-        }}
-        order={selectedOrder}
-        onSaveChecklist={updateChecklist}
-      />
+      {isInspectionModalOpen && selectedOrder && (
+        <InspeccionHVACModal
+          isOpen={isInspectionModalOpen}
+          onClose={() => {
+            setIsInspectionModalOpen(false);
+            setSelectedOrder(null);
+          }}
+          order={selectedOrder}
+          onSaveChecklist={updateChecklist}
+        />
+      )}
 
-      <PublicBookingModal
-        isOpen={isBookingModalOpen}
-        onClose={() => {
-          setIsBookingModalOpen(false);
-          setBookingPrefill(null);
-        }}
-        settings={tenantSettings || settings}
-        customers={customers}
-        prefill={bookingPrefill}
-        onConfirmBooking={handleConfirmPublicBooking}
-      />
+      {isBookingModalOpen && (
+        <PublicBookingModal
+          isOpen={isBookingModalOpen}
+          onClose={() => {
+            setIsBookingModalOpen(false);
+            setBookingPrefill(null);
+          }}
+          settings={tenantSettings || settings}
+          customers={customers}
+          prefill={bookingPrefill}
+          onConfirmBooking={handleConfirmPublicBooking}
+        />
+      )}
 
-      <ReceiptModalAir
-        isOpen={Boolean(receiptOrder)}
-        onClose={() => setReceiptOrder(null)}
-        order={receiptOrder}
-        settings={tenantSettings || settings}
-      />
+      {Boolean(receiptOrder) && (
+        <ReceiptModalAir
+          isOpen={Boolean(receiptOrder)}
+          onClose={() => setReceiptOrder(null)}
+          order={receiptOrder}
+          settings={tenantSettings || settings}
+        />
+      )}
     </>
   );
 }
