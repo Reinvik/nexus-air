@@ -82,6 +82,19 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
     );
   }, [customers, searchTerm]);
 
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsAddCustModalOpen(false);
+        setIsEditCustModalOpen(false);
+        setIsAddEqModalOpen(false);
+        setEquipmentToDelete(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId) || filteredCustomers[0];
   const selectedEquipments = equipments.filter(e => e.customer_id === selectedCustomer?.id);
 
@@ -356,8 +369,16 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
 
       {/* Add Customer Modal */}
       {isAddCustModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xl">
+        <div 
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsAddCustModalOpen(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xl cursor-default"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-bold text-slate-900 text-base">Nuevo Cliente</h3>
               <button onClick={() => setIsAddCustModalOpen(false)} className="text-slate-400 hover:text-slate-700">
@@ -461,8 +482,16 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
 
       {/* Add Equipment Modal */}
       {isAddEqModalOpen && selectedCustomer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xl">
+        <div 
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsAddEqModalOpen(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xl cursor-default"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-bold text-slate-900 text-base">Nuevo Equipo para {selectedCustomer.name}</h3>
               <button onClick={() => setIsAddEqModalOpen(false)} className="text-slate-400 hover:text-slate-700">
@@ -578,8 +607,16 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
 
       {/* Edit Customer Modal */}
       {isEditCustModalOpen && selectedCustomer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in duration-150">
+        <div 
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsEditCustModalOpen(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in duration-150 cursor-default"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-cyan-50 border border-cyan-200 text-cyan-600 flex items-center justify-center">
@@ -731,8 +768,16 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
 
       {/* Delete Equipment Confirmation Modal */}
       {equipmentToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in duration-150">
+        <div 
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setEquipmentToDelete(null);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in duration-150 cursor-default"
+          >
             <div className="flex items-start gap-3.5">
               <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0">
                 <AlertTriangle className="w-5 h-5" />

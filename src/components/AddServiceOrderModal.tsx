@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Customer, AirEquipment, Technician, ServiceOrder, ServiceType } from '../types';
+import { Customer, AirEquipment, Technician, ServiceOrder, ServiceType, AirSettings } from '../types';
 import { X, Plus, Calendar, Clock, User, Wrench, UserCheck, Users, Percent, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
 

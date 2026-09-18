@@ -63,6 +63,16 @@ export const InventoryAir: React.FC<InventoryAirProps> = ({
     setIsModalOpen(true);
   };
 
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const openEditModal = (part: AirPart) => {
     setEditingPart(part);
     setSku(part.sku);
@@ -277,8 +287,16 @@ export const InventoryAir: React.FC<InventoryAirProps> = ({
 
       {/* Add / Edit Modal in Crisp White */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-          <div className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden my-8">
+        <div 
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsModalOpen(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden my-8 cursor-default"
+          >
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
               <h3 className="font-bold text-base text-slate-900">
                 {editingPart ? 'Editar Producto' : 'Nuevo Producto / Equipo HVAC'}

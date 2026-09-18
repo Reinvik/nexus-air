@@ -26,7 +26,7 @@ interface PublicBookingModalProps {
     scheduled_date: string;
     scheduled_time_slot: string;
     notes: string;
-  }) => ServiceOrder;
+  }) => ServiceOrder | Promise<ServiceOrder>;
 }
 
 export const PublicBookingModal: React.FC<PublicBookingModalProps> = ({
@@ -128,9 +128,17 @@ export const PublicBookingModal: React.FC<PublicBookingModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    if (isOpen) window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const order = onConfirmBooking({
+    const res = onConfirmBooking({
       name,
       rut: rut.trim() || undefined,
       phone,
@@ -141,12 +149,21 @@ export const PublicBookingModal: React.FC<PublicBookingModalProps> = ({
       scheduled_time_slot: scheduledSlot,
       notes,
     });
+    const order = res instanceof Promise ? await res : res;
     setConfirmedOrder(order);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-      <div className="w-full max-w-lg bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden my-8 text-slate-900">
+    <div 
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto cursor-pointer"
+    >
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden my-8 text-slate-900 cursor-default"
+      >
         {/* Header */}
         <div className="px-6 py-4 bg-slate-50/90 border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-3">

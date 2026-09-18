@@ -13,7 +13,10 @@ export type ServiceType =
   | 'mantencion_preventiva' 
   | 'mantencion_correctiva' 
   | 'visita_tecnica' 
-  | 'recarga_gas';
+  | 'recarga_gas'
+  | 'reparacion'
+  | 'recaptacion'
+  | 'pruebas_qa';
 
 export type OrderStatus = 
   | 'ingresado' 
@@ -44,6 +47,7 @@ export interface Customer {
   id: string;
   name: string;
   rut: string;
+  id_number?: string; // alias internacional
   phone: string;
   email: string;
   address: string;
@@ -54,6 +58,8 @@ export interface Customer {
   equipments?: AirEquipment[];
   created_at: string;
 }
+
+export type CustomerAir = Customer;
 
 export interface Technician {
   id: string;
@@ -122,6 +128,9 @@ export interface ServiceOrder {
   ticket_number: string; // ej: "AIR-2026-001"
   customer_id: string;
   customer?: Customer;
+  customer_name?: string;
+  customer_phone?: string;
+  customer_email?: string;
   equipment_id?: string;
   equipment?: AirEquipment;
   service_type: ServiceType;
@@ -236,6 +245,12 @@ export interface AirSettings {
   whatsapp_template_recaptacion: string;
   whatsapp_template_agendamiento: string;
   whatsapp_template_terminado: string;
+  warranty_months?: number;
+  logo_url?: string;
+  tax_id?: string;
+  phone_prefix?: string;
+  sample_cities?: string[];
+  default_country?: string;
   landing_config?: {
     hero_title?: string;
     hero_subtitle?: string;

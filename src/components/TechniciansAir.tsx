@@ -97,6 +97,18 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
     return technicians.filter(t => (t.role || 'tecnico') === roleFilter);
   }, [technicians, roleFilter]);
 
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsAddModalOpen(false);
+        setEditingTech(null);
+        setSelectedTechForSettlement(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Cálculo de liquidaciones y comisiones por colaborador para el mes seleccionado
   const techSettlementMap = useMemo(() => {
     const map = new Map<string, {
@@ -599,8 +611,16 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
 
       {/* Modal Agregar Personal (NK-029 & NK-012) */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-          <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xl my-6">
+        <div 
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsAddModalOpen(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xl my-6 cursor-default"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-bold text-slate-900 text-base">Registrar Colaborador HVAC</h3>
               <button onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-slate-700">
@@ -800,8 +820,16 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
 
       {/* Modal Editar Personal (NK-029 & NK-012) */}
       {editingTech && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-          <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xl my-6">
+        <div 
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setEditingTech(null);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xl my-6 cursor-default"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-bold text-slate-900 text-base">Editar Colaborador HVAC</h3>
               <button onClick={() => setEditingTech(null)} className="text-slate-400 hover:text-slate-700">
@@ -997,8 +1025,16 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
 
       {/* Modal Liquidación & Resumen Detallado (NK-012) - SIN MOSTRAR FACTURACIÓN TOTAL AL CLIENTE */}
       {selectedTechForSettlement && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-          <div className="w-full max-w-2xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden my-8">
+        <div 
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedTechForSettlement(null);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-2xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden my-8 cursor-default"
+          >
             {/* Encabezado */}
             <div className="p-6 bg-slate-900 text-white flex items-center justify-between">
               <div>

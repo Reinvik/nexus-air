@@ -64,6 +64,27 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
   const [geoWatchId, setGeoWatchId] = useState<number | null>(null);
   const [routeEta, setRouteEta] = useState<RouteETA | null>(null);
 
+  useEffect(() => {
+    if (order) {
+      setStatus(order.status);
+      setTechnicianId(order.assigned_technician_id || '');
+      setAssistantId(order.assigned_assistant_id || '');
+      setTechPayoutType(order.technician_payout_type || 'fixed');
+      setTechPayoutValue(order.technician_payout_value ?? 20000);
+      setAssistantPayoutType(order.assistant_payout_type || 'fixed');
+      setAssistantPayoutValue(order.assistant_payout_value ?? 10000);
+      setScheduledDate(order.scheduled_date);
+      setScheduledSlot(order.scheduled_time_slot);
+      setDescription(order.description);
+      setDiagnosis(order.diagnosis || '');
+      setResolution(order.resolution || '');
+      setPaymentStatus(order.payment_status);
+      setTotal(order.total);
+      setIsTrackingGps(order.status === 'en_ruta' && !!order.technician_location?.is_active);
+      setLastCoords(order.technician_location ? { lat: order.technician_location.lat, lng: order.technician_location.lng } : null);
+    }
+  }, [order?.id]);
+
   // Cálculo Dinámico de Ruta OSRM hacia el Cliente
   useEffect(() => {
     if (!lastCoords) return;

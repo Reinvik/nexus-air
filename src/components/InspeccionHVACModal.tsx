@@ -72,6 +72,29 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
     videos_after: order.checklist?.videos_after || [],
   }));
 
+  useEffect(() => {
+    if (order) {
+      setChecklist({
+        clean_evaporator_coil: order.checklist?.clean_evaporator_coil || false,
+        clean_turbine_fan: order.checklist?.clean_turbine_fan || false,
+        sanitize_bactericide: order.checklist?.sanitize_bactericide || false,
+        clean_condenser_coil: order.checklist?.clean_condenser_coil || false,
+        check_electrical_connections: order.checklist?.check_electrical_connections || false,
+        check_condensate_drain: order.checklist?.check_condensate_drain || false,
+        clean_filters: order.checklist?.clean_filters || false,
+        delta_t_celsius: order.checklist?.delta_t_celsius || 12.0,
+        suction_pressure_psi: order.checklist?.suction_pressure_psi || 120,
+        discharge_pressure_psi: order.checklist?.discharge_pressure_psi || 350,
+        amperage_amps: order.checklist?.amperage_amps || 4.5,
+        technician_notes: order.checklist?.technician_notes || '',
+        photos_before: order.checklist?.photos_before || [],
+        photos_after: order.checklist?.photos_after || [],
+        videos_before: order.checklist?.videos_before || [],
+        videos_after: order.checklist?.videos_after || [],
+      });
+    }
+  }, [order?.id]);
+
   const [inputUrl, setInputUrl] = useState('');
   const [activeMediaTab, setActiveMediaTab] = useState<'before' | 'after'>('before');
   const [driveModalTarget, setDriveModalTarget] = useState<'before' | 'after' | null>(null);
