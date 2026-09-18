@@ -163,6 +163,10 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const taxRate = settings?.tax_rate !== undefined ? Number(settings.tax_rate) : 0.19;
+    const subtotal = Math.round(total / (1 + taxRate));
+    const tax = total - subtotal;
+
     onUpdateOrder(order.id, {
       status,
       assigned_technician_id: technicianId,
@@ -177,6 +181,8 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
       diagnosis,
       resolution,
       payment_status: paymentStatus,
+      subtotal,
+      tax,
       total,
     });
 

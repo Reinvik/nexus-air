@@ -177,6 +177,11 @@ export default function App() {
       ? settings.standard_installation_price 
       : settings.standard_maintenance_price;
 
+    const activeSettings = tenantSettings || settings;
+    const taxRate = activeSettings?.tax_rate !== undefined ? Number(activeSettings.tax_rate) : 0.19;
+    const taxAmount = Math.round(price * taxRate);
+    const totalAmount = price + taxAmount;
+
     const newOrder = await addOrder({
       customer_id: cust.id,
       service_type: bookingData.service_type,
@@ -195,8 +200,8 @@ export default function App() {
         }
       ],
       subtotal: price,
-      tax: Math.round(price * 0.19),
-      total: Math.round(price * 1.19),
+      tax: taxAmount,
+      total: totalAmount,
       payment_status: 'pendiente',
     });
 
@@ -447,6 +452,7 @@ export default function App() {
         customers={customers}
         equipments={equipments}
         technicians={technicians}
+        settings={tenantSettings || settings}
         onAddOrder={addOrder}
       />
 

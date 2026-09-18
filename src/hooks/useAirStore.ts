@@ -300,8 +300,17 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
           rut: t.rut,
           phone: t.phone,
           email: t.email,
+          role: t.role || 'tecnico',
           sec_certified: t.sec_certified ?? true,
           status: t.active ? 'disponible' : 'inactivo',
+          default_commission_type: t.default_commission_type || 'fixed',
+          default_commission_value: t.default_commission_value !== null && t.default_commission_value !== undefined ? Number(t.default_commission_value) : 20000,
+          commission_mantencion_type: t.commission_mantencion_type || 'fixed',
+          commission_mantencion_value: t.commission_mantencion_value !== null && t.commission_mantencion_value !== undefined ? Number(t.commission_mantencion_value) : 20000,
+          commission_instalacion_type: t.commission_instalacion_type || 'fixed',
+          commission_instalacion_value: t.commission_instalacion_value !== null && t.commission_instalacion_value !== undefined ? Number(t.commission_instalacion_value) : 35000,
+          commission_reparacion_type: t.commission_reparacion_type || 'fixed',
+          commission_reparacion_value: t.commission_reparacion_value !== null && t.commission_reparacion_value !== undefined ? Number(t.commission_reparacion_value) : 15000,
           active_orders_count: 1
         })));
       }
@@ -325,6 +334,11 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
           const cust = (dbCustomers || []).find((c: any) => c.id === o.customer_id);
           const eq = (dbEquipments || []).find((e: any) => e.id === o.equipment_id);
           const tech = (dbTechnicians || []).find((t: any) => t.id === o.assigned_technician_id);
+          const asst = (dbTechnicians || []).find((t: any) => t.id === o.assigned_assistant_id);
+
+          const orderTotal = Number(o.total) || 0;
+          const orderSubtotal = o.subtotal !== null && o.subtotal !== undefined ? Number(o.subtotal) : orderTotal;
+          const orderTax = o.tax !== null && o.tax !== undefined ? Number(o.tax) : 0;
 
           return {
             id: o.id,
@@ -364,12 +378,28 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
               rut: tech.rut,
               phone: tech.phone,
               email: tech.email,
+              role: tech.role || 'tecnico',
               sec_certified: tech.sec_certified ?? true,
               status: tech.active ? 'disponible' : 'inactivo'
             } : undefined,
+            assigned_assistant_id: o.assigned_assistant_id,
+            assigned_assistant: asst ? {
+              id: asst.id,
+              name: asst.name,
+              rut: asst.rut,
+              phone: asst.phone,
+              email: asst.email,
+              role: asst.role || 'ayudante',
+              sec_certified: asst.sec_certified ?? false,
+              status: asst.active ? 'disponible' : 'inactivo'
+            } : undefined,
+            technician_payout_type: o.technician_payout_type || 'fixed',
+            technician_payout_value: o.technician_payout_value !== null && o.technician_payout_value !== undefined ? Number(o.technician_payout_value) : 0,
+            assistant_payout_type: o.assistant_payout_type || 'fixed',
+            assistant_payout_value: o.assistant_payout_value !== null && o.assistant_payout_value !== undefined ? Number(o.assistant_payout_value) : 0,
             service_type: o.service_type || 'mantencion_preventiva',
             status: o.status || 'ingresado',
-            scheduled_date: o.scheduled_date || format(new Date(), 'yyyy-MM-dd'),
+            scheduled_date: o.scheduled_date ? o.scheduled_date.split('T')[0] : format(new Date(), 'yyyy-MM-dd'),
             scheduled_time_slot: o.scheduled_time_slot || '09:00 - 11:00',
             description: o.description || '',
             diagnosis: o.diagnosis,
@@ -383,12 +413,15 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
               check_electrical_connections: false,
               check_condensate_drain: false
             },
-            items: [],
-            subtotal: Number(o.total) || 45000,
-            tax: Math.round((Number(o.total) || 45000) * 0.19),
-            total: Number(o.total) || 45000,
+            items: Array.isArray(o.items) ? o.items : [],
+            subtotal: orderSubtotal,
+            tax: orderTax,
+            total: orderTotal,
             payment_status: o.payment_status || 'pendiente',
-            created_at: o.created_at || new Date().toISOString()
+            payment_method: o.payment_method,
+            technician_location: o.technician_location,
+            created_at: o.created_at || new Date().toISOString(),
+            completed_at: o.completed_at
           };
         });
         setOrders(mappedOrders);
@@ -489,9 +522,11 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
 
   // Acciones de Órdenes
   const updateOrderStatus = useCallback(async (orderId: string, newStatus: OrderStatus) => {
+    const completedAtStr = newStatus === 'completado' ? format(new Date(), 'yyyy-MM-dd HH:mm') : undefined;
+
     setOrders(prev => prev.map(o => {
       if (o.id !== orderId) return o;
-      const completedAt = newStatus === 'completado' ? format(new Date(), 'yyyy-MM-dd HH:mm') : o.completed_at;
+      const completedAt = newStatus === 'completado' ? (o.completed_at || completedAtStr) : o.completed_at;
       
       // Si se completa, actualizar fecha de mantenimiento en equipo a hoy (+180 días próxima)
       if (newStatus === 'completado' && o.equipment_id) {
@@ -514,9 +549,17 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     toast.success(`Estado: ${newStatus.replace('_', ' ').toUpperCase()}`);
 
     try {
+      const dbUpdates: any = { 
+        status: newStatus, 
+        updated_at: new Date().toISOString() 
+      };
+      if (newStatus === 'completado') {
+        dbUpdates.completed_at = new Date().toISOString();
+      }
+
       await supabaseAir
         .from('orders')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .update(dbUpdates)
         .eq('id', orderId);
     } catch (e) {
       console.warn('[useAirStore] Failed to sync order status to DB:', e);
@@ -529,7 +572,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
 
     try {
       const dbUpdates: any = { updated_at: new Date().toISOString() };
-      if (updates.status) dbUpdates.status = updates.status;
+      if (updates.status !== undefined) dbUpdates.status = updates.status;
       if (updates.assigned_technician_id !== undefined) dbUpdates.assigned_technician_id = updates.assigned_technician_id || null;
       if (updates.assigned_assistant_id !== undefined) dbUpdates.assigned_assistant_id = updates.assigned_assistant_id || null;
       if (updates.technician_payout_type !== undefined) dbUpdates.technician_payout_type = updates.technician_payout_type;
@@ -537,14 +580,20 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       if (updates.assistant_payout_type !== undefined) dbUpdates.assistant_payout_type = updates.assistant_payout_type;
       if (updates.assistant_payout_value !== undefined) dbUpdates.assistant_payout_value = updates.assistant_payout_value;
       if (updates.technician_location !== undefined) dbUpdates.technician_location = updates.technician_location;
-      if (updates.scheduled_date) dbUpdates.scheduled_date = updates.scheduled_date;
-      if (updates.scheduled_time_slot) dbUpdates.scheduled_time_slot = updates.scheduled_time_slot;
-      if (updates.description) dbUpdates.description = updates.description;
+      if (updates.scheduled_date !== undefined) dbUpdates.scheduled_date = updates.scheduled_date;
+      if (updates.scheduled_time_slot !== undefined) dbUpdates.scheduled_time_slot = updates.scheduled_time_slot;
+      if (updates.service_type !== undefined) dbUpdates.service_type = updates.service_type;
+      if (updates.description !== undefined) dbUpdates.description = updates.description;
       if (updates.diagnosis !== undefined) dbUpdates.diagnosis = updates.diagnosis;
       if (updates.resolution !== undefined) dbUpdates.resolution = updates.resolution;
-      if (updates.payment_status) dbUpdates.payment_status = updates.payment_status;
+      if (updates.payment_status !== undefined) dbUpdates.payment_status = updates.payment_status;
+      if (updates.payment_method !== undefined) dbUpdates.payment_method = updates.payment_method;
+      if (updates.subtotal !== undefined) dbUpdates.subtotal = updates.subtotal;
+      if (updates.tax !== undefined) dbUpdates.tax = updates.tax;
       if (updates.total !== undefined) dbUpdates.total = updates.total;
-      if (updates.checklist) dbUpdates.checklist = updates.checklist;
+      if (updates.items !== undefined) dbUpdates.items = updates.items;
+      if (updates.completed_at !== undefined) dbUpdates.completed_at = updates.completed_at;
+      if (updates.checklist !== undefined) dbUpdates.checklist = updates.checklist;
 
       await supabaseAir
         .from('orders')
@@ -588,6 +637,48 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     const ticketNumber = `AIR-${new Date().getFullYear()}-${String(orders.length + 1).padStart(3, '0')}`;
     const newId = crypto.randomUUID();
 
+    const tech = technicians.find(t => t.id === orderData.assigned_technician_id);
+    const asst = technicians.find(t => t.id === orderData.assigned_assistant_id);
+
+    // Dynamic tax calculation using settings.tax_rate
+    const taxRate = settings?.tax_rate !== undefined ? Number(settings.tax_rate) : 0.19;
+    
+    let subtotal = orderData.subtotal;
+    let total = orderData.total;
+    let tax = orderData.tax;
+
+    if (total !== undefined && subtotal === undefined) {
+      subtotal = Math.round(total / (1 + taxRate));
+      tax = total - subtotal;
+    } else if (subtotal !== undefined && total === undefined) {
+      tax = Math.round(subtotal * taxRate);
+      total = subtotal + tax;
+    } else if (total === undefined && subtotal === undefined) {
+      total = 45000;
+      subtotal = Math.round(total / (1 + taxRate));
+      tax = total - subtotal;
+    }
+
+    // Default payout if not specified in orderData
+    let techPayoutType = orderData.technician_payout_type;
+    let techPayoutVal = orderData.technician_payout_value;
+    if (tech && (techPayoutVal === undefined || techPayoutVal === 0)) {
+      const sType = orderData.service_type || 'mantencion_preventiva';
+      if (sType.startsWith('mantencion')) {
+        techPayoutType = tech.commission_mantencion_type || tech.default_commission_type || 'fixed';
+        techPayoutVal = tech.commission_mantencion_value ?? tech.default_commission_value ?? 20000;
+      } else if (sType.startsWith('instalacion')) {
+        techPayoutType = tech.commission_instalacion_type || tech.default_commission_type || 'fixed';
+        techPayoutVal = tech.commission_instalacion_value ?? tech.default_commission_value ?? 35000;
+      } else if (sType.startsWith('reparacion')) {
+        techPayoutType = tech.commission_reparacion_type || tech.default_commission_type || 'fixed';
+        techPayoutVal = tech.commission_reparacion_value ?? tech.default_commission_value ?? 15000;
+      } else {
+        techPayoutType = tech.default_commission_type || 'fixed';
+        techPayoutVal = tech.default_commission_value ?? 20000;
+      }
+    }
+
     const newOrder: ServiceOrder = {
       id: newId,
       ticket_number: ticketNumber,
@@ -596,7 +687,13 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       equipment_id: orderData.equipment_id,
       equipment: equipments.find(e => e.id === orderData.equipment_id),
       assigned_technician_id: orderData.assigned_technician_id,
-      assigned_technician: technicians.find(t => t.id === orderData.assigned_technician_id),
+      assigned_technician: tech,
+      assigned_assistant_id: orderData.assigned_assistant_id,
+      assigned_assistant: asst,
+      technician_payout_type: techPayoutType || 'fixed',
+      technician_payout_value: techPayoutVal || 0,
+      assistant_payout_type: orderData.assistant_payout_type || 'fixed',
+      assistant_payout_value: orderData.assistant_payout_value || 0,
       service_type: orderData.service_type || 'mantencion_preventiva',
       status: orderData.status || 'ingresado',
       scheduled_date: orderData.scheduled_date || format(new Date(), 'yyyy-MM-dd'),
@@ -612,11 +709,14 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         check_condensate_drain: false
       },
       items: orderData.items || [],
-      subtotal: orderData.subtotal || orderData.total || 45000,
-      tax: orderData.tax || Math.round((orderData.total || 45000) * 0.19),
-      total: orderData.total || 45000,
+      subtotal: subtotal ?? 0,
+      tax: tax ?? 0,
+      total: total ?? 0,
       payment_status: orderData.payment_status || 'pendiente',
-      created_at: format(new Date(), 'yyyy-MM-dd HH:mm')
+      payment_method: orderData.payment_method || 'efectivo',
+      technician_location: orderData.technician_location,
+      created_at: format(new Date(), 'yyyy-MM-dd HH:mm'),
+      completed_at: orderData.status === 'completado' ? format(new Date(), 'yyyy-MM-dd HH:mm') : undefined
     };
 
     setOrders(prev => [newOrder, ...prev]);
@@ -630,22 +730,33 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         customer_id: orderData.customer_id,
         equipment_id: orderData.equipment_id || null,
         assigned_technician_id: orderData.assigned_technician_id || null,
-        service_type: orderData.service_type || 'mantencion_preventiva',
-        status: orderData.status || 'ingresado',
+        assigned_assistant_id: orderData.assigned_assistant_id || null,
+        technician_payout_type: newOrder.technician_payout_type,
+        technician_payout_value: newOrder.technician_payout_value,
+        assistant_payout_type: newOrder.assistant_payout_type,
+        assistant_payout_value: newOrder.assistant_payout_value,
+        service_type: newOrder.service_type,
+        status: newOrder.status,
         priority: 'normal',
-        scheduled_date: orderData.scheduled_date || format(new Date(), 'yyyy-MM-dd'),
-        scheduled_time_slot: orderData.scheduled_time_slot || '09:00 - 11:00',
-        description: orderData.description,
-        total: orderData.total || 45000,
-        payment_status: orderData.payment_status || 'pendiente',
-        checklist: newOrder.checklist
+        scheduled_date: newOrder.scheduled_date,
+        scheduled_time_slot: newOrder.scheduled_time_slot,
+        description: newOrder.description,
+        items: newOrder.items,
+        subtotal: newOrder.subtotal,
+        tax: newOrder.tax,
+        total: newOrder.total,
+        payment_status: newOrder.payment_status,
+        payment_method: newOrder.payment_method,
+        technician_location: newOrder.technician_location || null,
+        checklist: newOrder.checklist,
+        completed_at: newOrder.completed_at ? new Date().toISOString() : null
       }]);
     } catch (e) {
       console.warn('[useAirStore] Failed to insert order into DB:', e);
     }
 
     return newOrder;
-  }, [orders.length, companyId, customers, equipments, technicians]);
+  }, [orders.length, companyId, customers, equipments, technicians, settings]);
 
   // Acciones de Recaptación
   const markReminderContacted = useCallback((equipmentId: string) => {
@@ -658,6 +769,11 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
   }, []);
 
   const scheduleReminderService = useCallback((reminder: RecaptacionReminder) => {
+    const taxRate = settings?.tax_rate !== undefined ? Number(settings.tax_rate) : 0.19;
+    const basePrice = settings.standard_maintenance_price;
+    const taxAmount = Math.round(basePrice * taxRate);
+    const totalPrice = basePrice + taxAmount;
+
     const newOrder = addOrder({
       customer_id: reminder.customer_id,
       equipment_id: reminder.equipment_id,
@@ -671,19 +787,19 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
           id: `it-${Date.now()}`,
           description: `Mantención Preventiva ${reminder.equipment_brand} ${reminder.equipment_btu} BTU`,
           quantity: 1,
-          unit_price: settings.standard_maintenance_price,
-          total: settings.standard_maintenance_price,
+          unit_price: basePrice,
+          total: basePrice,
           type: 'servicio',
         }
       ],
-      subtotal: settings.standard_maintenance_price,
-      tax: Math.round(settings.standard_maintenance_price * 0.19),
-      total: Math.round(settings.standard_maintenance_price * 1.19),
+      subtotal: basePrice,
+      tax: taxAmount,
+      total: totalPrice,
     });
 
     markReminderContacted(reminder.equipment_id);
     return newOrder;
-  }, [addOrder, markReminderContacted, settings.standard_maintenance_price]);
+  }, [addOrder, markReminderContacted, settings.standard_maintenance_price, settings.tax_rate]);
 
   const generateWhatsAppUrl = useCallback((reminder: RecaptacionReminder) => {
     let text = settings.whatsapp_template_recaptacion;
@@ -849,10 +965,19 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       ...techData,
       id: newId,
       status: techData.status || 'disponible',
+      role: techData.role || 'tecnico',
+      default_commission_type: techData.default_commission_type || 'fixed',
+      default_commission_value: techData.default_commission_value !== undefined ? Number(techData.default_commission_value) : 20000,
+      commission_mantencion_type: techData.commission_mantencion_type || 'fixed',
+      commission_mantencion_value: techData.commission_mantencion_value !== undefined ? Number(techData.commission_mantencion_value) : 20000,
+      commission_instalacion_type: techData.commission_instalacion_type || 'fixed',
+      commission_instalacion_value: techData.commission_instalacion_value !== undefined ? Number(techData.commission_instalacion_value) : 35000,
+      commission_reparacion_type: techData.commission_reparacion_type || 'fixed',
+      commission_reparacion_value: techData.commission_reparacion_value !== undefined ? Number(techData.commission_reparacion_value) : 15000,
       active_orders_count: 0,
     };
     setTechnicians(prev => [...prev, newTech]);
-    toast.success(`Técnico ${newTech.name} registrado`);
+    toast.success(`${newTech.role === 'ayudante' ? 'Ayudante' : 'Técnico'} ${newTech.name} registrado`);
 
     try {
       await supabaseAir.from('technicians').insert([{
@@ -862,8 +987,17 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         email: techData.email,
         phone: techData.phone,
         rut: techData.rut,
+        role: newTech.role,
         sec_certified: techData.sec_certified ?? true,
-        active: true
+        active: true,
+        default_commission_type: newTech.default_commission_type,
+        default_commission_value: newTech.default_commission_value,
+        commission_mantencion_type: newTech.commission_mantencion_type,
+        commission_mantencion_value: newTech.commission_mantencion_value,
+        commission_instalacion_type: newTech.commission_instalacion_type,
+        commission_instalacion_value: newTech.commission_instalacion_value,
+        commission_reparacion_type: newTech.commission_reparacion_type,
+        commission_reparacion_value: newTech.commission_reparacion_value,
       }]);
     } catch (e) {
       console.warn('[useAirStore] Error inserting technician:', e);
@@ -873,18 +1007,29 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
 
   const updateTechnician = useCallback(async (id: string, updates: Partial<Technician>) => {
     setTechnicians(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
-    toast.success('Técnico actualizado');
+    toast.success('Personal técnico actualizado');
 
     try {
+      const dbUpdates: any = { updated_at: new Date().toISOString() };
+      if (updates.name !== undefined) dbUpdates.name = updates.name;
+      if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
+      if (updates.email !== undefined) dbUpdates.email = updates.email;
+      if (updates.rut !== undefined) dbUpdates.rut = updates.rut;
+      if (updates.role !== undefined) dbUpdates.role = updates.role;
+      if (updates.sec_certified !== undefined) dbUpdates.sec_certified = updates.sec_certified;
+      if (updates.status !== undefined) dbUpdates.active = updates.status === 'disponible';
+      if (updates.default_commission_type !== undefined) dbUpdates.default_commission_type = updates.default_commission_type;
+      if (updates.default_commission_value !== undefined) dbUpdates.default_commission_value = updates.default_commission_value;
+      if (updates.commission_mantencion_type !== undefined) dbUpdates.commission_mantencion_type = updates.commission_mantencion_type;
+      if (updates.commission_mantencion_value !== undefined) dbUpdates.commission_mantencion_value = updates.commission_mantencion_value;
+      if (updates.commission_instalacion_type !== undefined) dbUpdates.commission_instalacion_type = updates.commission_instalacion_type;
+      if (updates.commission_instalacion_value !== undefined) dbUpdates.commission_instalacion_value = updates.commission_instalacion_value;
+      if (updates.commission_reparacion_type !== undefined) dbUpdates.commission_reparacion_type = updates.commission_reparacion_type;
+      if (updates.commission_reparacion_value !== undefined) dbUpdates.commission_reparacion_value = updates.commission_reparacion_value;
+
       await supabaseAir
         .from('technicians')
-        .update({
-          name: updates.name,
-          phone: updates.phone,
-          email: updates.email,
-          sec_certified: updates.sec_certified,
-          updated_at: new Date().toISOString()
-        })
+        .update(dbUpdates)
         .eq('id', id);
     } catch (e) {
       console.warn('[useAirStore] Error updating technician:', e);

@@ -9,6 +9,7 @@ interface AddServiceOrderModalProps {
   customers: Customer[];
   equipments: AirEquipment[];
   technicians: Technician[];
+  settings?: AirSettings;
   onAddOrder: (orderData: Partial<ServiceOrder>) => void;
 }
 
@@ -18,6 +19,7 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
   customers,
   equipments,
   technicians,
+  settings,
   onAddOrder,
 }) => {
   useEffect(() => {
@@ -127,8 +129,8 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
           type: 'servicio',
         }
       ],
-      subtotal: Math.round(totalPrice / 1.19),
-      tax: Math.round(totalPrice - (totalPrice / 1.19)),
+      subtotal: Math.round(totalPrice / (1 + (settings?.tax_rate !== undefined ? Number(settings.tax_rate) : 0.19))),
+      tax: Math.round(totalPrice - (totalPrice / (1 + (settings?.tax_rate !== undefined ? Number(settings.tax_rate) : 0.19)))),
       total: totalPrice,
       payment_status: 'pendiente',
     });
@@ -306,9 +308,11 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                   <div className="flex items-center justify-between">
                     <label className="font-bold text-slate-800 flex items-center gap-1.5">
                       <DollarSign className="w-4 h-4 text-emerald-600" />
-                      Valor Total Estimado ($ CLP)
+                      Valor Total Estimado ({settings?.currency_symbol || '$'} {settings?.currency_code || 'CLP'})
                     </label>
-                    <span className="text-[11px] text-slate-500 font-medium">IVA incluido (19%)</span>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      {settings?.tax_name || 'IVA'} incluido ({Math.round((settings?.tax_rate !== undefined ? Number(settings.tax_rate) : 0.19) * 100)}%)
+                    </span>
                   </div>
                   <input
                     type="number"
@@ -317,8 +321,8 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                     className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-900 text-lg font-mono font-bold focus:border-cyan-500 focus:outline-none shadow-inner"
                   />
                   <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-                    <span>Neto: ${Math.round(totalPrice / 1.19).toLocaleString('es-CL')}</span>
-                    <span>IVA: ${Math.round(totalPrice - (totalPrice / 1.19)).toLocaleString('es-CL')}</span>
+                    <span>Neto: {settings?.currency_symbol || '$'}{Math.round(totalPrice / (1 + (settings?.tax_rate !== undefined ? Number(settings.tax_rate) : 0.19))).toLocaleString()}</span>
+                    <span>{settings?.tax_name || 'IVA'}: {settings?.currency_symbol || '$'}{Math.round(totalPrice - (totalPrice / (1 + (settings?.tax_rate !== undefined ? Number(settings.tax_rate) : 0.19)))).toLocaleString()}</span>
                   </div>
                 </div>
 
