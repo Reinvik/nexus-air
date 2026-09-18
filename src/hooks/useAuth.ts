@@ -38,8 +38,8 @@ export function useAuth() {
           id: userId,
           email: user?.email || '',
           full_name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Administrador',
-          role: 'admin',
-          company_id: DEFAULT_COMPANY_ID,
+          role: user?.user_metadata?.role || 'admin',
+          company_id: user?.user_metadata?.company_id || DEFAULT_COMPANY_ID,
           is_active: true
         });
       }

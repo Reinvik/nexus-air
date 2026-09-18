@@ -459,7 +459,10 @@ export default function App() {
         order={selectedOrder}
         technicians={technicians}
         settings={tenantSettings || settings}
-        onOpenReceipt={(ord) => setReceiptOrder(ord)}
+        onOpenReceipt={(ord) => {
+          setIsEditOrderModalOpen(false);
+          setReceiptOrder(ord);
+        }}
         onUpdateOrder={updateOrder}
         onDeleteOrder={deleteOrder}
       />

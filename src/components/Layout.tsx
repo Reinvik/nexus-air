@@ -226,7 +226,11 @@ export const Layout: React.FC<LayoutProps> = ({
                 {currentUserProfile?.email || settings.email || 'contacto@nexusair.cl'}
               </div>
               <div className="text-[10px] font-bold text-[#00d2ff]">
-                {currentUserProfile?.role === 'admin' ? 'Administrador HVAC' : 'Técnico Certificado SEC'}
+                {['nexusowner', 'NexusOwner', 'owner'].includes(currentUserProfile?.role)
+                  ? 'Nexus Owner HVAC'
+                  : currentUserProfile?.role === 'admin'
+                  ? 'Administrador HVAC'
+                  : 'Técnico Certificado SEC'}
               </div>
             </div>
           </div>
