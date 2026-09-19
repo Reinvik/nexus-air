@@ -9,14 +9,28 @@ export interface UserProfile {
   role?: string;
   company_id?: string;
   is_active?: boolean;
+  is_authorized?: boolean;
+  is_platform_superadmin?: boolean;
 }
 
 const DEFAULT_COMPANY_ID = 'a1111111-2222-3333-4444-555555555555';
+const OWNER_EMAILS = [
+  'ariel.mellag@gmail.com', 
+  'fariacricardog@gmail.com', 
+  'equipo@belean.cl'
+];
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
+  const [activeCompanyOverride, setActiveCompanyOverride] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('nexus_air_owner_company_override');
+    } catch {
+      return null;
+    }
+  });
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -99,16 +113,44 @@ export function useAuth() {
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
+    setActiveCompanyOverride(null);
+    localStorage.removeItem('nexus_air_owner_company_override');
   };
 
-  const effectiveCompanyId = profile?.company_id || DEFAULT_COMPANY_ID;
+  const switchActiveCompany = (companyId: string | null) => {
+    if (companyId) {
+      localStorage.setItem('nexus_air_owner_company_override', companyId);
+      setActiveCompanyOverride(companyId);
+    } else {
+      localStorage.removeItem('nexus_air_owner_company_override');
+      setActiveCompanyOverride(null);
+    }
+  };
+
+  const emailLower = user?.email?.trim().toLowerCase() || '';
+  const profileEmailLower = profile?.email?.trim().toLowerCase() || '';
+  const roleLower = profile?.role?.trim().toLowerCase() || '';
+
+  const isNexusOwner = 
+    OWNER_EMAILS.includes(emailLower) || 
+    OWNER_EMAILS.includes(profileEmailLower) || 
+    ['nexusowner', 'nexus_owner', 'owner', 'superadmin'].includes(roleLower) ||
+    Boolean(profile?.is_platform_superadmin);
+
+  const effectiveCompanyId = (isNexusOwner && activeCompanyOverride)
+    ? activeCompanyOverride
+    : (profile?.company_id || DEFAULT_COMPANY_ID);
 
   return {
     user,
     profile,
     loadingAuth,
+    isNexusOwner,
     effectiveCompanyId,
+    activeCompanyOverride,
+    switchActiveCompany,
     login,
     logout
   };
 }
+

@@ -273,4 +273,34 @@ export type ViewTab =
   | 'customers' 
   | 'technicians' 
   | 'sales' 
-  | 'settings';
+  | 'settings'
+  | 'nexus_owner';
+
+export type UserRole = 'nexus_owner' | 'admin' | 'tecnico' | 'ayudante' | 'user';
+
+export interface Company {
+  id: string;
+  name: string;
+  slug?: string;
+  schema_name: string;
+  allowed_apps?: string[];
+  allowed_modules?: string[];
+  is_lobby?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  user_count?: number;
+}
+
+export interface ProfileUser {
+  id: string;
+  email: string;
+  full_name?: string;
+  role: string;
+  company_id?: string;
+  is_active?: boolean;
+  is_authorized?: boolean;
+  created_at?: string;
+  last_login?: string;
+  avatar_url?: string;
+}
+

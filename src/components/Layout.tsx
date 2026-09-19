@@ -21,7 +21,9 @@ import {
   RefreshCw,
   LogOut,
   Menu,
-  X
+  X,
+  Crown,
+  ShieldAlert
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -34,6 +36,7 @@ interface LayoutProps {
   activeOrdersCount: number;
   settings: AirSettings;
   currentUserProfile?: any;
+  isNexusOwner?: boolean;
   onLogout?: () => void;
   children: React.ReactNode;
 }
@@ -48,6 +51,7 @@ export const Layout: React.FC<LayoutProps> = ({
   activeOrdersCount,
   settings,
   currentUserProfile,
+  isNexusOwner,
   onLogout,
   children,
 }) => {
@@ -203,6 +207,37 @@ export const Layout: React.FC<LayoutProps> = ({
                 })}
               </div>
             </div>
+
+            {/* Category: SUPERADMIN (EXCLUSIVO NEXUS OWNER) */}
+            {isNexusOwner && (
+              <div className="pt-2 border-t border-white/[0.05]">
+                <div className="text-[10px] font-extrabold text-amber-400 tracking-[0.15em] px-3 py-1.5 uppercase flex items-center gap-1.5">
+                  <Crown className="w-3.5 h-3.5 text-amber-400" />
+                  <span>SUPERADMIN GLOBAL</span>
+                </div>
+                <div className="space-y-1 mt-1">
+                  <button
+                    onClick={() => {
+                      setActiveTab('nexus_owner');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold nexus-sidebar-item cursor-pointer transition-all ${
+                      activeTab === 'nexus_owner'
+                        ? 'active text-amber-300 font-bold bg-amber-500/15 border border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.15)]'
+                        : 'text-amber-400/90 hover:text-amber-300 hover:bg-amber-500/10'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <ShieldAlert className={`w-4 h-4 transition-colors ${activeTab === 'nexus_owner' ? 'text-amber-400' : 'text-amber-500/80'}`} />
+                      <span>Nexus Owner</span>
+                    </div>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-md font-black bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      OWNER
+                    </span>
+                  </button>
+                </div>
+              </div>
+            )}
           </nav>
         </div>
 
@@ -226,8 +261,8 @@ export const Layout: React.FC<LayoutProps> = ({
                 {currentUserProfile?.email || settings.email || 'contacto@nexusair.cl'}
               </div>
               <div className="text-[10px] font-bold text-[#00d2ff]">
-                {['nexusowner', 'NexusOwner', 'owner'].includes(currentUserProfile?.role)
-                  ? 'Nexus Owner HVAC'
+                {isNexusOwner
+                  ? '👑 Nexus Owner HVAC'
                   : currentUserProfile?.role === 'admin'
                   ? 'Administrador HVAC'
                   : 'Técnico Certificado SEC'}

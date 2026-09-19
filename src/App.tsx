@@ -20,13 +20,25 @@ import { LandingNexusAir } from './components/LandingNexusAir';
 import { LandingTenantAir } from './components/LandingTenantAir';
 import { LoginAir } from './components/LoginAir';
 import { CustomerPortalAir } from './components/CustomerPortalAir';
+import { NexusOwnerAir } from './components/NexusOwnerAir';
 import { ViewTab, ServiceOrder, AirSettings, Customer, AirEquipment, ServiceType } from './types';
 import { Toaster, toast } from 'react-hot-toast';
+import { ShieldAlert } from 'lucide-react';
 
 type MainView = 'landing' | 'tenant_landing' | 'login' | 'customer' | 'dashboard';
 
 export default function App() {
-  const { user, profile, loadingAuth, effectiveCompanyId, login, logout } = useAuth();
+  const { 
+    user, 
+    profile, 
+    loadingAuth, 
+    isNexusOwner, 
+    effectiveCompanyId, 
+    activeCompanyOverride, 
+    switchActiveCompany, 
+    login, 
+    logout 
+  } = useAuth();
   const {
     customers,
     equipments,
@@ -351,6 +363,7 @@ export default function App() {
         activeOrdersCount={activeOrdersCount}
         settings={settings}
         currentUserProfile={currentProfile}
+        isNexusOwner={isNexusOwner}
         onLogout={async () => {
           await logout();
           setView('landing');
@@ -444,6 +457,33 @@ export default function App() {
             onUpdateSettings={updateSettings}
             onResetDefaults={resetToDefaults}
           />
+        )}
+
+        {activeTab === 'nexus_owner' && (
+          isNexusOwner ? (
+            <NexusOwnerAir
+              currentProfile={currentProfile}
+              currentCompanyId={effectiveCompanyId}
+              activeCompanyOverride={activeCompanyOverride}
+              onSwitchActiveCompany={switchActiveCompany}
+            />
+          ) : (
+            <div className="bg-white rounded-3xl p-8 border border-rose-200 text-center max-w-lg mx-auto my-12 space-y-4 shadow-sm">
+              <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+                <ShieldAlert className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-black text-slate-900">Acceso Restringido</h3>
+              <p className="text-xs text-slate-500">
+                El módulo Nexus Owner es exclusivo para cuentas con rol de Nexus Owner o directiva de la plataforma.
+              </p>
+              <button
+                onClick={() => setActiveTab('dashboard')}
+                className="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs cursor-pointer hover:bg-slate-800"
+              >
+                Volver al Dashboard
+              </button>
+            </div>
+          )
         )}
       </Layout>
 
