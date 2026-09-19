@@ -6,7 +6,8 @@ import {
   generateReceiptPdfAir, 
   buildReceiptHtml, 
   downloadElementAsCleanPng, 
-  copyElementAsCleanPng 
+  copyElementAsCleanPng,
+  getReceiptDateTimeFormatted
 } from '../lib/pdfServiceAir';
 import { 
   X, 
@@ -65,6 +66,7 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
   const currencySymbol = settings.currency_symbol || '₡';
   const countryCode = settings.country_code || 'CR';
   const taxPercent = getTaxPercentage(settings.tax_rate);
+  const { dateFormatted, timeFormatted } = getReceiptDateTimeFormatted(order);
 
   // Calculations
   const calculatedTechPayout = order.technician_payout_type === 'percentage'
@@ -328,8 +330,11 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
               <div className="font-mono text-base font-black text-cyan-800">
                 REC-{order.ticket_number}
               </div>
-              <div className="text-[11px] text-slate-600">
-                Fecha: <strong className="text-slate-900">{order.scheduled_date}</strong>
+              <div className="text-[11px] text-slate-700 font-medium">
+                Fecha: <strong className="text-slate-900">{dateFormatted}</strong>
+              </div>
+              <div className="text-[11px] text-slate-700 font-medium">
+                Hora: <strong className="text-slate-900">{timeFormatted}</strong>
               </div>
               <div className="pt-1">
                 <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${

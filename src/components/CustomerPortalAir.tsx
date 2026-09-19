@@ -20,12 +20,15 @@ import {
   Camera,
   Video,
   Play,
-  ExternalLink
+  ExternalLink,
+  Download
 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
 import { formatAirPrice } from '../lib/countries';
 import { parseVideoUrl } from '../lib/videoUtils';
 import { calculateLiveRouteETA, getCustomerCoordinates, RouteETA } from '../lib/routingService';
+import { generateReceiptPdfAir } from '../lib/pdfServiceAir';
 
 interface CustomerPortalAirProps {
   customers: Customer[];
@@ -211,6 +214,7 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
     }
     return customers[0]?.id || '';
   });
+  const [downloadingReceiptId, setDownloadingReceiptId] = useState<string | null>(null);
 
   // Buscar cliente por RUT o Teléfono o Nombre
   const matchedCustomer = customers.find(c => 
@@ -657,14 +661,38 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
                     </div>
                   )}
 
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                  <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
                     <span className="flex items-center gap-1">
                       <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                      Fecha de atención: {ord.scheduled_date}
+                      Fecha de atención: {ord.scheduled_date || 'Atención técnica'}
                     </span>
-                    <span className="font-mono font-bold text-slate-900">
-                      Total: {formatAirPrice(ord.total, settings?.currency_symbol, settings?.country_code)}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono font-bold text-slate-900">
+                        Total: {formatAirPrice(ord.total, settings?.currency_symbol, settings?.country_code)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            setDownloadingReceiptId(ord.id);
+                            toast.loading('Generando comprobante de servicio...', { id: `rc-${ord.id}` });
+                            await generateReceiptPdfAir(ord, settings);
+                            toast.success('¡Comprobante descargado en PDF!', { id: `rc-${ord.id}` });
+                          } catch (err) {
+                            console.error('Error generando comprobante:', err);
+                            toast.error('Error al descargar comprobante', { id: `rc-${ord.id}` });
+                          } finally {
+                            setDownloadingReceiptId(null);
+                          }
+                        }}
+                        disabled={downloadingReceiptId === ord.id}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-cyan-50 hover:text-cyan-700 text-slate-700 font-bold text-xs border border-slate-200 transition-colors shadow-2xs cursor-pointer active:scale-95 disabled:opacity-50"
+                        title="Descargar Comprobante / Recibo Oficial en PDF"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>{downloadingReceiptId === ord.id ? 'Generando...' : 'Descargar Recibo (PDF)'}</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))

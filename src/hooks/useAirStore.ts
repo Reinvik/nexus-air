@@ -55,7 +55,18 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     return INITIAL_EQUIPMENTS;
   });
 
-  const [technicians, setTechnicians] = useState<Technician[]>(INITIAL_TECHNICIANS);
+  const [technicians, setTechnicians] = useState<Technician[]>(() => {
+    try {
+      const saved = localStorage.getItem(`nexus_air_technicians_${companyId}`) || localStorage.getItem('nexus_air_technicians');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn('Error reading technicians from localStorage:', e);
+    }
+    return INITIAL_TECHNICIANS;
+  });
   const [parts, setParts] = useState<AirPart[]>(INITIAL_PARTS);
   const [settings, setSettings] = useState<AirSettings>(() => {
     try {
@@ -122,6 +133,16 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       console.warn('Error saving orders:', e);
     }
   }, [orders, companyId]);
+
+  // Persistir técnicos localmente (NK-032)
+  useEffect(() => {
+    try {
+      localStorage.setItem(`nexus_air_technicians_${companyId}`, JSON.stringify(technicians));
+      localStorage.setItem('nexus_air_technicians', JSON.stringify(technicians));
+    } catch (e) {
+      console.warn('Error saving technicians:', e);
+    }
+  }, [technicians, companyId]);
 
   // Sincronizar settings si companyId cambia
   useEffect(() => {
@@ -999,7 +1020,14 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       commission_reparacion_value: techData.commission_reparacion_value !== undefined ? Number(techData.commission_reparacion_value) : 15000,
       active_orders_count: 0,
     };
-    setTechnicians(prev => [...prev, newTech]);
+    setTechnicians(prev => {
+      const updated = [...prev, newTech];
+      try {
+        localStorage.setItem(`nexus_air_technicians_${activeId}`, JSON.stringify(updated));
+        localStorage.setItem('nexus_air_technicians', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
     toast.success(`${newTech.role === 'ayudante' ? 'Ayudante' : 'Técnico'} ${newTech.name} registrado`);
 
     try {
@@ -1029,7 +1057,14 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
   }, [companyId]);
 
   const updateTechnician = useCallback(async (id: string, updates: Partial<Technician>) => {
-    setTechnicians(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+    setTechnicians(prev => {
+      const updated = prev.map(t => t.id === id ? { ...t, ...updates } : t);
+      try {
+        localStorage.setItem(`nexus_air_technicians_${companyId}`, JSON.stringify(updated));
+        localStorage.setItem('nexus_air_technicians', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
     toast.success('Personal técnico actualizado');
 
     try {
@@ -1057,10 +1092,17 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     } catch (e) {
       console.warn('[useAirStore] Error updating technician:', e);
     }
-  }, []);
+  }, [companyId]);
 
   const deleteTechnician = useCallback(async (id: string) => {
-    setTechnicians(prev => prev.filter(t => t.id !== id));
+    setTechnicians(prev => {
+      const updated = prev.filter(t => t.id !== id);
+      try {
+        localStorage.setItem(`nexus_air_technicians_${companyId}`, JSON.stringify(updated));
+        localStorage.setItem('nexus_air_technicians', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
     toast.success('Técnico eliminado');
 
     try {
@@ -1068,7 +1110,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     } catch (e) {
       console.warn('[useAirStore] Error deleting technician:', e);
     }
-  }, []);
+  }, [companyId]);
 
   // Acciones de Inventario
   const addPart = useCallback(async (partData: Omit<AirPart, 'id'>) => {

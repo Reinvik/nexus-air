@@ -11,13 +11,16 @@ export interface ProformaPdfData {
   clientPhone?: string;
   clientEmail?: string;
   clientAddress?: string;
+  serviceCategory?: 'instalacion' | 'mantencion_multiequipo' | 'reparacion';
+  serviceTitle?: string;
   areaM2?: number;
   recommendedBtu?: number;
   recommendedTon?: number;
-  equipmentName: string;
-  equipmentQty: number;
-  equipmentPrice: number;
-  installationItems?: Array<{ concept: string; quantity: number; unitPrice: number; total: number }>;
+  equipmentName?: string;
+  equipmentQty?: number;
+  equipmentPrice?: number;
+  installationItems?: Array<{ concept: string; quantity: number; unitPrice: number; total: number; notes?: string }>;
+  customItems?: Array<{ concept: string; quantity: number; unitPrice: number; total: number; notes?: string }>;
   subtotal: number;
   taxRate: number;
   taxAmount: number;
@@ -47,7 +50,7 @@ async function waitForImages(container: HTMLElement): Promise<void> {
 async function renderElementToPdf(container: HTMLElement, filename: string): Promise<void> {
   await waitForImages(container);
 
-  // Escala 1.5 con fondo blanco puro y renderizado nítido
+  // Escala 1.5 con fondo blanco puro y renderizado nítido sin desfases de scroll
   const canvas = await html2canvas(container, {
     scale: 1.5,
     useCORS: true,
@@ -55,6 +58,10 @@ async function renderElementToPdf(container: HTMLElement, filename: string): Pro
     backgroundColor: '#ffffff',
     logging: false,
     windowWidth: 780,
+    scrollY: 0,
+    scrollX: 0,
+    x: 0,
+    y: 0,
   });
 
   // JPEG calidad 0.92 para garantizar peso ultraliviano y fidelidad de texto
@@ -104,6 +111,10 @@ export async function downloadElementAsCleanPng(container: HTMLElement, filename
     backgroundColor: '#ffffff',
     logging: false,
     windowWidth: 780,
+    scrollY: 0,
+    scrollX: 0,
+    x: 0,
+    y: 0,
   });
   const dataUrl = canvas.toDataURL('image/png');
   const a = document.createElement('a');
@@ -124,6 +135,10 @@ export async function copyElementAsCleanPng(container: HTMLElement, filenameFall
     backgroundColor: '#ffffff',
     logging: false,
     windowWidth: 780,
+    scrollY: 0,
+    scrollX: 0,
+    x: 0,
+    y: 0,
   });
 
   return new Promise<boolean>((resolve) => {
@@ -133,21 +148,110 @@ export async function copyElementAsCleanPng(container: HTMLElement, filenameFall
         return;
       }
       try {
-        const item = new ClipboardItem({ 'image/png': blob });
-        await navigator.clipboard.write([item]);
-        resolve(true);
-      } catch (e) {
-        console.warn('Clipboard write failed, triggering fallback download:', e);
-        const url = URL.createObjectURL(blob);
+        if (navigator.clipboard && window.ClipboardItem) {
+          await navigator.clipboard.write([
+            new window.ClipboardItem({ 'image/png': blob })
+          ]);
+          resolve(true);
+        } else {
+          // Fallback a descarga automática si el portapapeles no soporta PNG directo
+          const dataUrl = canvas.toDataURL('image/png');
+          const a = document.createElement('a');
+          a.href = dataUrl;
+          a.download = filenameFallback;
+          a.click();
+          resolve(false);
+        }
+      } catch (err) {
+        console.warn('Fallback clipboard descarga:', err);
+        const dataUrl = canvas.toDataURL('image/png');
         const a = document.createElement('a');
-        a.href = url;
+        a.href = dataUrl;
         a.download = filenameFallback;
         a.click();
-        URL.revokeObjectURL(url);
         resolve(false);
       }
     }, 'image/png');
   });
+}
+
+/**
+ * Helper para formatear fecha y hora garantizadas del servicio técnico (NK-026).
+ */
+export function getReceiptDateTimeFormatted(order: ServiceOrder): { dateFormatted: string; timeFormatted: string } {
+  let dateFormatted = '';
+  let timeFormatted = '';
+
+  if (order.scheduled_date && order.scheduled_date.trim() !== '') {
+    const trimmed = order.scheduled_date.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      const [y, m, d] = trimmed.split('-');
+      dateFormatted = `${d}/${m}/${y}`;
+    } else {
+      dateFormatted = trimmed;
+    }
+  }
+
+  if (order.scheduled_time_slot && order.scheduled_time_slot.trim() !== '') {
+    timeFormatted = order.scheduled_time_slot.includes('hrs') 
+      ? order.scheduled_time_slot 
+      : `${order.scheduled_time_slot} hrs`;
+  }
+
+  if (order.completed_at) {
+    try {
+      const d = new Date(order.completed_at);
+      if (!isNaN(d.getTime())) {
+        if (!dateFormatted) {
+          const dd = String(d.getDate()).padStart(2, '0');
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const yyyy = d.getFullYear();
+          dateFormatted = `${dd}/${mm}/${yyyy}`;
+        }
+        if (!timeFormatted) {
+          const hh = String(d.getHours()).padStart(2, '0');
+          const min = String(d.getMinutes()).padStart(2, '0');
+          timeFormatted = `${hh}:${min} hrs`;
+        }
+      }
+    } catch {}
+  }
+
+  if (order.created_at) {
+    try {
+      const d = new Date(order.created_at);
+      if (!isNaN(d.getTime())) {
+        if (!dateFormatted) {
+          const dd = String(d.getDate()).padStart(2, '0');
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const yyyy = d.getFullYear();
+          dateFormatted = `${dd}/${mm}/${yyyy}`;
+        }
+        if (!timeFormatted) {
+          const hh = String(d.getHours()).padStart(2, '0');
+          const min = String(d.getMinutes()).padStart(2, '0');
+          timeFormatted = `${hh}:${min} hrs`;
+        }
+      }
+    } catch {}
+  }
+
+  if (!dateFormatted) {
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yyyy = now.getFullYear();
+    dateFormatted = `${dd}/${mm}/${yyyy}`;
+  }
+
+  if (!timeFormatted) {
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    timeFormatted = `${hh}:${min} hrs`;
+  }
+
+  return { dateFormatted, timeFormatted };
 }
 
 /**
@@ -157,6 +261,7 @@ export function buildReceiptHtml(order: ServiceOrder, settings: AirSettings): st
   const currencySymbol = settings.currency_symbol || '$';
   const countryCode = settings.country_code || 'CL';
   const taxPercent = getTaxPercentage(settings.tax_rate);
+  const { dateFormatted, timeFormatted } = getReceiptDateTimeFormatted(order);
 
   const calculatedTax = order.tax > 0 
     ? order.tax 
@@ -171,7 +276,7 @@ export function buildReceiptHtml(order: ServiceOrder, settings: AirSettings): st
       <!-- ENCABEZADO OFICIAL -->
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px; border-bottom: 2px solid #0284c7; padding-bottom: 12px;">
         <tr>
-          <td style="vertical-align: top; width: 62%;">
+          <td style="vertical-align: top; width: 60%;">
             <div style="font-size: 18px; font-weight: 900; color: #0369a1; letter-spacing: -0.5px; text-transform: uppercase;">
               ${settings.fantasy_name || settings.company_name || 'NEXUS AIR CLIMATIZACIÓN'}
             </div>
@@ -187,18 +292,21 @@ export function buildReceiptHtml(order: ServiceOrder, settings: AirSettings): st
               <strong>${settings.tax_id_label || 'RUT/ID'}:</strong> ${settings.rut || '77.892.410-K'} • <strong>País:</strong> ${settings.country || 'Chile'}
             </div>
           </td>
-          <td style="vertical-align: top; width: 38%; text-align: right;">
-            <div style="display: inline-block; border: 2px solid #0284c7; border-radius: 8px; padding: 8px 14px; background: #f0f9ff; text-align: center; min-width: 180px;">
+          <td style="vertical-align: top; width: 40%; text-align: right;">
+            <div style="display: inline-block; border: 2px solid #0284c7; border-radius: 8px; padding: 10px 16px; background: #f0f9ff; text-align: center; min-width: 200px;">
               <div style="font-size: 8.5px; font-weight: 800; color: #0369a1; text-transform: uppercase; letter-spacing: 0.5px;">
                 COMPROBANTE DE SERVICIO TÉCNICO
               </div>
-              <div style="font-family: monospace; font-size: 16px; font-weight: 900; color: #0c4a6e; margin: 2px 0;">
+              <div style="font-family: monospace; font-size: 16px; font-weight: 900; color: #0c4a6e; margin: 3px 0;">
                 REC-${order.ticket_number}
               </div>
-              <div style="font-size: 9px; color: #475569;">
-                <strong>Fecha:</strong> ${order.scheduled_date || new Date().toISOString().split('T')[0]}
+              <div style="font-size: 10px; color: #334155; margin-top: 3px; font-weight: 700;">
+                <span>Fecha:</span> <strong style="color: #0f172a;">${dateFormatted}</strong>
               </div>
-              <div style="margin-top: 4px; display: inline-block; padding: 2px 8px; border-radius: 999px; background: #dcfce7; color: #166534; font-size: 8.5px; font-weight: 800; text-transform: uppercase;">
+              <div style="font-size: 10px; color: #334155; margin-top: 2px; font-weight: 700;">
+                <span>Hora:</span> <strong style="color: #0f172a;">${timeFormatted}</strong>
+              </div>
+              <div style="margin-top: 6px; display: inline-block; padding: 3px 10px; border-radius: 999px; background: #dcfce7; color: #166534; font-size: 8.5px; font-weight: 800; text-transform: uppercase;">
                 ${order.payment_status === 'pagado' ? 'PAGADO ✓' : (order.payment_status === 'abono' ? 'ABONO PARCIAL' : 'PENDIENTE DE PAGO')}
               </div>
             </div>
@@ -407,6 +515,18 @@ export function buildProformaHtml(data: ProformaPdfData, settings: AirSettings):
   const currencySymbol = settings.currency_symbol || '$';
   const countryCode = settings.country_code || 'CL';
   const taxPercent = getTaxPercentage(data.taxRate || settings.tax_rate);
+  const category = data.serviceCategory || 'instalacion';
+
+  const isMultiMaintenance = category === 'mantencion_multiequipo';
+  const isRepair = category === 'reparacion';
+
+  const categoryTitle = data.serviceTitle || (
+    isMultiMaintenance 
+      ? 'PRESUPUESTO MANTENCIÓN MULTIEQUIPO' 
+      : isRepair 
+        ? 'PRESUPUESTO REPARACIÓN Y DIAGNÓSTICO' 
+        : 'COTIZACIÓN / PROFORMA'
+  );
 
   return `
     <div style="width: 760px; padding: 24px 28px; background: #ffffff; color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; box-sizing: border-box; font-size: 11px; line-height: 1.35;">
@@ -414,12 +534,12 @@ export function buildProformaHtml(data: ProformaPdfData, settings: AirSettings):
       <!-- ENCABEZADO -->
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px; border-bottom: 2px solid #0891b2; padding-bottom: 12px;">
         <tr>
-          <td style="vertical-align: top; width: 62%;">
+          <td style="vertical-align: top; width: 60%;">
             <div style="font-size: 18px; font-weight: 900; color: #0e7490; letter-spacing: -0.5px; text-transform: uppercase;">
               ${settings.fantasy_name || settings.company_name || 'NEXUS AIR CLIMATIZACIÓN'}
             </div>
             <div style="font-size: 10px; color: #475569; font-weight: 600; margin-top: 2px;">
-              Soluciones Integrales de Climatización & Cálculo Térmico
+              ${isMultiMaintenance ? 'Mantenimiento Preventivo Multiequipo & Planes Corporativos HVAC' : isRepair ? 'Servicio Técnico de Reparación Especializada & Diagnóstico' : 'Soluciones Integrales de Climatización & Cálculo Térmico'}
             </div>
             <div style="font-size: 9.5px; color: #64748b; margin-top: 4px;">
               ${settings.address ? `<span>📍 ${settings.address}</span> • ` : ''}
@@ -430,10 +550,10 @@ export function buildProformaHtml(data: ProformaPdfData, settings: AirSettings):
               <strong>${settings.tax_id_label || 'RUT/ID'}:</strong> ${settings.rut || '77.892.410-K'} • <strong>País:</strong> ${settings.country || 'Costa Rica'}
             </div>
           </td>
-          <td style="vertical-align: top; width: 38%; text-align: right;">
-            <div style="display: inline-block; border: 2px solid #0891b2; border-radius: 8px; padding: 8px 14px; background: #ecfeff; text-align: center; min-width: 180px;">
-              <div style="font-size: 8.5px; font-weight: 800; color: #0e7490; text-transform: uppercase; letter-spacing: 0.5px;">
-                COTIZACIÓN / PROFORMA
+          <td style="vertical-align: top; width: 40%; text-align: right;">
+            <div style="display: inline-block; border: 2px solid #0891b2; border-radius: 8px; padding: 8px 14px; background: #ecfeff; text-align: center; min-width: 190px;">
+              <div style="font-size: 8px; font-weight: 800; color: #0e7490; text-transform: uppercase; letter-spacing: 0.5px;">
+                ${categoryTitle}
               </div>
               <div style="font-family: monospace; font-size: 16px; font-weight: 900; color: #155e75; margin: 2px 0;">
                 ${data.folio}
@@ -449,7 +569,7 @@ export function buildProformaHtml(data: ProformaPdfData, settings: AirSettings):
         </tr>
       </table>
 
-      <!-- DATOS CLIENTE & DIMENSIONAMIENTO -->
+      <!-- DATOS CLIENTE & ALCANCE TÉCNICO -->
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 14px;">
         <tr>
           <!-- Cliente -->
@@ -479,32 +599,68 @@ export function buildProformaHtml(data: ProformaPdfData, settings: AirSettings):
             </table>
           </td>
 
-          <!-- Dimensionamiento Técnico -->
+          <!-- Alcance del Servicio o Dimensionamiento -->
           <td style="width: 50%; vertical-align: top; padding-left: 8px;">
             <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; border-radius: 6px;">
               <tr style="background: #f1f5f9;">
                 <th colspan="2" style="text-align: left; padding: 5px 8px; font-size: 9.5px; font-weight: 800; color: #1e293b; text-transform: uppercase; border-bottom: 1px solid #cbd5e1;">
-                  📐 Estudio Térmico Estimado
+                  ${isMultiMaintenance ? '🏢 Alcance Mantención Multiequipo' : isRepair ? '🔧 Diagnóstico y Alcance Técnico' : '📐 Estudio Térmico Estimado'}
                 </th>
               </tr>
-              <tr>
-                <td style="padding: 4px 8px; color: #64748b; width: 45%; border-bottom: 1px solid #f1f5f9;">Área a Climatizar:</td>
-                <td style="padding: 4px 8px; font-weight: 700; color: #0f172a; border-bottom: 1px solid #f1f5f9;">${data.areaM2 || 20} m²</td>
-              </tr>
-              <tr>
-                <td style="padding: 4px 8px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Capacidad Sugerida:</td>
-                <td style="padding: 4px 8px; font-weight: 700; color: #0891b2; border-bottom: 1px solid #f1f5f9;">
-                  ${data.recommendedBtu ? `${data.recommendedBtu.toLocaleString()} BTU` : '12.000 BTU'} ${data.recommendedTon ? `(${data.recommendedTon} Ton)` : ''}
-                </td>
-              </tr>
-              <tr>
-                <td style="padding: 4px 8px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Tecnología:</td>
-                <td style="padding: 4px 8px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9;">Inverter Alta Eficiencia</td>
-              </tr>
-              <tr>
-                <td style="padding: 4px 8px; color: #64748b;">Refrigerante:</td>
-                <td style="padding: 4px 8px; font-weight: 600; color: #0f172a;">R410A / R32 Ecológico</td>
-              </tr>
+              ${isMultiMaintenance ? `
+                <tr>
+                  <td style="padding: 4px 8px; color: #64748b; width: 45%; border-bottom: 1px solid #f1f5f9;">Tipo de Servicio:</td>
+                  <td style="padding: 4px 8px; font-weight: 700; color: #0891b2; border-bottom: 1px solid #f1f5f9;">Mantención Preventiva Corporativa</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 8px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Protocolo:</td>
+                  <td style="padding: 4px 8px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9;">Desarme, Hidrolavado, Sanitización y Presiones</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 8px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Garantía Técnica:</td>
+                  <td style="padding: 4px 8px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9;">6 Meses de Cobertura</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 8px; color: #64748b;">Normativa:</td>
+                  <td style="padding: 4px 8px; font-weight: 600; color: #0f172a;">Estándar HVAC y Eficiencia Eléctrica</td>
+                </tr>
+              ` : isRepair ? `
+                <tr>
+                  <td style="padding: 4px 8px; color: #64748b; width: 45%; border-bottom: 1px solid #f1f5f9;">Servicio:</td>
+                  <td style="padding: 4px 8px; font-weight: 700; color: #0891b2; border-bottom: 1px solid #f1f5f9;">Reparación y Corrección de Fallas</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 8px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Pruebas:</td>
+                  <td style="padding: 4px 8px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9;">Detección de fugas, vacío y presurización</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 8px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Refrigerante:</td>
+                  <td style="padding: 4px 8px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9;">Ecológico R410A / R32 Puro</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 8px; color: #64748b;">Garantía:</td>
+                  <td style="padding: 4px 8px; font-weight: 600; color: #0f172a;">6 Meses en componentes y mano de obra</td>
+                </tr>
+              ` : `
+                <tr>
+                  <td style="padding: 4px 8px; color: #64748b; width: 45%; border-bottom: 1px solid #f1f5f9;">Área a Climatizar:</td>
+                  <td style="padding: 4px 8px; font-weight: 700; color: #0f172a; border-bottom: 1px solid #f1f5f9;">${data.areaM2 || 20} m²</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 8px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Capacidad Sugerida:</td>
+                  <td style="padding: 4px 8px; font-weight: 700; color: #0891b2; border-bottom: 1px solid #f1f5f9;">
+                    ${data.recommendedBtu ? `${data.recommendedBtu.toLocaleString()} BTU` : '12.000 BTU'} ${data.recommendedTon ? `(${data.recommendedTon} Ton)` : ''}
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 8px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Tecnología:</td>
+                  <td style="padding: 4px 8px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9;">Inverter Alta Eficiencia</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 8px; color: #64748b;">Refrigerante:</td>
+                  <td style="padding: 4px 8px; font-weight: 600; color: #0f172a;">R410A / R32 Ecológico</td>
+                </tr>
+              `}
             </table>
           </td>
         </tr>
@@ -514,45 +670,53 @@ export function buildProformaHtml(data: ProformaPdfData, settings: AirSettings):
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 14px; border: 1px solid #cbd5e1;">
         <thead>
           <tr style="background: #0f172a; color: #ffffff;">
-            <th style="padding: 6px 8px; text-align: left; font-size: 9px; text-transform: uppercase;">Descripción del Ítem</th>
+            <th style="padding: 6px 8px; text-align: left; font-size: 9px; text-transform: uppercase;">Descripción del Ítem / Servicio</th>
             <th style="padding: 6px 8px; text-align: center; font-size: 9px; text-transform: uppercase; width: 12%;">Cant.</th>
             <th style="padding: 6px 8px; text-align: right; font-size: 9px; text-transform: uppercase; width: 20%;">Precio Unit.</th>
             <th style="padding: 6px 8px; text-align: right; font-size: 9px; text-transform: uppercase; width: 22%;">Total</th>
           </tr>
         </thead>
         <tbody>
-          <!-- Equipo Principal -->
-          <tr style="background: #ffffff; border-bottom: 1px solid #e2e8f0;">
-            <td style="padding: 6px 8px;">
-              <div style="font-weight: 700; color: #0f172a;">${data.equipmentName}</div>
-              <div style="font-size: 8.5px; color: #64748b;">Unidad interior (evaporadora) + exterior (condensadora) + control remoto</div>
-            </td>
-            <td style="padding: 6px 8px; text-align: center; font-weight: 700;">${data.equipmentQty}</td>
-            <td style="padding: 6px 8px; text-align: right; font-family: monospace;">${formatAirPrice(data.equipmentPrice, currencySymbol, countryCode)}</td>
-            <td style="padding: 6px 8px; text-align: right; font-family: monospace; font-weight: 700;">${formatAirPrice(data.equipmentPrice * data.equipmentQty, currencySymbol, countryCode)}</td>
-          </tr>
+          ${(isMultiMaintenance || isRepair) && data.customItems && data.customItems.length > 0 ? (
+            data.customItems.map((item, idx) => `
+              <tr style="background: ${idx % 2 === 0 ? '#f8fafc' : '#ffffff'}; border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 6px 8px;">
+                  <div style="font-weight: 700; color: #0f172a;">${item.concept}</div>
+                  ${item.notes ? `<div style="font-size: 8px; color: #64748b;">${item.notes}</div>` : ''}
+                </td>
+                <td style="padding: 6px 8px; text-align: center; font-weight: 700;">${item.quantity}</td>
+                <td style="padding: 6px 8px; text-align: right; font-family: monospace;">${formatAirPrice(item.unitPrice, currencySymbol, countryCode)}</td>
+                <td style="padding: 6px 8px; text-align: right; font-family: monospace; font-weight: 700;">${formatAirPrice(item.total, currencySymbol, countryCode)}</td>
+              </tr>
+            `).join('')
+          ) : (
+            `
+              <!-- Equipo Principal -->
+              ${data.equipmentName ? `
+                <tr style="background: #ffffff; border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 6px 8px;">
+                    <div style="font-weight: 700; color: #0f172a;">${data.equipmentName}</div>
+                    <div style="font-size: 8.5px; color: #64748b;">Unidad interior (evaporadora) + exterior (condensadora) + control remoto</div>
+                  </td>
+                  <td style="padding: 6px 8px; text-align: center; font-weight: 700;">${data.equipmentQty || 1}</td>
+                  <td style="padding: 6px 8px; text-align: right; font-family: monospace;">${formatAirPrice(data.equipmentPrice || 0, currencySymbol, countryCode)}</td>
+                  <td style="padding: 6px 8px; text-align: right; font-family: monospace; font-weight: 700;">${formatAirPrice((data.equipmentPrice || 0) * (data.equipmentQty || 1), currencySymbol, countryCode)}</td>
+                </tr>
+              ` : ''}
 
-          <!-- Instalación y Materiales -->
-          ${data.installationItems && data.installationItems.length > 0 ? data.installationItems.map((item, idx) => `
-            <tr style="background: ${idx % 2 === 0 ? '#f8fafc' : '#ffffff'}; border-bottom: 1px solid #e2e8f0;">
-              <td style="padding: 6px 8px;">
-                <div style="font-weight: 600; color: #1e293b;">${item.concept}</div>
-              </td>
-              <td style="padding: 6px 8px; text-align: center; font-weight: 700;">${item.quantity}</td>
-              <td style="padding: 6px 8px; text-align: right; font-family: monospace;">${formatAirPrice(item.unitPrice, currencySymbol, countryCode)}</td>
-              <td style="padding: 6px 8px; text-align: right; font-family: monospace; font-weight: 700;">${formatAirPrice(item.total, currencySymbol, countryCode)}</td>
-            </tr>
-          `).join('') : `
-            <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
-              <td style="padding: 6px 8px;">
-                <div style="font-weight: 600; color: #1e293b;">Servicio de Instalación Certificada HVAC & Kit Básico</div>
-                <div style="font-size: 8.5px; color: #64748b;">Montaje en muro, hasta 3m cañería de cobre, vacío con bomba y puesta en marcha</div>
-              </td>
-              <td style="padding: 6px 8px; text-align: center; font-weight: 700;">1</td>
-              <td style="padding: 6px 8px; text-align: right; font-family: monospace;">${formatAirPrice(data.subtotal - (data.equipmentPrice * data.equipmentQty), currencySymbol, countryCode)}</td>
-              <td style="padding: 6px 8px; text-align: right; font-family: monospace; font-weight: 700;">${formatAirPrice(data.subtotal - (data.equipmentPrice * data.equipmentQty), currencySymbol, countryCode)}</td>
-            </tr>
-          `}
+              <!-- Instalación y Materiales -->
+              ${data.installationItems && data.installationItems.length > 0 ? data.installationItems.map((item, idx) => `
+                <tr style="background: ${idx % 2 === 0 ? '#f8fafc' : '#ffffff'}; border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 6px 8px;">
+                    <div style="font-weight: 600; color: #1e293b;">${item.concept}</div>
+                  </td>
+                  <td style="padding: 6px 8px; text-align: center; font-weight: 700;">${item.quantity}</td>
+                  <td style="padding: 6px 8px; text-align: right; font-family: monospace;">${formatAirPrice(item.unitPrice, currencySymbol, countryCode)}</td>
+                  <td style="padding: 6px 8px; text-align: right; font-family: monospace; font-weight: 700;">${formatAirPrice(item.total, currencySymbol, countryCode)}</td>
+                </tr>
+              `).join('') : ''}
+            `
+          )}
         </tbody>
       </table>
 

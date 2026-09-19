@@ -43,6 +43,15 @@ export const KanbanBoardAir: React.FC<KanbanBoardAirProps> = ({
   const [filterType, setFilterType] = useState<string>('all');
   const [filterTech, setFilterTech] = useState<string>('all');
 
+  const [showAllCompleted, setShowAllCompleted] = useState(false);
+
+  const isOrderFromToday = (ord: ServiceOrder) => {
+    const today = new Date().toISOString().split('T')[0];
+    const scheduled = ord.scheduled_date ? ord.scheduled_date.split('T')[0] : '';
+    const completed = ord.completed_at ? ord.completed_at.split('T')[0] : '';
+    return scheduled === today || completed === today;
+  };
+
   const filteredOrders = useMemo(() => {
     return orders.filter((ord) => {
       const matchSearch =
@@ -122,7 +131,10 @@ export const KanbanBoardAir: React.FC<KanbanBoardAirProps> = ({
       {/* Kanban Columns Grid */}
       <div className="flex-1 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 overflow-x-auto min-h-[600px] pb-4">
         {COLUMNS.map((col) => {
-          const colOrders = filteredOrders.filter((ord) => ord.status === col.id);
+          const rawColOrders = filteredOrders.filter((ord) => ord.status === col.id);
+          const colOrders = col.id === 'completado' && !showAllCompleted
+            ? rawColOrders.filter(isOrderFromToday)
+            : rawColOrders;
           const ColIcon = col.icon;
 
           return (
@@ -131,21 +143,47 @@ export const KanbanBoardAir: React.FC<KanbanBoardAirProps> = ({
               className={`flex flex-col rounded-2xl border ${col.color} p-3.5 shadow-xs`}
             >
               {/* Column Header */}
-              <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200">
-                <div className="flex items-center gap-2">
-                  <ColIcon className="w-4 h-4 text-cyan-700" />
-                  <h3 className="text-xs font-bold text-slate-800">{col.title}</h3>
+              <div className="flex flex-col gap-1 pb-3 mb-3 border-b border-slate-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ColIcon className="w-4 h-4 text-cyan-700" />
+                    <h3 className="text-xs font-bold text-slate-800">{col.title}</h3>
+                  </div>
+                  <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${col.badgeColor}`}>
+                    {colOrders.length}
+                  </span>
                 </div>
-                <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${col.badgeColor}`}>
-                  {colOrders.length}
-                </span>
+
+                {col.id === 'completado' && (
+                  <div className="flex items-center justify-between pt-1 text-[10px]">
+                    <span className="text-emerald-700 font-bold">
+                      {showAllCompleted ? 'Historial completo' : 'Solo hoy'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowAllCompleted(!showAllCompleted)}
+                      className="text-cyan-700 hover:text-cyan-900 font-bold hover:underline cursor-pointer"
+                    >
+                      {showAllCompleted ? 'Ver solo hoy' : (rawColOrders.length > colOrders.length ? `+${rawColOrders.length - colOrders.length} anteriores` : 'Ver histórico')}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Column Cards Container */}
               <div className="flex-1 space-y-3 overflow-y-auto pr-1">
                 {colOrders.length === 0 ? (
-                  <div className="h-32 flex flex-col items-center justify-center text-slate-400 text-xs border border-dashed border-slate-300 rounded-xl">
-                    <span>Sin órdenes activas</span>
+                  <div className="h-32 flex flex-col items-center justify-center text-center p-3 text-slate-400 text-xs border border-dashed border-slate-300 rounded-xl space-y-1.5">
+                    <span>{col.id === 'completado' && !showAllCompleted && rawColOrders.length > 0 ? 'Sin entregas hoy' : 'Sin órdenes activas'}</span>
+                    {col.id === 'completado' && !showAllCompleted && rawColOrders.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllCompleted(true)}
+                        className="text-cyan-700 font-bold hover:underline text-[11px] cursor-pointer"
+                      >
+                        Ver {rawColOrders.length} del historial
+                      </button>
+                    )}
                   </div>
                 ) : (
                   colOrders.map((ord) => (

@@ -47,6 +47,12 @@ interface ProformaModalAirProps {
   settings?: AirSettings | null;
   customers?: Customer[];
   onCreateOrder?: (orderData: Partial<ServiceOrder>) => void;
+  includeCondensatePump?: boolean;
+  pumpPrice?: number;
+  includeInstallation?: boolean;
+  installationPrice?: number;
+  initialEquipmentPrice?: number;
+  initialServiceCategory?: 'instalacion' | 'mantencion_multiequipo' | 'reparacion';
 }
 
 export function ProformaModalAir({
@@ -59,6 +65,12 @@ export function ProformaModalAir({
   settings,
   customers = [],
   onCreateOrder,
+  includeCondensatePump,
+  pumpPrice,
+  includeInstallation,
+  installationPrice,
+  initialEquipmentPrice,
+  initialServiceCategory = 'instalacion',
 }: ProformaModalAirProps) {
   const countryCode = settings?.country_code || 'CR';
   const isChile = countryCode === 'CL';
@@ -130,6 +142,10 @@ export function ProformaModalAir({
     }
   }, [defaultEquip, isChile]);
 
+  const [serviceCategory, setServiceCategory] = useState<'instalacion' | 'mantencion_multiequipo' | 'reparacion'>(
+    initialServiceCategory || 'instalacion'
+  );
+
   // Mano de Obra y Materiales de Instalación calibrados por país (Total base: 155.500)
   const [installationItems, setInstallationItems] = useState<ProformaItem[]>(() => {
     if (isChile) {
@@ -150,6 +166,103 @@ export function ProformaModalAir({
       { id: 'mat-7', concept: 'CABLE 3X12 USO RUDO (Metros)', quantity: 10, unitPrice: 1700, total: 17000, type: 'material' },
     ];
   });
+
+  // Ítems de Mantención Multiequipo Corporativa (NK-035)
+  const [maintenanceItems, setMaintenanceItems] = useState<ProformaItem[]>(() => {
+    if (isChile) {
+      return [
+        { id: 'm-1', concept: 'MANTENCIÓN PREVENTIVA SPLIT 9.000 - 12.000 BTU (DESARME E HIDROLAVADO)', quantity: 8, unitPrice: 35000, total: 280000, type: 'instalacion' },
+        { id: 'm-2', concept: 'MANTENCIÓN PREVENTIVA SPLIT 18.000 - 24.000 BTU (DESARME Y PRESIÓN)', quantity: 4, unitPrice: 45000, total: 180000, type: 'instalacion' },
+        { id: 'm-3', concept: 'MANTENCIÓN CASSETTE / PISO-CIELO 36.000 - 60.000 BTU', quantity: 2, unitPrice: 75000, total: 150000, type: 'instalacion' },
+        { id: 'm-4', concept: 'SANITIZACIÓN Y DESINFECCIÓN CON BACTERICIDA CERTIFICADO', quantity: 1, unitPrice: 45000, total: 45000, type: 'material' },
+        { id: 'm-5', concept: 'REVISIÓN ELÉCTRICA DE TABLEROS Y CONSUMO AMPERIMÉTRICO', quantity: 1, unitPrice: 50000, total: 50000, type: 'instalacion' },
+      ];
+    }
+    return [
+      { id: 'm-1', concept: 'MANTENCIÓN PREVENTIVA SPLIT 9.000 - 12.000 BTU (DESARME E HIDROLAVADO)', quantity: 8, unitPrice: 22000, total: 176000, type: 'instalacion' },
+      { id: 'm-2', concept: 'MANTENCIÓN PREVENTIVA SPLIT 18.000 - 24.000 BTU (DESARME Y PRESIÓN)', quantity: 4, unitPrice: 32000, total: 128000, type: 'instalacion' },
+      { id: 'm-3', concept: 'MANTENCIÓN CASSETTE / PISO-CIELO 36.000 - 60.000 BTU', quantity: 2, unitPrice: 55000, total: 110000, type: 'instalacion' },
+      { id: 'm-4', concept: 'SANITIZACIÓN Y DESINFECCIÓN CON BACTERICIDA CERTIFICADO', quantity: 1, unitPrice: 25000, total: 25000, type: 'material' },
+      { id: 'm-5', concept: 'REVISIÓN ELÉCTRICA DE TABLEROS Y CONSUMO AMPERIMÉTRICO', quantity: 1, unitPrice: 30000, total: 30000, type: 'instalacion' },
+    ];
+  });
+
+  // Ítems de Reparación y Diagnóstico (NK-035)
+  const [repairItems, setRepairItems] = useState<ProformaItem[]>(() => {
+    if (isChile) {
+      return [
+        { id: 'r-1', concept: 'VISITA TÉCNICA ESPECIALIZADA Y DIAGNÓSTICO EN TERRENO', quantity: 1, unitPrice: 35000, total: 35000, type: 'instalacion' },
+        { id: 'r-2', concept: 'DETECCIÓN DE FUGAS CON NITRÓGENO Y CORRECCIÓN DE UNIONES', quantity: 1, unitPrice: 65000, total: 65000, type: 'instalacion' },
+        { id: 'r-3', concept: 'CARGA COMPLETA REFRIGERANTE R410A / R32 CON BALANZA Y VACÍO', quantity: 1, unitPrice: 55000, total: 55000, type: 'material' },
+        { id: 'r-4', concept: 'SUSTITUCIÓN DE CAPACITOR DUAL COMPRESOR/VENTILADOR', quantity: 1, unitPrice: 45000, total: 45000, type: 'material' },
+      ];
+    }
+    return [
+      { id: 'r-1', concept: 'VISITA TÉCNICA ESPECIALIZADA Y DIAGNÓSTICO EN TERRENO', quantity: 1, unitPrice: 25000, total: 25000, type: 'instalacion' },
+      { id: 'r-2', concept: 'DETECCIÓN DE FUGAS CON NITRÓGENO Y CORRECCIÓN DE FLARE', quantity: 1, unitPrice: 45000, total: 45000, type: 'instalacion' },
+      { id: 'r-3', concept: 'CARGA COMPLETA REFRIGERANTE R410A / R32 CON BALANZA Y VACÍO', quantity: 1, unitPrice: 38000, total: 38000, type: 'material' },
+      { id: 'r-4', concept: 'SUSTITUCIÓN DE CAPACITOR DUAL MARCHA/ARRANQUE', quantity: 1, unitPrice: 28000, total: 28000, type: 'material' },
+    ];
+  });
+
+  // Sincronización con Cotizador Térmico (NK-033)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (initialServiceCategory) {
+      setServiceCategory(initialServiceCategory);
+    }
+
+    if (initialEquipmentPrice !== undefined && initialEquipmentPrice > 0) {
+      setEquipmentPrice(initialEquipmentPrice);
+    }
+
+    setInstallationItems(prev => {
+      let updated = [...prev];
+
+      if (installationPrice !== undefined) {
+        updated = updated.map(item => {
+          if (item.type === 'instalacion' || item.id === 'mat-1') {
+            return {
+              ...item,
+              unitPrice: installationPrice,
+              total: (item.quantity || 1) * installationPrice,
+            };
+          }
+          return item;
+        });
+      }
+
+      if (includeInstallation === false) {
+        updated = updated.filter(item => item.id !== 'mat-1');
+      }
+
+      const pumpIndex = updated.findIndex(item => item.id === 'mat-pump' || item.concept.includes('BOMBA DE CONDENSADO'));
+      if (includeCondensatePump) {
+        const effectivePump = pumpPrice !== undefined && pumpPrice > 0 ? pumpPrice : 45000;
+        if (pumpIndex >= 0) {
+          updated[pumpIndex] = {
+            ...updated[pumpIndex],
+            unitPrice: effectivePump,
+            total: (updated[pumpIndex].quantity || 1) * effectivePump,
+          };
+        } else {
+          updated.push({
+            id: 'mat-pump',
+            concept: 'BOMBA DE CONDENSADO SILENCIOSA',
+            quantity: 1,
+            unitPrice: effectivePump,
+            total: effectivePump,
+            type: 'material',
+          });
+        }
+      } else if (includeCondensatePump === false && pumpIndex >= 0) {
+        updated.splice(pumpIndex, 1);
+      }
+
+      return updated;
+    });
+  }, [isOpen, includeCondensatePump, pumpPrice, includeInstallation, installationPrice, initialEquipmentPrice, initialServiceCategory, isChile]);
 
   const currentEquipment = availableEquipments.find(e => e.id === selectedEquipId) || defaultEquip;
 
@@ -188,37 +301,117 @@ export function ProformaModalAir({
     setInstallationItems(prev => [...prev, newItem]);
   };
 
-  // Totales
-  const subtotalEquipos = equipmentPrice * equipmentQty;
-  const subtotalInstalacion = installationItems.reduce((acc, it) => acc + (it.total || 0), 0);
+  // Handlers para Mantención Multiequipo (NK-035)
+  const handleMaintenanceItemChange = (id: string, field: 'quantity' | 'unitPrice' | 'concept', value: any) => {
+    setMaintenanceItems(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const updated = { ...item, [field]: value };
+      if (field === 'quantity' || field === 'unitPrice') {
+        updated.total = (Number(updated.quantity) || 0) * (Number(updated.unitPrice) || 0);
+      }
+      return updated;
+    }));
+  };
+
+  const handleRemoveMaintenanceItem = (id: string) => {
+    setMaintenanceItems(prev => prev.filter(item => item.id !== id));
+  };
+
+  const handleAddMaintenanceItem = (presetConcept?: string, defaultPrice?: number) => {
+    const newItem: ProformaItem = {
+      id: `m-${Date.now()}`,
+      concept: presetConcept || 'NUEVA PARTIDA DE MANTENCIÓN PREVENTIVA',
+      quantity: 1,
+      unitPrice: defaultPrice || (isChile ? 35000 : 22000),
+      total: defaultPrice || (isChile ? 35000 : 22000),
+      type: 'instalacion'
+    };
+    setMaintenanceItems(prev => [...prev, newItem]);
+  };
+
+  // Handlers para Reparación (NK-035)
+  const handleRepairItemChange = (id: string, field: 'quantity' | 'unitPrice' | 'concept', value: any) => {
+    setRepairItems(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const updated = { ...item, [field]: value };
+      if (field === 'quantity' || field === 'unitPrice') {
+        updated.total = (Number(updated.quantity) || 0) * (Number(updated.unitPrice) || 0);
+      }
+      return updated;
+    }));
+  };
+
+  const handleRemoveRepairItem = (id: string) => {
+    setRepairItems(prev => prev.filter(item => item.id !== id));
+  };
+
+  const handleAddRepairItem = (presetConcept?: string, defaultPrice?: number) => {
+    const newItem: ProformaItem = {
+      id: `r-${Date.now()}`,
+      concept: presetConcept || 'NUEVA PARTIDA DE REPARACIÓN / DIAGNÓSTICO',
+      quantity: 1,
+      unitPrice: defaultPrice || (isChile ? 45000 : 28000),
+      total: defaultPrice || (isChile ? 45000 : 28000),
+      type: 'material'
+    };
+    setRepairItems(prev => [...prev, newItem]);
+  };
+
+  // Totales Dinámicos según Categoría de Servicio (NK-035)
+  const isInstallation = serviceCategory === 'instalacion';
+  const isMultiMaintenance = serviceCategory === 'mantencion_multiequipo';
+  const isRepair = serviceCategory === 'reparacion';
+
+  const subtotalEquipos = isInstallation ? (equipmentPrice * equipmentQty) : 0;
+  const subtotalInstalacion = isInstallation
+    ? installationItems.reduce((acc, it) => acc + (it.total || 0), 0)
+    : isMultiMaintenance
+    ? maintenanceItems.reduce((acc, it) => acc + (it.total || 0), 0)
+    : repairItems.reduce((acc, it) => acc + (it.total || 0), 0);
+
   const subTotalDirecto = subtotalEquipos + subtotalInstalacion;
   const montoIva = Math.round(subTotalDirecto * (taxRatePercent / 100));
   const precioVentaTotal = subTotalDirecto + montoIva;
 
-  const getProformaData = (): ProformaPdfData => ({
-    folio: proformaFolio,
-    date: emissionDate,
-    clientName,
-    clientIdNumber,
-    clientPhone,
-    clientEmail,
-    areaM2,
-    recommendedBtu,
-    recommendedTon,
-    equipmentName: currentEquipment?.name || 'Aire Acondicionado Split Inverter Ecológico',
-    equipmentQty,
-    equipmentPrice,
-    installationItems: installationItems.map(it => ({
-      concept: it.concept,
-      quantity: it.quantity,
-      unitPrice: it.unitPrice,
-      total: it.total,
-    })),
-    subtotal: subTotalDirecto,
-    taxRate: settings?.tax_rate ?? (isChile ? 0.19 : 0.13),
-    taxAmount: montoIva,
-    total: precioVentaTotal,
-  });
+  const getProformaData = (): ProformaPdfData => {
+    const activeCustom = isMultiMaintenance ? maintenanceItems : isRepair ? repairItems : [];
+    return {
+      folio: proformaFolio,
+      date: emissionDate,
+      clientName,
+      clientIdNumber,
+      clientPhone,
+      clientEmail,
+      serviceCategory,
+      serviceTitle: isMultiMaintenance
+        ? 'PRESUPUESTO MANTENCIÓN MULTIEQUIPO CORPORATIVA'
+        : isRepair
+        ? 'PRESUPUESTO REPARACIÓN Y DIAGNÓSTICO'
+        : 'COTIZACIÓN / PROFORMA OFICIAL',
+      areaM2: isInstallation ? areaM2 : undefined,
+      recommendedBtu: isInstallation ? recommendedBtu : undefined,
+      recommendedTon: isInstallation ? recommendedTon : undefined,
+      equipmentName: isInstallation ? (currentEquipment?.name || 'Aire Acondicionado Split Inverter Ecológico') : undefined,
+      equipmentQty: isInstallation ? equipmentQty : undefined,
+      equipmentPrice: isInstallation ? equipmentPrice : undefined,
+      installationItems: isInstallation ? installationItems.map(it => ({
+        concept: it.concept,
+        quantity: it.quantity,
+        unitPrice: it.unitPrice,
+        total: it.total,
+      })) : undefined,
+      customItems: (isMultiMaintenance || isRepair) ? activeCustom.map(it => ({
+        concept: it.concept,
+        quantity: it.quantity,
+        unitPrice: it.unitPrice,
+        total: it.total,
+      })) : undefined,
+      subtotal: subTotalDirecto,
+      taxRate: settings?.tax_rate ?? (isChile ? 0.19 : 0.13),
+      taxAmount: montoIva,
+      total: precioVentaTotal,
+    };
+  };
 
   const handlePrint = () => {
     window.print();
@@ -261,19 +454,34 @@ export function ProformaModalAir({
       } else {
         toast.success('Imagen descargada para adjuntar en WhatsApp.', { id: 'cap-pf' });
       }
+      const activeItems = isMultiMaintenance ? maintenanceItems : isRepair ? repairItems : installationItems;
+      const title = isMultiMaintenance 
+        ? 'PRESUPUESTO MANTENCIÓN MULTIEQUIPO' 
+        : isRepair 
+        ? 'PRESUPUESTO REPARACIÓN Y DIAGNÓSTICO' 
+        : 'PROFORMA OFICIAL DE CLIMATIZACIÓN';
+
+      let itemsSummary = '';
+      if (isInstallation) {
+        itemsSummary = `📦 *Equipo Cotizado:* ${currentEquipment?.name || 'Split Inverter'}\n` +
+          `• Cantidad: ${equipmentQty} un.\n` +
+          `• Precio Equipo: ${formatAirPrice(subtotalEquipos, currencySymbol, countryCode)}\n\n` +
+          `🔧 *Instalación y Materiales:* ${formatAirPrice(subtotalInstalacion, currencySymbol, countryCode)}\n`;
+      } else {
+        itemsSummary = `📋 *Detalle de Partidas Cotizadas:*\n` +
+          activeItems.map(it => `• ${it.concept} (${it.quantity} un.): ${formatAirPrice(it.total, currencySymbol, countryCode)}`).join('\n') + '\n\n';
+      }
+
       const phone = clientPhone.replace(/\D/g, '');
-      const msg = `*PROFORMA OFICIAL DE CLIMATIZACIÓN* ❄️\n` +
+      const msg = `*${title}* ❄️\n` +
         `*Folio:* ${proformaFolio}\n` +
         `*Cliente:* ${clientName}\n\n` +
-        `📦 *Equipo Cotizado:* ${currentEquipment?.name || 'Split Inverter'}\n` +
-        `• Cantidad: ${equipmentQty} un.\n` +
-        `• Precio Equipo: ${formatAirPrice(subtotalEquipos, currencySymbol, countryCode)}\n\n` +
-        `🔧 *Instalación y Materiales:* ${formatAirPrice(subtotalInstalacion, currencySymbol, countryCode)}\n` +
+        itemsSummary +
         `──────────────────\n` +
         `*Subtotal:* ${formatAirPrice(subTotalDirecto, currencySymbol, countryCode)}\n` +
         `*IVA (${taxRatePercent}%):* ${formatAirPrice(montoIva, currencySymbol, countryCode)}\n` +
         `*TOTAL FINAL:* ${formatAirPrice(precioVentaTotal, currencySymbol, countryCode)}\n\n` +
-        `📋 *Te adjunto la proforma oficial (Presiona Ctrl + V para pegarla).*`;
+        `📋 *Te adjunto la propuesta oficial (Presiona Ctrl + V para pegarla).*`;
 
       const url = `https://wa.me/${phone ? (phone.length <= 8 && !isChile ? `506${phone}` : (isChile && !phone.startsWith('56') ? `56${phone}` : phone)) : ''}?text=${encodeURIComponent(msg)}`;
       window.open(url, '_blank');
@@ -318,19 +526,34 @@ export function ProformaModalAir({
   };
 
   const handleSendWhatsApp = () => {
+    const activeItems = isMultiMaintenance ? maintenanceItems : isRepair ? repairItems : installationItems;
+    const title = isMultiMaintenance 
+      ? 'PRESUPUESTO MANTENCIÓN MULTIEQUIPO' 
+      : isRepair 
+      ? 'PRESUPUESTO REPARACIÓN Y DIAGNÓSTICO' 
+      : 'PROFORMA OFICIAL DE CLIMATIZACIÓN';
+
+    let itemsSummary = '';
+    if (isInstallation) {
+      itemsSummary = `📦 *Equipo Cotizado:* ${currentEquipment?.name || 'Split Inverter'}\n` +
+        `• Cantidad: ${equipmentQty} un.\n` +
+        `• Precio Equipo: ${formatAirPrice(subtotalEquipos, currencySymbol, countryCode)}\n\n` +
+        `🔧 *Instalación y Materiales:* ${formatAirPrice(subtotalInstalacion, currencySymbol, countryCode)}\n`;
+    } else {
+      itemsSummary = `📋 *Detalle de Partidas Cotizadas:*\n` +
+        activeItems.map(it => `• ${it.concept} (${it.quantity} un.): ${formatAirPrice(it.total, currencySymbol, countryCode)}`).join('\n') + '\n\n';
+    }
+
     const phone = clientPhone.replace(/\D/g, '');
-    const msg = `*PROFORMA OFICIAL DE CLIMATIZACIÓN* ❄️\n` +
+    const msg = `*${title}* ❄️\n` +
       `*Folio:* ${proformaFolio}\n` +
       `*Cliente:* ${clientName}\n\n` +
-      `📦 *Equipo Cotizado:* ${currentEquipment?.name || 'Split Inverter'}\n` +
-      `• Cantidad: ${equipmentQty} un.\n` +
-      `• Precio Equipo: ${formatAirPrice(subtotalEquipos, currencySymbol, countryCode)}\n\n` +
-      `🔧 *Instalación y Materiales:* ${formatAirPrice(subtotalInstalacion, currencySymbol, countryCode)}\n` +
+      itemsSummary +
       `──────────────────\n` +
       `*Subtotal:* ${formatAirPrice(subTotalDirecto, currencySymbol, countryCode)}\n` +
       `*IVA (${taxRatePercent}%):* ${formatAirPrice(montoIva, currencySymbol, countryCode)}\n` +
       `*TOTAL FINAL:* ${formatAirPrice(precioVentaTotal, currencySymbol, countryCode)}\n\n` +
-      `_Validez: 30 días. Incluye garantía de instalación._\n` +
+      `_Validez: 30 días. Incluye garantía técnica formal._\n` +
       `${settings?.fantasy_name || settings?.company_name || 'Climatización Profesional'}`;
 
     const url = `https://wa.me/${phone ? (phone.length <= 8 && !isChile ? `506${phone}` : (isChile && !phone.startsWith('56') ? `56${phone}` : phone)) : ''}?text=${encodeURIComponent(msg)}`;
@@ -340,30 +563,52 @@ export function ProformaModalAir({
   const handleConvertToOrder = () => {
     if (onCreateOrder) {
       onCreateOrder({
-        service_type: 'instalacion',
+        service_type: isMultiMaintenance ? 'mantencion' : isRepair ? 'reparacion' : 'instalacion',
         status: 'ingresado',
         customer_name: clientName,
         customer_phone: clientPhone,
         customer_email: clientEmail,
-        description: `Instalación dimensionada con Proforma ${proformaFolio}: ${currentEquipment?.name || 'Equipo'} para área de ${areaM2} m².`,
-        items: [
-          {
-            id: `eq-${Date.now()}`,
-            description: currentEquipment?.name || `Equipo Split Inverter ${recommendedBtu} BTU`,
-            quantity: equipmentQty,
-            unit_price: equipmentPrice,
-            total: subtotalEquipos,
-            type: 'equipo',
-          },
-          ...installationItems.map(item => ({
-            id: item.id,
-            description: item.concept,
-            quantity: item.quantity,
-            unit_price: item.unitPrice,
-            total: item.total,
-            type: (item.type === 'instalacion' ? 'servicio' : 'insumo') as any,
-          }))
-        ],
+        description: isMultiMaintenance
+          ? `Mantención preventiva multiequipo según Proforma ${proformaFolio}`
+          : isRepair
+          ? `Reparación y diagnóstico especializado según Proforma ${proformaFolio}`
+          : `Instalación dimensionada con Proforma ${proformaFolio}: ${currentEquipment?.name || 'Equipo'} para área de ${areaM2} m².`,
+        items: isMultiMaintenance
+          ? maintenanceItems.map(item => ({
+              id: item.id,
+              description: item.concept,
+              quantity: item.quantity,
+              unit_price: item.unitPrice,
+              total: item.total,
+              type: 'servicio' as const,
+            }))
+          : isRepair
+          ? repairItems.map(item => ({
+              id: item.id,
+              description: item.concept,
+              quantity: item.quantity,
+              unit_price: item.unitPrice,
+              total: item.total,
+              type: (item.type === 'instalacion' ? 'servicio' : 'insumo') as any,
+            }))
+          : [
+              {
+                id: `eq-${Date.now()}`,
+                description: currentEquipment?.name || `Equipo Split Inverter ${recommendedBtu} BTU`,
+                quantity: equipmentQty,
+                unit_price: equipmentPrice,
+                total: subtotalEquipos,
+                type: 'equipo',
+              },
+              ...installationItems.map(item => ({
+                id: item.id,
+                description: item.concept,
+                quantity: item.quantity,
+                unit_price: item.unitPrice,
+                total: item.total,
+                type: (item.type === 'instalacion' ? 'servicio' : 'insumo') as any,
+              }))
+            ],
         subtotal: subTotalDirecto,
         tax: montoIva,
         total: precioVentaTotal,
@@ -487,6 +732,46 @@ export function ProformaModalAir({
         {/* Proforma Sheet Content (Clean, Professional Print Layout matching specimen) */}
         <div id="printable-proforma" className="p-6 sm:p-8 overflow-y-auto flex-1 space-y-6 bg-white text-slate-800">
           
+          {/* Selector de Modo de Servicio (print:hidden) */}
+          <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-100 rounded-xl border border-slate-200 print:hidden">
+            <button
+              type="button"
+              onClick={() => setServiceCategory('instalacion')}
+              className={`flex-1 min-w-[140px] py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                serviceCategory === 'instalacion'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+              }`}
+            >
+              <Snowflake className="w-3.5 h-3.5" />
+              <span>🛠️ Instalación de Climatización</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setServiceCategory('mantencion_multiequipo')}
+              className={`flex-1 min-w-[140px] py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                serviceCategory === 'mantencion_multiequipo'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span>🏢 Mantención Multiequipo Corporativa</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setServiceCategory('reparacion')}
+              className={`flex-1 min-w-[140px] py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                serviceCategory === 'reparacion'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+              }`}
+            >
+              <Wrench className="w-3.5 h-3.5" />
+              <span>🔧 Reparación & Diagnóstico</span>
+            </button>
+          </div>
+
           {/* Header Row: Logo/Brand & Document Badge */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-6 border-slate-200">
             <div className="flex items-center gap-4">
@@ -508,7 +793,7 @@ export function ProformaModalAir({
             {/* Proforma Box */}
             <div className="sm:text-right border border-slate-300 rounded-xl overflow-hidden shrink-0 shadow-xs">
               <div className="bg-slate-800 text-white px-6 py-1.5 font-black text-center text-sm tracking-widest uppercase">
-                PROFORMA
+                {isMultiMaintenance ? 'MANTENCIÓN MULTIEQUIPO' : isRepair ? 'REPARACIÓN & DIAGNÓSTICO' : 'PROFORMA'}
               </div>
               <div className="p-2.5 bg-slate-50 text-xs font-mono space-y-1">
                 <div className="flex justify-between gap-4">
@@ -636,155 +921,404 @@ export function ProformaModalAir({
               <span className="text-[11px] font-normal opacity-90">Moneda: {currencySymbol} ({countryCode === 'CL' ? 'Chile' : (settings?.country || 'Costa Rica')})</span>
             </div>
 
-            {/* 1. Venta de Equipos de Aire Acondicionado */}
-            <div className="border border-slate-300 rounded-xl overflow-hidden shadow-xs">
-              <div className="bg-blue-100 text-blue-900 font-bold px-4 py-2 text-xs uppercase tracking-wider flex items-center justify-between">
-                <span>Venta de Equipos de Aire Acondicionado</span>
-                <span className="text-[11px] text-blue-700 font-medium">Recomendado para {areaM2} m²: {recommendedBtu.toLocaleString()} BTU ({recommendedTon} Ton)</span>
-              </div>
+            {/* CASO 1: INSTALACIÓN NUEVA */}
+            {isInstallation && (
+              <>
+                {/* 1. Venta de Equipos de Aire Acondicionado */}
+                <div className="border border-slate-300 rounded-xl overflow-hidden shadow-xs">
+                  <div className="bg-blue-100 text-blue-900 font-bold px-4 py-2 text-xs uppercase tracking-wider flex items-center justify-between">
+                    <span>Venta de Equipos de Aire Acondicionado</span>
+                    <span className="text-[11px] text-blue-700 font-medium">Recomendado para {areaM2} m²: {recommendedBtu.toLocaleString()} BTU ({recommendedTon} Ton)</span>
+                  </div>
 
-              {/* Selector de equipo interactivo */}
-              <div className="p-3 bg-slate-50/70 border-b border-slate-200 flex flex-col sm:flex-row items-center gap-3 print:hidden">
-                <span className="text-xs font-bold text-slate-700 shrink-0">Cambiar Modelo de Equipo:</span>
-                <select
-                  value={selectedEquipId}
-                  onChange={e => handleSelectEquipment(e.target.value)}
-                  className="flex-1 px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {availableEquipments.map(eq => (
-                    <option key={eq.id} value={eq.id}>
-                      {eq.name} — {formatAirPrice(eq.sale_price || 0, currencySymbol, countryCode)}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  {/* Selector de equipo interactivo */}
+                  <div className="p-3 bg-slate-50/70 border-b border-slate-200 flex flex-col sm:flex-row items-center gap-3 print:hidden">
+                    <span className="text-xs font-bold text-slate-700 shrink-0">Cambiar Modelo de Equipo:</span>
+                    <select
+                      value={selectedEquipId}
+                      onChange={e => handleSelectEquipment(e.target.value)}
+                      className="flex-1 px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {availableEquipments.map(eq => (
+                        <option key={eq.id} value={eq.id}>
+                          {eq.name} — {formatAirPrice(eq.sale_price || 0, currencySymbol, countryCode)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-100/70 text-slate-600 font-bold">
-                    <th className="p-3">Concepto</th>
-                    <th className="p-3 text-center w-20">Cantidad</th>
-                    <th className="p-3 text-right w-36">Precio Unitario</th>
-                    <th className="p-3 text-right w-36">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b border-slate-100 hover:bg-slate-50/50">
-                    <td className="p-3 font-semibold text-slate-900">
-                      {currentEquipment?.name || `A.A ECOLD ${recommendedBtu / 1000}K BTU SEER 21.5 INVERTER CON WIFI`}
-                    </td>
-                    <td className="p-3 text-center">
-                      <input
-                        type="number"
-                        min="1"
-                        value={equipmentQty}
-                        onChange={e => setEquipmentQty(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-14 text-center py-0.5 border rounded border-slate-300 font-bold focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="p-3 text-right font-mono">
-                      <div className="flex items-center justify-end gap-1">
-                        <span>{currencySymbol}</span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={equipmentPrice}
-                          onChange={e => setEquipmentPrice(Math.max(0, parseInt(e.target.value) || 0))}
-                          className="w-24 text-right py-0.5 border rounded border-slate-300 font-mono font-bold focus:outline-none"
-                        />
-                      </div>
-                    </td>
-                    <td className="p-3 text-right font-mono font-bold text-slate-900">
-                      {formatAirPrice(subtotalEquipos, currencySymbol, countryCode)}
-                    </td>
-                  </tr>
-                  <tr className="bg-slate-50/90 font-bold border-t border-slate-200">
-                    <td colSpan={3} className="p-2.5 text-right uppercase text-slate-700">Subtotal Equipos:</td>
-                    <td className="p-2.5 text-right font-mono text-slate-900">{formatAirPrice(subtotalEquipos, currencySymbol, countryCode)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            {/* 2. Mano de Obra y Materiales de Instalación */}
-            <div className="border border-slate-300 rounded-xl overflow-hidden shadow-xs">
-              <div className="bg-blue-100 text-blue-900 font-bold px-4 py-2 text-xs uppercase tracking-wider flex items-center justify-between">
-                <span>(Mano de Obra y Materiales de Instalación)</span>
-                <button
-                  type="button"
-                  onClick={handleAddItem}
-                  className="print:hidden inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-white px-2.5 py-0.5 rounded border border-blue-300 hover:bg-blue-50"
-                >
-                  <Plus className="w-3 h-3" />
-                  <span>Agregar Ítem</span>
-                </button>
-              </div>
-
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-100/70 text-slate-600 font-bold">
-                    <th className="p-3">Concepto</th>
-                    <th className="p-3 text-center w-20">Cantidad</th>
-                    <th className="p-3 text-right w-36">Precio Unitario</th>
-                    <th className="p-3 text-right w-36">Total</th>
-                    <th className="p-3 text-center w-10 print:hidden"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {installationItems.map(item => (
-                    <tr key={item.id} className="hover:bg-slate-50/50">
-                      <td className="p-2.5">
-                        <input
-                          type="text"
-                          value={item.concept}
-                          onChange={e => handleItemChange(item.id, 'concept', e.target.value)}
-                          className="w-full font-medium text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none uppercase"
-                        />
-                      </td>
-                      <td className="p-2.5 text-center">
-                        <input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={e => handleItemChange(item.id, 'quantity', parseInt(e.target.value) || 0)}
-                          className="w-14 text-center py-0.5 border rounded border-slate-200 font-medium focus:outline-none"
-                        />
-                      </td>
-                      <td className="p-2.5 text-right font-mono">
-                        <div className="flex items-center justify-end gap-1">
-                          <span>{currencySymbol}</span>
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-100/70 text-slate-600 font-bold">
+                        <th className="p-3">Concepto</th>
+                        <th className="p-3 text-center w-20">Cantidad</th>
+                        <th className="p-3 text-right w-36">Precio Unitario</th>
+                        <th className="p-3 text-right w-36">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-slate-100 hover:bg-slate-50/50">
+                        <td className="p-3 font-semibold text-slate-900">
+                          {currentEquipment?.name || `A.A ECOLD ${recommendedBtu / 1000}K BTU SEER 21.5 INVERTER CON WIFI`}
+                        </td>
+                        <td className="p-3 text-center">
                           <input
                             type="number"
-                            min="0"
-                            value={item.unitPrice}
-                            onChange={e => handleItemChange(item.id, 'unitPrice', parseInt(e.target.value) || 0)}
-                            className="w-24 text-right py-0.5 border rounded border-slate-200 font-mono focus:outline-none"
+                            min="1"
+                            value={equipmentQty}
+                            onChange={e => setEquipmentQty(Math.max(1, parseInt(e.target.value) || 1))}
+                            className="w-14 text-center py-0.5 border rounded border-slate-300 font-bold focus:outline-none focus:ring-1 focus:ring-blue-500"
                           />
-                        </div>
-                      </td>
-                      <td className="p-2.5 text-right font-mono font-semibold text-slate-800">
-                        {formatAirPrice(item.total || 0, currencySymbol, countryCode)}
-                      </td>
-                      <td className="p-2.5 text-center print:hidden">
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem(item.id)}
-                          className="text-slate-300 hover:text-red-500 transition-colors"
-                          title="Eliminar ítem"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
+                        </td>
+                        <td className="p-3 text-right font-mono">
+                          <div className="flex items-center justify-end gap-1">
+                            <span>{currencySymbol}</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={equipmentPrice}
+                              onChange={e => setEquipmentPrice(Math.max(0, parseInt(e.target.value) || 0))}
+                              className="w-24 text-right py-0.5 border rounded border-slate-300 font-mono font-bold focus:outline-none"
+                            />
+                          </div>
+                        </td>
+                        <td className="p-3 text-right font-mono font-bold text-slate-900">
+                          {formatAirPrice(subtotalEquipos, currencySymbol, countryCode)}
+                        </td>
+                      </tr>
+                      <tr className="bg-slate-50/90 font-bold border-t border-slate-200">
+                        <td colSpan={3} className="p-2.5 text-right uppercase text-slate-700">Subtotal Equipos:</td>
+                        <td className="p-2.5 text-right font-mono text-slate-900">{formatAirPrice(subtotalEquipos, currencySymbol, countryCode)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* 2. Mano de Obra y Materiales de Instalación */}
+                <div className="border border-slate-300 rounded-xl overflow-hidden shadow-xs">
+                  <div className="bg-blue-100 text-blue-900 font-bold px-4 py-2 text-xs uppercase tracking-wider flex items-center justify-between">
+                    <span>(Mano de Obra y Materiales de Instalación)</span>
+                    <button
+                      type="button"
+                      onClick={handleAddItem}
+                      className="print:hidden inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-white px-2.5 py-0.5 rounded border border-blue-300 hover:bg-blue-50"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Agregar Ítem</span>
+                    </button>
+                  </div>
+
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-100/70 text-slate-600 font-bold">
+                        <th className="p-3">Concepto</th>
+                        <th className="p-3 text-center w-20">Cantidad</th>
+                        <th className="p-3 text-right w-36">Precio Unitario</th>
+                        <th className="p-3 text-right w-36">Total</th>
+                        <th className="p-3 text-center w-10 print:hidden"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {installationItems.map(item => (
+                        <tr key={item.id} className="hover:bg-slate-50/50">
+                          <td className="p-2.5">
+                            <input
+                              type="text"
+                              value={item.concept}
+                              onChange={e => handleItemChange(item.id, 'concept', e.target.value)}
+                              className="w-full font-medium text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none uppercase"
+                            />
+                          </td>
+                          <td className="p-2.5 text-center">
+                            <input
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              onChange={e => handleItemChange(item.id, 'quantity', parseInt(e.target.value) || 0)}
+                              className="w-14 text-center py-0.5 border rounded border-slate-200 font-medium focus:outline-none"
+                            />
+                          </td>
+                          <td className="p-2.5 text-right font-mono">
+                            <div className="flex items-center justify-end gap-1">
+                              <span>{currencySymbol}</span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={item.unitPrice}
+                                onChange={e => handleItemChange(item.id, 'unitPrice', parseInt(e.target.value) || 0)}
+                                className="w-24 text-right py-0.5 border rounded border-slate-200 font-mono focus:outline-none"
+                              />
+                            </div>
+                          </td>
+                          <td className="p-2.5 text-right font-mono font-semibold text-slate-800">
+                            {formatAirPrice(item.total || 0, currencySymbol, countryCode)}
+                          </td>
+                          <td className="p-2.5 text-center print:hidden">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveItem(item.id)}
+                              className="text-slate-300 hover:text-red-500 transition-colors cursor-pointer"
+                              title="Eliminar ítem"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      <tr className="bg-slate-50/90 font-bold border-t border-slate-200">
+                        <td colSpan={3} className="p-2.5 text-right uppercase text-slate-700">Subtotal Instalación:</td>
+                        <td className="p-2.5 text-right font-mono text-slate-900">{formatAirPrice(subtotalInstalacion, currencySymbol, countryCode)}</td>
+                        <td className="print:hidden"></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+
+            {/* CASO 2: MANTENCIÓN MULTIEQUIPO CORPORATIVA (NK-035) */}
+            {isMultiMaintenance && (
+              <div className="border border-slate-300 rounded-xl overflow-hidden shadow-xs">
+                <div className="bg-blue-100 text-blue-900 font-bold px-4 py-2.5 text-xs uppercase tracking-wider flex flex-wrap items-center justify-between gap-2">
+                  <span>🏢 Partidas de Mantención Multiequipo Corporativa</span>
+                  <button
+                    type="button"
+                    onClick={() => handleAddMaintenanceItem()}
+                    className="print:hidden inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-white px-2.5 py-1 rounded-lg border border-blue-300 hover:bg-blue-50 cursor-pointer shadow-2xs"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Agregar Partida</span>
+                  </button>
+                </div>
+
+                {/* Presets Rápidos */}
+                <div className="p-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center gap-1.5 print:hidden">
+                  <span className="text-[11px] font-bold text-slate-500 mr-1">Rápidos:</span>
+                  <button
+                    type="button"
+                    onClick={() => handleAddMaintenanceItem('MANTENCIÓN PREVENTIVA SPLIT 9.000 - 12.000 BTU (DESARME E HIDROLAVADO)', isChile ? 35000 : 22000)}
+                    className="px-2 py-0.5 rounded text-[10px] font-bold bg-white text-slate-700 border border-slate-200 hover:border-cyan-500 hover:text-cyan-700 transition-colors cursor-pointer"
+                  >
+                    + Split 9k-12k
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAddMaintenanceItem('MANTENCIÓN PREVENTIVA SPLIT 18.000 - 24.000 BTU (DESARME Y PRESIÓN)', isChile ? 45000 : 32000)}
+                    className="px-2 py-0.5 rounded text-[10px] font-bold bg-white text-slate-700 border border-slate-200 hover:border-cyan-500 hover:text-cyan-700 transition-colors cursor-pointer"
+                  >
+                    + Split 18k-24k
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAddMaintenanceItem('MANTENCIÓN CASSETTE / PISO-CIELO 36.000 - 60.000 BTU', isChile ? 75000 : 55000)}
+                    className="px-2 py-0.5 rounded text-[10px] font-bold bg-white text-slate-700 border border-slate-200 hover:border-cyan-500 hover:text-cyan-700 transition-colors cursor-pointer"
+                  >
+                    + Cassette / Piso-Cielo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAddMaintenanceItem('SANITIZACIÓN Y DESINFECCIÓN CON BACTERICIDA CERTIFICADO', isChile ? 45000 : 25000)}
+                    className="px-2 py-0.5 rounded text-[10px] font-bold bg-white text-slate-700 border border-slate-200 hover:border-cyan-500 hover:text-cyan-700 transition-colors cursor-pointer"
+                  >
+                    + Sanitización
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAddMaintenanceItem('REVISIÓN ELÉCTRICA DE TABLEROS Y CONSUMO AMPERIMÉTRICO', isChile ? 50000 : 30000)}
+                    className="px-2 py-0.5 rounded text-[10px] font-bold bg-white text-slate-700 border border-slate-200 hover:border-cyan-500 hover:text-cyan-700 transition-colors cursor-pointer"
+                  >
+                    + Tableros & Amperaje
+                  </button>
+                </div>
+
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-100/70 text-slate-600 font-bold">
+                      <th className="p-3">Descripción de Partida / Servicio</th>
+                      <th className="p-3 text-center w-24">Cantidad</th>
+                      <th className="p-3 text-right w-36">Precio Unitario</th>
+                      <th className="p-3 text-right w-36">Total</th>
+                      <th className="p-3 text-center w-10 print:hidden"></th>
                     </tr>
-                  ))}
-                  <tr className="bg-slate-50/90 font-bold border-t border-slate-200">
-                    <td colSpan={3} className="p-2.5 text-right uppercase text-slate-700">Subtotal Instalación:</td>
-                    <td className="p-2.5 text-right font-mono text-slate-900">{formatAirPrice(subtotalInstalacion, currencySymbol, countryCode)}</td>
-                    <td className="print:hidden"></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {maintenanceItems.map(item => (
+                      <tr key={item.id} className="hover:bg-slate-50/50">
+                        <td className="p-2.5">
+                          <input
+                            type="text"
+                            value={item.concept}
+                            onChange={e => handleMaintenanceItemChange(item.id, 'concept', e.target.value)}
+                            className="w-full font-medium text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none uppercase"
+                          />
+                        </td>
+                        <td className="p-2.5 text-center">
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={e => handleMaintenanceItemChange(item.id, 'quantity', parseInt(e.target.value) || 0)}
+                            className="w-16 text-center py-0.5 border rounded border-slate-200 font-bold focus:outline-none"
+                          />
+                        </td>
+                        <td className="p-2.5 text-right font-mono">
+                          <div className="flex items-center justify-end gap-1">
+                            <span>{currencySymbol}</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={item.unitPrice}
+                              onChange={e => handleMaintenanceItemChange(item.id, 'unitPrice', parseInt(e.target.value) || 0)}
+                              className="w-24 text-right py-0.5 border rounded border-slate-200 font-mono focus:outline-none"
+                            />
+                          </div>
+                        </td>
+                        <td className="p-2.5 text-right font-mono font-semibold text-slate-800">
+                          {formatAirPrice(item.total || 0, currencySymbol, countryCode)}
+                        </td>
+                        <td className="p-2.5 text-center print:hidden">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMaintenanceItem(item.id)}
+                            className="text-slate-300 hover:text-red-500 transition-colors cursor-pointer"
+                            title="Eliminar partida"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="bg-slate-50/90 font-bold border-t border-slate-200">
+                      <td colSpan={3} className="p-2.5 text-right uppercase text-slate-700">Subtotal Mantención Multiequipo:</td>
+                      <td className="p-2.5 text-right font-mono text-slate-900">{formatAirPrice(subtotalInstalacion, currencySymbol, countryCode)}</td>
+                      <td className="print:hidden"></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* CASO 3: REPARACIÓN Y DIAGNÓSTICO (NK-035) */}
+            {isRepair && (
+              <div className="border border-slate-300 rounded-xl overflow-hidden shadow-xs">
+                <div className="bg-blue-100 text-blue-900 font-bold px-4 py-2.5 text-xs uppercase tracking-wider flex flex-wrap items-center justify-between gap-2">
+                  <span>🔧 Detalle de Reparación, Repuestos & Diagnóstico</span>
+                  <button
+                    type="button"
+                    onClick={() => handleAddRepairItem()}
+                    className="print:hidden inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-white px-2.5 py-1 rounded-lg border border-blue-300 hover:bg-blue-50 cursor-pointer shadow-2xs"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Agregar Ítem</span>
+                  </button>
+                </div>
+
+                {/* Presets Rápidos */}
+                <div className="p-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center gap-1.5 print:hidden">
+                  <span className="text-[11px] font-bold text-slate-500 mr-1">Rápidos:</span>
+                  <button
+                    type="button"
+                    onClick={() => handleAddRepairItem('VISITA TÉCNICA ESPECIALIZADA Y DIAGNÓSTICO EN TERRENO', isChile ? 35000 : 25000)}
+                    className="px-2 py-0.5 rounded text-[10px] font-bold bg-white text-slate-700 border border-slate-200 hover:border-cyan-500 hover:text-cyan-700 transition-colors cursor-pointer"
+                  >
+                    + Diagnóstico Terreno
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAddRepairItem('DETECCIÓN DE FUGAS CON NITRÓGENO Y CORRECCIÓN DE UNIONES', isChile ? 65000 : 45000)}
+                    className="px-2 py-0.5 rounded text-[10px] font-bold bg-white text-slate-700 border border-slate-200 hover:border-cyan-500 hover:text-cyan-700 transition-colors cursor-pointer"
+                  >
+                    + Fuga & Nitrógeno
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAddRepairItem('CARGA COMPLETA REFRIGERANTE R410A / R32 CON BALANZA Y VACÍO', isChile ? 55000 : 38000)}
+                    className="px-2 py-0.5 rounded text-[10px] font-bold bg-white text-slate-700 border border-slate-200 hover:border-cyan-500 hover:text-cyan-700 transition-colors cursor-pointer"
+                  >
+                    + Carga Refrigerante
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAddRepairItem('SUSTITUCIÓN DE CAPACITOR DUAL MARCHA/ARRANQUE', isChile ? 45000 : 28000)}
+                    className="px-2 py-0.5 rounded text-[10px] font-bold bg-white text-slate-700 border border-slate-200 hover:border-cyan-500 hover:text-cyan-700 transition-colors cursor-pointer"
+                  >
+                    + Capacitor Dual
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAddRepairItem('REEMPLAZO / REPARACIÓN DE TARJETA ELECTRÓNICA INVERTER', isChile ? 120000 : 85000)}
+                    className="px-2 py-0.5 rounded text-[10px] font-bold bg-white text-slate-700 border border-slate-200 hover:border-cyan-500 hover:text-cyan-700 transition-colors cursor-pointer"
+                  >
+                    + Tarjeta Inverter
+                  </button>
+                </div>
+
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-100/70 text-slate-600 font-bold">
+                      <th className="p-3">Concepto / Procedimiento</th>
+                      <th className="p-3 text-center w-24">Cantidad</th>
+                      <th className="p-3 text-right w-36">Precio Unitario</th>
+                      <th className="p-3 text-right w-36">Total</th>
+                      <th className="p-3 text-center w-10 print:hidden"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {repairItems.map(item => (
+                      <tr key={item.id} className="hover:bg-slate-50/50">
+                        <td className="p-2.5">
+                          <input
+                            type="text"
+                            value={item.concept}
+                            onChange={e => handleRepairItemChange(item.id, 'concept', e.target.value)}
+                            className="w-full font-medium text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none uppercase"
+                          />
+                        </td>
+                        <td className="p-2.5 text-center">
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={e => handleRepairItemChange(item.id, 'quantity', parseInt(e.target.value) || 0)}
+                            className="w-16 text-center py-0.5 border rounded border-slate-200 font-bold focus:outline-none"
+                          />
+                        </td>
+                        <td className="p-2.5 text-right font-mono">
+                          <div className="flex items-center justify-end gap-1">
+                            <span>{currencySymbol}</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={item.unitPrice}
+                              onChange={e => handleRepairItemChange(item.id, 'unitPrice', parseInt(e.target.value) || 0)}
+                              className="w-24 text-right py-0.5 border rounded border-slate-200 font-mono focus:outline-none"
+                            />
+                          </div>
+                        </td>
+                        <td className="p-2.5 text-right font-mono font-semibold text-slate-800">
+                          {formatAirPrice(item.total || 0, currencySymbol, countryCode)}
+                        </td>
+                        <td className="p-2.5 text-center print:hidden">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveRepairItem(item.id)}
+                            className="text-slate-300 hover:text-red-500 transition-colors cursor-pointer"
+                            title="Eliminar ítem"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="bg-slate-50/90 font-bold border-t border-slate-200">
+                      <td colSpan={3} className="p-2.5 text-right uppercase text-slate-700">Subtotal Reparación:</td>
+                      <td className="p-2.5 text-right font-mono text-slate-900">{formatAirPrice(subtotalInstalacion, currencySymbol, countryCode)}</td>
+                      <td className="print:hidden"></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             {/* Financial Totals Summary Card (Exact match with specimen) */}
             <div className="flex flex-col sm:flex-row justify-end">

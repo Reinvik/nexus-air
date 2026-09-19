@@ -64,6 +64,9 @@ export const ThermalQuoterAir: React.FC<ThermalQuoterAirProps> = ({
            parts.find(p => p.category === 'equipo') || null;
   }, [parts, result.recommended_btu]);
 
+  const [customInstallationPrice, setCustomInstallationPrice] = useState<number | null>(null);
+  const [customPumpPrice, setCustomPumpPrice] = useState<number | null>(null);
+
   // Precios base en Costa Rica / moneda local
   const equipmentPrice = matchedEquipment?.sale_price || (
     result.recommended_btu <= 9000 ? 180000 :
@@ -73,12 +76,19 @@ export const ThermalQuoterAir: React.FC<ThermalQuoterAirProps> = ({
     result.recommended_btu <= 24000 ? 395000 : 680000
   );
 
-  const installationBasePrice = includeInstallation ? (
+  const defaultInstallationBasePrice = (
     result.recommended_btu <= 12000 ? 80000 :
     result.recommended_btu <= 18000 ? 95000 : 120000
-  ) : 0;
+  );
 
-  const pumpPrice = includeCondensatePump ? 45000 : 0;
+  const installationBasePrice = includeInstallation
+    ? (customInstallationPrice !== null ? customInstallationPrice : defaultInstallationBasePrice)
+    : 0;
+
+  const defaultPumpPrice = 45000;
+  const pumpPrice = includeCondensatePump
+    ? (customPumpPrice !== null ? customPumpPrice : defaultPumpPrice)
+    : 0;
   const extraCopperPrice = extraMetersCopper * 12000;
 
   const subtotal = equipmentPrice + installationBasePrice + pumpPrice + extraCopperPrice;
@@ -444,8 +454,8 @@ export const ThermalQuoterAir: React.FC<ThermalQuoterAirProps> = ({
               Instalación & Materiales
             </h4>
 
-            <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <label className="flex items-center gap-3 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={includeInstallation}
@@ -456,12 +466,24 @@ export const ThermalQuoterAir: React.FC<ThermalQuoterAirProps> = ({
                   <div className="text-xs font-bold text-slate-900">Mano de Obra de Instalación y Vacío</div>
                   <div className="text-[11px] text-slate-500">Incluye soporte de condensado, anclajes y presurización</div>
                 </div>
+              </label>
+              <div className="flex items-center gap-1">
+                <span className="text-xs font-mono font-bold text-cyan-700">+{currencySymbol}</span>
+                <input
+                  type="number"
+                  min="0"
+                  disabled={!includeInstallation}
+                  value={customInstallationPrice !== null ? customInstallationPrice : defaultInstallationBasePrice}
+                  onChange={(e) => setCustomInstallationPrice(Math.max(0, parseInt(e.target.value) || 0))}
+                  className="w-24 text-right px-2 py-0.5 border rounded border-slate-300 font-mono font-bold text-xs text-cyan-800 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                  placeholder="80000"
+                  title="Precio editable de mano de obra"
+                />
               </div>
-              <span className="text-xs font-mono font-bold text-cyan-700">+{currencySymbol}{installationBasePrice.toLocaleString()}</span>
-            </label>
+            </div>
 
-            <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <label className="flex items-center gap-3 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={includeCondensatePump}
@@ -472,9 +494,21 @@ export const ThermalQuoterAir: React.FC<ThermalQuoterAirProps> = ({
                   <div className="text-xs font-bold text-slate-900">Bomba de Condensado Silenciosa</div>
                   <div className="text-[11px] text-slate-500">Para desagües sin gravedad o tiradas complejas</div>
                 </div>
+              </label>
+              <div className="flex items-center gap-1">
+                <span className="text-xs font-mono font-bold text-cyan-700">+{currencySymbol}</span>
+                <input
+                  type="number"
+                  min="0"
+                  disabled={!includeCondensatePump}
+                  value={customPumpPrice !== null ? customPumpPrice : defaultPumpPrice}
+                  onChange={(e) => setCustomPumpPrice(Math.max(0, parseInt(e.target.value) || 0))}
+                  className="w-24 text-right px-2 py-0.5 border rounded border-slate-300 font-mono font-bold text-xs text-cyan-800 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                  placeholder="45000"
+                  title="Precio editable de bomba de condensado"
+                />
               </div>
-              <span className="text-xs font-mono font-bold text-cyan-700">+{currencySymbol}{pumpPrice.toLocaleString()}</span>
-            </label>
+            </div>
           </div>
         </div>
 
@@ -595,7 +629,7 @@ export const ThermalQuoterAir: React.FC<ThermalQuoterAirProps> = ({
         </div>
       </div>
 
-      {/* Modal Proforma Oficial (NK-018) */}
+      {/* Modal Proforma Oficial (NK-018 / NK-033 / NK-035) */}
       <ProformaModalAir
         isOpen={isProformaOpen}
         onClose={() => setIsProformaOpen(false)}
@@ -606,6 +640,11 @@ export const ThermalQuoterAir: React.FC<ThermalQuoterAirProps> = ({
         settings={settings}
         customers={customers}
         onCreateOrder={onCreateOrderFromQuote}
+        includeCondensatePump={includeCondensatePump}
+        pumpPrice={pumpPrice}
+        includeInstallation={includeInstallation}
+        installationPrice={installationBasePrice}
+        initialEquipmentPrice={equipmentPrice}
       />
     </div>
   );
