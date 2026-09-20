@@ -325,6 +325,7 @@ export default function App() {
           equipments={equipments}
           orders={orders}
           settings={tenantSettings || settings}
+          isStaff={Boolean(user)}
           onBackToApp={() => setView(user ? 'dashboard' : (tenantSlug ? 'tenant_landing' : 'landing'))}
           onOpenBooking={(cust, eq) => handleOpenBooking(cust, eq, 'mantencion_preventiva')}
         />

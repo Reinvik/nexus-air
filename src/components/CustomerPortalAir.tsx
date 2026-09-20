@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Customer, AirEquipment, ServiceOrder, AirSettings } from '../types';
 import { 
   Wind, 
@@ -21,7 +21,10 @@ import {
   Video,
   Play,
   ExternalLink,
-  Download
+  Download,
+  LogOut,
+  Eye,
+  UserCheck
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -35,6 +38,7 @@ interface CustomerPortalAirProps {
   equipments: AirEquipment[];
   orders: ServiceOrder[];
   settings: AirSettings;
+  isStaff?: boolean;
   onBackToApp: () => void;
   onOpenBooking: (customer?: Customer, equipment?: AirEquipment) => void;
 }
@@ -196,38 +200,209 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
   onBackToApp,
   onOpenBooking,
 }) => {
-  const [searchQuery, setSearchQuery] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      return params.get('rut') || params.get('p') || '';
-    }
-    return '';
-  });
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>(() => {
+  // Helper to normalize RUT / strings for robust matching
+  const cleanDoc = (val?: string) => (val || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  const [inputRut, setInputRut] = useState('');
+  const [hasSearched, setHasSearched] = useState(false);
+
+  // Client identifier from URL param (?rut or ?p) or sessionStorage
+  const [activeIdentifier, setActiveIdentifier] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const rutParam = params.get('rut') || params.get('p');
-      if (rutParam) {
-        const found = customers.find(c => c.rut.toLowerCase() === rutParam.toLowerCase() || c.id === rutParam);
-        if (found) return found.id;
-      }
+      if (rutParam) return rutParam;
+      const stored = sessionStorage.getItem('nexus_air_portal_identifier');
+      if (stored) return stored;
     }
+    return '';
+  });
+
+  // Selected customer for staff admin preview
+  const [adminSelectedCustomerId, setAdminSelectedCustomerId] = useState<string>(() => {
     return customers[0]?.id || '';
   });
+
   const [downloadingReceiptId, setDownloadingReceiptId] = useState<string | null>(null);
 
-  // Buscar cliente por RUT o Teléfono o Nombre
-  const matchedCustomer = customers.find(c => 
-    (selectedCustomerId && c.id === selectedCustomerId) ||
-    (searchQuery && (
-      c.rut.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.phone.includes(searchQuery) ||
-      c.name.toLowerCase().includes(searchQuery.toLowerCase())
-    ))
-  ) || customers[0];
+  // Determine matchedCustomer:
+  // - If isStaff: preview any customer via adminSelectedCustomerId, default to customers[0]
+  // - If !isStaff: ONLY match if activeIdentifier is present and matches a customer. NEVER default to customers[0].
+  const matchedCustomer = useMemo(() => {
+    if (isStaff) {
+      return customers.find(c => c.id === adminSelectedCustomerId) || customers[0] || null;
+    }
 
-  const clientEquipments = equipments.filter(e => e.customer_id === matchedCustomer?.id);
-  const clientOrders = orders.filter(o => o.customer_id === matchedCustomer?.id);
+    if (!activeIdentifier) return null;
+
+    const query = cleanDoc(activeIdentifier);
+    return customers.find(c => {
+      const r = cleanDoc(c.rut);
+      const p = cleanDoc(c.phone);
+      const id = cleanDoc(c.id);
+      return (r && r === query) || (p && p.includes(query)) || (id && id === query);
+    }) || null;
+  }, [isStaff, adminSelectedCustomerId, activeIdentifier, customers]);
+
+  const handleLookupSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = cleanDoc(inputRut);
+    if (!query) {
+      toast.error(`Por favor ingresa tu ${settings.tax_id_label || 'RUT'} o teléfono`);
+      return;
+    }
+
+    const found = customers.find(c => {
+      const r = cleanDoc(c.rut);
+      const p = cleanDoc(c.phone);
+      const id = cleanDoc(c.id);
+      return (r && r === query) || (p && p.includes(query)) || (id && id === query);
+    });
+
+    if (found) {
+      setActiveIdentifier(found.rut || found.id);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('nexus_air_portal_identifier', found.rut || found.id);
+      }
+      setHasSearched(false);
+      toast.success(`¡Bienvenido/a, ${found.name}!`);
+    } else {
+      setHasSearched(true);
+    }
+  };
+
+  const handleExitPortal = () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('nexus_air_portal_identifier');
+      const url = new URL(window.location.href);
+      url.searchParams.delete('rut');
+      url.searchParams.delete('p');
+      window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+    }
+    setActiveIdentifier('');
+    setInputRut('');
+    setHasSearched(false);
+  };
+
+  // VISTA PARA CLIENTES NO IDENTIFICADOS (Evita mostrar datos de otros usuarios)
+  if (!matchedCustomer && !isStaff) {
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between">
+        {/* Top Navbar */}
+        <header className="border-b border-slate-200 bg-white/90 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+              <Wind className="w-5 h-5 text-slate-950" />
+            </div>
+            <div>
+              <span className="font-extrabold text-lg text-slate-900">
+                {settings?.company_name || 'NEXUS AIR'}
+              </span>
+              <p className="text-xs text-slate-500">Portal Mi Climatización & Historial</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => onOpenBooking()}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-md shadow-cyan-500/20 transition-all cursor-pointer"
+            >
+              <Calendar className="w-4 h-4" />
+              <span>Agendar Mantención</span>
+            </button>
+
+            <button
+              onClick={onBackToApp}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs transition-colors cursor-pointer border border-slate-200"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Volver al Inicio</span>
+            </button>
+          </div>
+        </header>
+
+        {/* Identification Form Card */}
+        <main className="max-w-md w-full mx-auto p-6 my-auto">
+          <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-xl space-y-6 text-center">
+            <div className="w-16 h-16 rounded-3xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-600 flex items-center justify-center mx-auto shadow-inner">
+              <ShieldCheck className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-xs font-extrabold text-cyan-600 tracking-wider uppercase">
+                Acceso Exclusivo a Clientes
+              </span>
+              <h2 className="text-2xl font-black text-slate-900">Consulta tu Historial</h2>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Ingresa tu {settings.tax_id_label || 'RUT'} o teléfono para consultar tus equipos registrados, historial de mantenciones y el seguimiento satelital de tu técnico en terreno.
+              </p>
+            </div>
+
+            <form onSubmit={handleLookupSubmit} className="space-y-4 text-left">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  {settings.tax_id_label || 'RUT'} del Titular o Teléfono
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={inputRut}
+                    onChange={(e) => {
+                      setInputRut(e.target.value);
+                      if (hasSearched) setHasSearched(false);
+                    }}
+                    placeholder="Ej: 17.257.060-7 o +56 9 1234 5678"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-semibold text-slate-900 focus:bg-white focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none transition-all"
+                    autoFocus
+                  />
+                  <Search className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
+
+              {hasSearched && (
+                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-xs space-y-2">
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                    <span>No encontramos servicios asociados</span>
+                  </div>
+                  <p className="text-[11px] text-amber-700">
+                    No encontramos ningún cliente registrado con el identificador ingresado. Si aún no tienes un servicio agendado, puedes solicitarlo a continuación:
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => onOpenBooking()}
+                    className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                  >
+                    Agendar Atención Ahora
+                  </button>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="w-full py-3 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-sm rounded-2xl shadow-lg shadow-cyan-500/20 transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Search className="w-4 h-4" />
+                <span>Consultar Mis Servicios</span>
+              </button>
+            </form>
+
+            <div className="pt-4 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Privacidad garantizada bajo cifrado SSL 256-bit</span>
+            </div>
+          </div>
+        </main>
+
+        <footer className="text-center py-6 text-xs text-slate-400">
+          © {new Date().getFullYear()} {settings.company_name || 'Nexus Air'}. Todos los derechos reservados.
+        </footer>
+      </div>
+    );
+  }
+
+  const clientEquipments = matchedCustomer ? equipments.filter(e => e.customer_id === matchedCustomer.id) : [];
+  const clientOrders = matchedCustomer ? orders.filter(o => o.customer_id === matchedCustomer.id) : [];
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
@@ -239,7 +414,7 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
           </div>
           <div>
             <span className="font-extrabold text-lg text-slate-900">
-              NEXUS<span className="text-cyan-600">AIR</span>
+              {settings?.company_name || 'NEXUS'}<span className="text-cyan-600">{settings?.company_name ? '' : 'AIR'}</span>
             </span>
             <p className="text-xs text-slate-500">Portal Mi Climatización & Historial de Equipos</p>
           </div>
@@ -247,7 +422,7 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => onOpenBooking(matchedCustomer)}
+            onClick={() => onOpenBooking(matchedCustomer || undefined)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-md shadow-cyan-500/20 transition-all cursor-pointer"
           >
             <Calendar className="w-4 h-4" />
@@ -259,39 +434,65 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs transition-colors cursor-pointer border border-slate-200"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Volver al Panel</span>
+            <span>{isStaff ? 'Volver al Panel' : 'Volver al Inicio'}</span>
           </button>
         </div>
       </header>
 
       {/* Main Container */}
       <main className="max-w-6xl mx-auto p-6 space-y-8">
-        {/* Customer Identity Bar & Search */}
+        {/* Banner de Previsualización para Administradores / Staff */}
+        {isStaff && (
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-900 shadow-xs">
+            <div className="flex items-center gap-2.5">
+              <Eye className="w-5 h-5 text-amber-600 flex-shrink-0" />
+              <div>
+                <span className="text-xs font-bold text-amber-900">Modo Vista Previa Administrador</span>
+                <p className="text-[11px] text-amber-700">
+                  Esta barra y el selector de perfiles solo son visibles para administradores y técnicos logeados.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-700 whitespace-nowrap">Simular Cliente:</span>
+              <select
+                value={matchedCustomer?.id || ''}
+                onChange={(e) => setAdminSelectedCustomerId(e.target.value)}
+                className="p-2 bg-white border border-amber-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none shadow-xs"
+              >
+                {customers.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.commune || 'Sin comuna'})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* Customer Identity Bar */}
         <div className="p-6 rounded-3xl bg-white border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xs">
           <div className="space-y-1">
             <span className="text-xs font-bold text-cyan-600 uppercase tracking-wider">
               Bienvenido/a a tu Portal de Climatización
             </span>
-            <h2 className="text-2xl font-black text-slate-900">{matchedCustomer?.name}</h2>
+            <h2 className="text-2xl font-black text-slate-900">{matchedCustomer?.name || 'Cliente'}</h2>
             <p className="text-xs text-slate-500">
               {matchedCustomer?.address}, {matchedCustomer?.commune} • {settings.tax_id_label || 'RUT'}: {matchedCustomer?.rut}
             </p>
           </div>
 
-          {/* Quick Client Switcher */}
-          <div className="flex items-center gap-2">
-            <select
-              value={selectedCustomerId}
-              onChange={(e) => setSelectedCustomerId(e.target.value)}
-              className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none transition-colors"
+          {!isStaff && (
+            <button
+              onClick={handleExitPortal}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer border border-slate-200 self-start md:self-center"
+              title="Salir y consultar con otro documento"
             >
-              {customers.map(c => (
-                <option key={c.id} value={c.id}>
-                  Ver perfil: {c.name} ({c.commune})
-                </option>
-              ))}
-            </select>
-          </div>
+              <LogOut className="w-3.5 h-3.5 text-slate-500" />
+              <span>Consultar otro {settings.tax_id_label || 'RUT'}</span>
+            </button>
+          )}
         </div>
 
         {/* SECCIÓN EN VIVO: SEGUIMIENTO DE TRABAJO (STEPPER EN VIVO & GPS - NK-025) */}
