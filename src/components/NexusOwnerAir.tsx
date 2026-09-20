@@ -207,13 +207,14 @@ export const NexusOwnerAir: React.FC<NexusOwnerAirProps> = ({
         .from('profiles')
         .update({ 
           is_active: nextActive,
+          is_blocked: !nextActive,
           updated_at: new Date().toISOString()
         })
         .eq('id', userId);
 
       if (error) throw error;
 
-      setProfiles(prev => prev.map(p => p.id === userId ? { ...p, is_active: nextActive } : p));
+      setProfiles(prev => prev.map(p => p.id === userId ? { ...p, is_active: nextActive, is_blocked: !nextActive } : p));
       toast.success(nextActive ? 'Usuario activado' : 'Usuario suspendido / bloqueado');
     } catch (err: any) {
       console.error('[NexusOwner] Error al cambiar estado de usuario:', err);
