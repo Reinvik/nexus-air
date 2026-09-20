@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase, supabaseAir } from '../lib/supabase';
 import { 
   ServiceOrder, 
@@ -23,19 +23,17 @@ import { addDays, differenceInDays, format, parseISO } from 'date-fns';
 import { toast } from 'react-hot-toast';
 
 export const DEFAULT_COMPANY_ID = 'a1111111-2222-3333-4444-555555555555';
+export const DEMO_SANDBOX_COMPANY_ID = '00000000-0000-0000-0000-000000000000';
 
 export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
-  const isMockCompany = (companyId === DEFAULT_COMPANY_ID);
+  const isMockCompany = (companyId === DEMO_SANDBOX_COMPANY_ID);
+  const fetchCounterRef = React.useRef(0);
 
   const [orders, setOrders] = useState<ServiceOrder[]>(() => {
     try {
       const saved = localStorage.getItem(`nexus_air_orders_${companyId}`);
       if (saved) return JSON.parse(saved);
-      if (isMockCompany) {
-        const legacy = localStorage.getItem('nexus_air_orders');
-        if (legacy) return JSON.parse(legacy);
-        return INITIAL_SERVICE_ORDERS;
-      }
+      if (isMockCompany) return INITIAL_SERVICE_ORDERS;
     } catch (e) {
       console.warn('Error reading orders from localStorage:', e);
     }
@@ -46,11 +44,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     try {
       const saved = localStorage.getItem(`nexus_air_customers_${companyId}`);
       if (saved) return JSON.parse(saved);
-      if (isMockCompany) {
-        const legacy = localStorage.getItem('nexus_air_customers');
-        if (legacy) return JSON.parse(legacy);
-        return INITIAL_CUSTOMERS;
-      }
+      if (isMockCompany) return INITIAL_CUSTOMERS;
     } catch (e) {
       console.warn('Error reading customers from localStorage:', e);
     }
@@ -61,11 +55,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     try {
       const saved = localStorage.getItem(`nexus_air_equipments_${companyId}`);
       if (saved) return JSON.parse(saved);
-      if (isMockCompany) {
-        const legacy = localStorage.getItem('nexus_air_equipments');
-        if (legacy) return JSON.parse(legacy);
-        return INITIAL_EQUIPMENTS;
-      }
+      if (isMockCompany) return INITIAL_EQUIPMENTS;
     } catch (e) {
       console.warn('Error reading equipments from localStorage:', e);
     }
@@ -79,14 +69,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
       }
-      if (isMockCompany) {
-        const legacy = localStorage.getItem('nexus_air_technicians');
-        if (legacy) {
-          const parsed = JSON.parse(legacy);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        }
-        return INITIAL_TECHNICIANS;
-      }
+      if (isMockCompany) return INITIAL_TECHNICIANS;
     } catch (e) {
       console.warn('Error reading technicians from localStorage:', e);
     }
@@ -100,9 +83,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
       }
-      if (isMockCompany) {
-        return INITIAL_PARTS;
-      }
+      if (isMockCompany) return INITIAL_PARTS;
     } catch (e) {
       console.warn('Error reading parts from localStorage:', e);
     }
@@ -113,12 +94,6 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     try {
       const saved = localStorage.getItem(`nexus_air_settings_${companyId}`);
       if (saved) return JSON.parse(saved);
-      if (isMockCompany) {
-        const legacy = 
-          localStorage.getItem('nexus_air_active_settings') ||
-          localStorage.getItem('nexus_air_settings');
-        if (legacy) return JSON.parse(legacy);
-      }
     } catch (e) {
       console.warn('Error reading settings from localStorage:', e);
     }
@@ -210,7 +185,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
   // Sincronizar estado en memoria inmediatamente al cambiar de empresa (switch o login)
   useEffect(() => {
     if (!companyId) return;
-    const isMock = companyId === DEFAULT_COMPANY_ID;
+    const isMock = companyId === DEMO_SANDBOX_COMPANY_ID;
 
     // 1. Sincronizar órdenes
     try {
@@ -307,9 +282,10 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
 
   // Cargar datos desde Supabase (Schema 'air')
   const fetchData = useCallback(async () => {
+    const fetchId = ++fetchCounterRef.current;
     try {
       const activeId = companyId || DEFAULT_COMPANY_ID;
-      const isMock = activeId === DEFAULT_COMPANY_ID;
+      const isMock = activeId === DEMO_SANDBOX_COMPANY_ID;
 
       // 1. Settings
       const { data: dbSettings } = await supabaseAir
@@ -451,6 +427,9 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         .select('*')
         .eq('company_id', activeId)
         .order('scheduled_date', { ascending: true });
+
+      // Verificar si hubo otra llamada a fetchData mientras esta petición estaba en curso
+      if (fetchCounterRef.current !== fetchId) return;
 
       if (dbCustomers && dbCustomers.length > 0) {
         setCustomers(dbCustomers.map((c: any) => ({
@@ -655,7 +634,9 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     } catch (err) {
       console.warn('[useAirStore] Using offline/initial cache:', err);
     } finally {
-      setIsLoaded(true);
+      if (fetchCounterRef.current === fetchId) {
+        setIsLoaded(true);
+      }
     }
   }, [companyId]);
 
@@ -1055,7 +1036,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     toast.success(`Cliente ${newCust.name} registrado`);
 
     try {
-      await supabaseAir.from('customers').insert([{
+      const { error } = await supabaseAir.from('customers').insert([{
         id: newId,
         company_id: activeId,
         name: custData.name,
@@ -1066,8 +1047,13 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         commune: custData.commune,
         notes: custData.notes
       }]);
-    } catch (e) {
+      if (error) {
+        console.error('[useAirStore] Error inserting customer into Supabase:', error);
+        toast.error(`Error al guardar en base de datos: ${error.message}`);
+      }
+    } catch (e: any) {
       console.warn('[useAirStore] Error inserting customer:', e);
+      toast.error(`Error de red: ${e?.message || e}`);
     }
     return newCust;
   }, [companyId]);
@@ -1408,7 +1394,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
 
   // Reset a valores de demostración o estado limpio
   const resetToDefaults = useCallback(() => {
-    const isMock = companyId === DEFAULT_COMPANY_ID;
+    const isMock = companyId === DEMO_SANDBOX_COMPANY_ID;
     if (isMock) {
       setCustomers(INITIAL_CUSTOMERS);
       setEquipments(INITIAL_EQUIPMENTS);

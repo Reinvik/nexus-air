@@ -31,6 +31,14 @@ export function useAuth() {
       return null;
     }
   });
+  const [cachedEffectiveCompany] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('nexus_air_owner_company_override') ||
+             localStorage.getItem('nexus_air_effective_company_id');
+    } catch {
+      return null;
+    }
+  });
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -115,14 +123,17 @@ export function useAuth() {
     setProfile(null);
     setActiveCompanyOverride(null);
     localStorage.removeItem('nexus_air_owner_company_override');
+    localStorage.removeItem('nexus_air_effective_company_id');
   };
 
   const switchActiveCompany = (companyId: string | null) => {
     if (companyId) {
       localStorage.setItem('nexus_air_owner_company_override', companyId);
+      localStorage.setItem('nexus_air_effective_company_id', companyId);
       setActiveCompanyOverride(companyId);
     } else {
       localStorage.removeItem('nexus_air_owner_company_override');
+      localStorage.removeItem('nexus_air_effective_company_id');
       setActiveCompanyOverride(null);
     }
   };
@@ -139,7 +150,15 @@ export function useAuth() {
 
   const effectiveCompanyId = (isNexusOwner && activeCompanyOverride)
     ? activeCompanyOverride
-    : (profile?.company_id || DEFAULT_COMPANY_ID);
+    : (activeCompanyOverride || profile?.company_id || (loadingAuth ? cachedEffectiveCompany : null) || DEFAULT_COMPANY_ID);
+
+  useEffect(() => {
+    if (effectiveCompanyId && !loadingAuth) {
+      try {
+        localStorage.setItem('nexus_air_effective_company_id', effectiveCompanyId);
+      } catch {}
+    }
+  }, [effectiveCompanyId, loadingAuth]);
 
   return {
     user,

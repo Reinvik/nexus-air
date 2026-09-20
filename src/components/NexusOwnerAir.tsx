@@ -149,6 +149,11 @@ export const NexusOwnerAir: React.FC<NexusOwnerAirProps> = ({
       const targetCompany = companies.find(c => c.id === newCompanyId);
       toast.success(`Empresa reasignada a: ${targetCompany?.name || 'Empresa seleccionada'}`);
       
+      // Si el usuario reasignado es el usuario actual, conmutar sesión a la nueva empresa
+      if (userId === currentProfile?.id) {
+        onSwitchActiveCompany(newCompanyId);
+      }
+
       // Refrescar contadores
       fetchData();
     } catch (err: any) {

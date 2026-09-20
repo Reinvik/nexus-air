@@ -26,7 +26,7 @@ interface CustomersAirProps {
   customers: Customer[];
   equipments: AirEquipment[];
   settings?: AirSettings;
-  onAddCustomer: (customer: Omit<Customer, 'id' | 'created_at'>) => void;
+  onAddCustomer: (customer: Omit<Customer, 'id' | 'created_at'>) => Promise<Customer | void> | void;
   onAddEquipment: (equipment: Omit<AirEquipment, 'id' | 'next_maintenance_date'>) => void;
   onUpdateCustomer: (id: string, updates: Partial<Customer>) => void;
   onDeleteEquipment?: (id: string) => void;
@@ -223,9 +223,18 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
     }
   };
 
-  const handleCreateCustomer = (e: React.FormEvent) => {
+  // Sincronizar selección si el cliente activo fue eliminado o si cambia la lista
+  React.useEffect(() => {
+    if (customers.length > 0 && (!selectedCustomerId || !customers.some(c => c.id === selectedCustomerId))) {
+      setSelectedCustomerId(customers[0].id);
+    } else if (customers.length === 0) {
+      setSelectedCustomerId(null);
+    }
+  }, [customers, selectedCustomerId]);
+
+  const handleCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
-    onAddCustomer({
+    const created = await onAddCustomer({
       name,
       rut,
       phone,
@@ -238,6 +247,9 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
     setIsAddCustModalOpen(false);
     setName('');
     setRut('');
+    if (created && 'id' in created && created.id) {
+      setSelectedCustomerId(created.id);
+    }
   };
 
   const handleCreateEquipment = (e: React.FormEvent) => {
