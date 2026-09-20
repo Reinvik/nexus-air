@@ -392,6 +392,7 @@ export default function App() {
             onMarkContacted={markReminderContacted}
             onScheduleService={scheduleReminderService}
             generateWhatsAppUrl={generateWhatsAppUrl}
+            onUpdateSettings={updateSettings}
           />
         )}
 
@@ -450,6 +451,7 @@ export default function App() {
           <SalesAir 
             orders={orders} 
             settings={tenantSettings || settings}
+            onUpdateOrder={updateOrder}
           />
         )}
 

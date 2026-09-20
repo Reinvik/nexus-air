@@ -299,21 +299,26 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-slate-200 pb-5">
             <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-cyan-600 text-white flex items-center justify-center font-bold">
-                  <Wind className="w-5 h-5" />
-                </div>
+              <div className="flex items-center gap-3">
+                {settings.logo_url ? (
+                  <img src={settings.logo_url} alt="Logo" className="max-h-12 max-w-[140px] object-contain" />
+                ) : (
+                  <div className="w-10 h-10 rounded-xl bg-cyan-600 text-white flex items-center justify-center font-bold">
+                    <Wind className="w-6 h-6" />
+                  </div>
+                )}
                 <div>
                   <h2 className="text-xl font-black text-slate-900 leading-none">
                     {settings.fantasy_name || settings.company_name}
                   </h2>
                   <span className="text-[10px] font-bold text-cyan-700 uppercase tracking-wider">
-                    Climatización & Refrigeración Profesional
+                    {settings.company_slogan || 'Climatización & Refrigeración Profesional'}
                   </span>
                 </div>
               </div>
               <p className="text-slate-500 text-[11px] pt-1">
                 {settings.tax_id_label || 'RUT/ID'}: <strong className="text-slate-800">{settings.rut || settings.tax_id || 'N/A'}</strong>
+                {settings.city ? ` • Ciudad: ${settings.city}` : ''}
               </p>
               <p className="text-slate-500 text-[11px]">
                 {[settings.address, settings.commune].filter(Boolean).join(', ') || 'Dirección comercial'} • Tel: {settings.phone || settings.whatsapp_number || 'N/A'}
@@ -359,21 +364,21 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
                 <User className="w-3 h-3 text-cyan-600" />
                 Datos del Cliente
               </span>
-              <h4 className="text-sm font-bold text-slate-900">{order.customer?.name || 'Cliente Particular'}</h4>
+              <h4 className="text-sm font-bold text-slate-900">{order.customer?.name || (order as any).customer_name || 'Cliente Particular'}</h4>
               <p className="text-slate-600 text-[11px]">
-                {settings.tax_id_label || 'RUT/ID'}: {order.customer?.rut || 'Sin registrar'}
+                {settings.tax_id_label || 'RUT/ID'}: {order.customer?.rut || (order as any).customer_rut || 'Sin registrar'}
               </p>
               <p className="text-slate-600 text-[11px]">
                 Dirección: {[order.customer?.address, order.customer?.commune].filter(Boolean).join(', ') || 'En taller / Domicilio cliente'}
               </p>
-              {order.customer?.phone && (
+              {(order.customer?.phone || (order as any).customer_phone) && (
                 <p className="text-slate-600 text-[11px]">
-                  Tel: {order.customer.phone}
+                  Tel: {order.customer?.phone || (order as any).customer_phone}
                 </p>
               )}
             </div>
 
-            {/* Equipment Box */}
+            {/* Equipment Box (NK-040: dual serials) */}
             <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200 space-y-1.5">
               <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                 <Wrench className="w-3 h-3 text-cyan-600" />
@@ -387,17 +392,18 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
                   <p className="text-slate-600 text-[11px]">
                     📍 Ubicación: <strong>{order.equipment.location_in_property}</strong>
                   </p>
-                  {order.equipment.model && (
-                    <p className="text-slate-600 text-[11px]">
-                      Modelo: {order.equipment.model}
-                    </p>
-                  )}
-                  {order.equipment.serial_number && (
-                    <div className="text-[11px] text-cyan-800 font-mono font-bold flex items-center gap-1 pt-0.5">
-                      <span>N° de Serial:</span>
-                      <span className="bg-cyan-50 px-1.5 py-0.2 rounded border border-cyan-200">{order.equipment.serial_number}</span>
-                    </div>
-                  )}
+                  <div className="text-[11px] text-cyan-800 font-mono font-bold flex flex-wrap gap-2 pt-0.5">
+                    {(order.checklist?.serial_evaporator || order.equipment.serial_number_evaporator || order.equipment.serial_number) && (
+                      <span className="bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200">
+                        Evap: {order.checklist?.serial_evaporator || order.equipment.serial_number_evaporator || order.equipment.serial_number}
+                      </span>
+                    )}
+                    {(order.checklist?.serial_condenser || order.equipment.serial_number_condenser) && (
+                      <span className="bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200">
+                        Cond: {order.checklist?.serial_condenser || order.equipment.serial_number_condenser}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-slate-600 text-[11px]">
                     Gas: {order.equipment.refrigerant} • Tecnología: {order.equipment.technology.toUpperCase()}
                   </p>
@@ -433,84 +439,118 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
               </div>
             )}
 
-            {/* QA Technical Measurements */}
-            {order.checklist?.delta_t_celsius && (
-              <div className="pt-2 border-t border-slate-200/80 flex flex-wrap items-center gap-4 text-[11px]">
-                <div className="flex items-center gap-1 font-bold text-cyan-800 font-mono">
+            {/* Venefrio Protocol: Initial vs Final Measurements Table (NK-040) */}
+            <div className="pt-2 border-t border-slate-200">
+              <div className="flex items-center justify-between pb-1.5">
+                <span className="font-bold text-slate-700 text-[11px] uppercase flex items-center gap-1">
                   <Thermometer className="w-3.5 h-3.5 text-cyan-600" />
-                  <span>Salto Térmico ΔT: {order.checklist.delta_t_celsius}°C</span>
+                  Mediciones Eléctricas y Presión (Protocolo Calidad HVAC)
+                </span>
+                {(order.checklist?.work_start_time || order.checklist?.work_end_time) && (
+                  <span className="text-[10px] font-mono text-slate-500">
+                    Horario: {order.checklist.work_start_time || '—'} a {order.checklist.work_end_time || '—'}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                <div className="p-2 rounded-lg bg-white border border-slate-200">
+                  <div className="text-[10px] text-slate-500">Consumo (Amp)</div>
+                  <div className="font-mono font-bold text-cyan-800">
+                    Ini: {order.checklist?.amp_initial ? `${order.checklist.amp_initial}A` : '—'} | Fin: {order.checklist?.amp_final ? `${order.checklist.amp_final}A` : (order.checklist?.amperage_amps ? `${order.checklist.amperage_amps}A` : '—')}
+                  </div>
                 </div>
-                {order.checklist.suction_pressure_psi && (
-                  <div className="font-mono text-slate-700">
-                    Presión Succión: {order.checklist.suction_pressure_psi} PSI
+                <div className="p-2 rounded-lg bg-white border border-slate-200">
+                  <div className="text-[10px] text-slate-500">Voltaje (V)</div>
+                  <div className="font-mono font-bold text-slate-800">
+                    {order.checklist?.voltage_final ? `${order.checklist.voltage_final}V` : '220V'}
                   </div>
-                )}
-                {order.checklist.amperage_amps && (
-                  <div className="font-mono text-slate-700">
-                    Consumo: {order.checklist.amperage_amps} A
+                </div>
+                <div className="p-2 rounded-lg bg-white border border-slate-200">
+                  <div className="text-[10px] text-slate-500">Presión Baja (PSI)</div>
+                  <div className="font-mono font-bold text-cyan-800">
+                    Ini: {order.checklist?.psi_low_initial || '—'} | Fin: {order.checklist?.psi_low_final || order.checklist?.suction_pressure_psi || '—'}
                   </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Financial Breakdown Table */}
-          <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-[10px]">
-                <tr>
-                  <th className="p-3">Descripción del Concepto / Insumo</th>
-                  <th className="p-3 text-center w-20">Cant.</th>
-                  <th className="p-3 text-right w-32">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {order.items && order.items.length > 0 ? (
-                  order.items.map((it, idx) => (
-                    <tr key={idx}>
-                      <td className="p-3 font-medium text-slate-800">{it.description}</td>
-                      <td className="p-3 text-center font-mono">{it.quantity}</td>
-                      <td className="p-3 text-right font-mono font-bold text-slate-900">
-                        {formatAirPrice(it.total, currencySymbol, countryCode)}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td className="p-3 font-medium text-slate-800">
-                      Servicio de {order.service_type.replace('_', ' ')} (Mano de obra y materiales)
-                    </td>
-                    <td className="p-3 text-center font-mono">1</td>
-                    <td className="p-3 text-right font-mono font-bold text-slate-900">
-                      {formatAirPrice(order.total, currencySymbol, countryCode)}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-
-            {/* Total Footer */}
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col items-end space-y-1">
-              <div className="flex justify-between w-64 text-slate-600">
-                <span>Subtotal Neto:</span>
-                <span className="font-mono font-bold text-slate-900">
-                  {formatAirPrice(Math.round(order.total / (1 + (taxPercent / 100))), currencySymbol, countryCode)}
-                </span>
-              </div>
-              <div className="flex justify-between w-64 text-slate-600">
-                <span>{settings.tax_name || 'IVA'} ({taxPercent}%):</span>
-                <span className="font-mono font-bold text-slate-900">
-                  {formatAirPrice(order.total - Math.round(order.total / (1 + (taxPercent / 100))), currencySymbol, countryCode)}
-                </span>
-              </div>
-              <div className="flex justify-between w-64 pt-2 border-t border-slate-300 text-sm font-black text-slate-900">
-                <span className="uppercase">TOTAL COMPROBANTE:</span>
-                <span className="font-mono text-base text-cyan-800">
-                  {formatAirPrice(order.total, currencySymbol, countryCode)}
-                </span>
+                </div>
+                <div className="p-2 rounded-lg bg-white border border-slate-200">
+                  <div className="text-[10px] text-slate-500">Salto Térmico (ΔT)</div>
+                  <div className="font-mono font-bold text-emerald-700">
+                    {order.checklist?.delta_t_celsius ? `${order.checklist.delta_t_celsius}°C` : 'Conforme'}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
+
+          {/* Financial Breakdown Table (NK-039: Selectable IVA) */}
+          {(() => {
+            const applyTax = order.apply_tax !== false;
+            const subtotalAmount = order.subtotal > 0 
+              ? order.subtotal 
+              : (applyTax ? Math.round(order.total / (1 + (taxPercent / 100))) : order.total);
+            const taxAmount = applyTax 
+              ? (order.tax > 0 ? order.tax : (order.total - subtotalAmount))
+              : 0;
+            const finalTotal = applyTax ? order.total : subtotalAmount;
+
+            return (
+              <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-[10px]">
+                    <tr>
+                      <th className="p-3">Descripción del Concepto / Insumo</th>
+                      <th className="p-3 text-center w-20">Cant.</th>
+                      <th className="p-3 text-right w-32">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {order.items && order.items.length > 0 ? (
+                      order.items.map((it, idx) => (
+                        <tr key={idx}>
+                          <td className="p-3 font-medium text-slate-800">{it.description}</td>
+                          <td className="p-3 text-center font-mono">{it.quantity}</td>
+                          <td className="p-3 text-right font-mono font-bold text-slate-900">
+                            {formatAirPrice(it.total, currencySymbol, countryCode)}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td className="p-3 font-medium text-slate-800">
+                          Servicio de {order.service_type.replace('_', ' ')} (Mano de obra y materiales)
+                        </td>
+                        <td className="p-3 text-center font-mono">1</td>
+                        <td className="p-3 text-right font-mono font-bold text-slate-900">
+                          {formatAirPrice(finalTotal, currencySymbol, countryCode)}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+
+                {/* Total Footer */}
+                <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col items-end space-y-1">
+                  <div className="flex justify-between w-64 text-slate-600">
+                    <span>Subtotal Neto:</span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {formatAirPrice(subtotalAmount, currencySymbol, countryCode)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between w-64 text-slate-600">
+                    <span>{settings.tax_name || 'IVA'} ({applyTax ? `${taxPercent}%` : '0%'}):</span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {applyTax ? formatAirPrice(taxAmount, currencySymbol, countryCode) : 'Exento (0%)'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between w-64 pt-2 border-t border-slate-300 text-sm font-black text-slate-900">
+                    <span className="uppercase">TOTAL COMPROBANTE:</span>
+                    <span className="font-mono text-base text-cyan-800">
+                      {formatAirPrice(finalTotal, currencySymbol, countryCode)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Internal Commission Breakdown (Toggle for administrative / technician verification) */}
           <div className="print:hidden space-y-2">

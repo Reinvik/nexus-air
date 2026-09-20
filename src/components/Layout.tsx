@@ -96,16 +96,26 @@ export const Layout: React.FC<LayoutProps> = ({
           {/* Brand Header */}
           <div className="p-5 pb-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[rgba(0,210,255,0.1)] border border-[rgba(0,210,255,0.3)] flex items-center justify-center text-[#00d2ff] shadow-[0_0_15px_rgba(0,210,255,0.25)] transition-transform hover:scale-105">
-                  <Wind className="w-5 h-5" />
-                </div>
-                <div className="flex flex-col">
-                  <div className="text-[20px] font-black tracking-[-0.04em] text-white flex items-center leading-none">
-                    NEXUS<span className="text-[#00d2ff]">AIR</span>
+              <div className="flex items-center gap-2.5 overflow-hidden">
+                {settings?.logo_url ? (
+                  <div className="h-9 max-w-[70px] flex items-center justify-center shrink-0">
+                    <img
+                      src={settings.logo_url}
+                      alt={settings.fantasy_name || 'Logo'}
+                      className="max-h-9 max-w-[70px] object-contain rounded"
+                    />
                   </div>
-                  <span className="text-[9px] font-extrabold text-[#00d2ff] tracking-[0.16em] uppercase mt-1">
-                    BY SMARTLEAN
+                ) : (
+                  <div className="w-9 h-9 rounded-xl bg-[rgba(0,210,255,0.1)] border border-[rgba(0,210,255,0.3)] flex items-center justify-center text-[#00d2ff] shadow-[0_0_15px_rgba(0,210,255,0.25)] transition-transform hover:scale-105 shrink-0">
+                    <Wind className="w-5 h-5" />
+                  </div>
+                )}
+                <div className="flex flex-col truncate min-w-0">
+                  <div className="text-[17px] font-black tracking-[-0.04em] text-white leading-none truncate">
+                    {settings?.fantasy_name || <>NEXUS<span className="text-[#00d2ff]">AIR</span></>}
+                  </div>
+                  <span className="text-[8.5px] font-extrabold text-[#00d2ff] tracking-[0.12em] uppercase mt-1 truncate">
+                    {settings?.company_slogan || 'BY SMARTLEAN'}
                   </span>
                 </div>
               </div>

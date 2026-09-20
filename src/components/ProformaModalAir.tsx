@@ -87,6 +87,7 @@ export function ProformaModalAir({
   const [clientPhone, setClientPhone] = useState('');
   const [proformaFolio, setProformaFolio] = useState(() => `PF-${Math.floor(1000 + Math.random() * 9000)}`);
   const [emissionDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [applyTax, setApplyTax] = useState<boolean>(() => settings?.default_apply_tax !== false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
   const handleSelectCustomer = (id: string) => {
@@ -370,14 +371,14 @@ export function ProformaModalAir({
     : repairItems.reduce((acc, it) => acc + (it.total || 0), 0);
 
   const subTotalDirecto = subtotalEquipos + subtotalInstalacion;
-  const montoIva = Math.round(subTotalDirecto * (taxRatePercent / 100));
+  const montoIva = applyTax ? Math.round(subTotalDirecto * (taxRatePercent / 100)) : 0;
   const precioVentaTotal = subTotalDirecto + montoIva;
 
   const getProformaData = (): ProformaPdfData => {
     const activeCustom = isMultiMaintenance ? maintenanceItems : isRepair ? repairItems : [];
     return {
       folio: proformaFolio,
-      date: emissionDate,
+      date: emissionDate || new Date().toISOString().split('T')[0],
       clientName,
       clientIdNumber,
       clientPhone,
@@ -410,6 +411,7 @@ export function ProformaModalAir({
       taxRate: settings?.tax_rate ?? (isChile ? 0.19 : 0.13),
       taxAmount: montoIva,
       total: precioVentaTotal,
+      applyTax,
     };
   };
 
@@ -479,7 +481,7 @@ export function ProformaModalAir({
         itemsSummary +
         `──────────────────\n` +
         `*Subtotal:* ${formatAirPrice(subTotalDirecto, currencySymbol, countryCode)}\n` +
-        `*IVA (${taxRatePercent}%):* ${formatAirPrice(montoIva, currencySymbol, countryCode)}\n` +
+        `*${settings?.tax_name || 'IVA'} (${applyTax ? `${taxRatePercent}%` : '0% - Exento'}):* ${applyTax ? formatAirPrice(montoIva, currencySymbol, countryCode) : 'Exento (0%)'}\n` +
         `*TOTAL FINAL:* ${formatAirPrice(precioVentaTotal, currencySymbol, countryCode)}\n\n` +
         `📋 *Te adjunto la propuesta oficial (Presiona Ctrl + V para pegarla).*`;
 
@@ -612,6 +614,7 @@ export function ProformaModalAir({
         subtotal: subTotalDirecto,
         tax: montoIva,
         total: precioVentaTotal,
+        apply_tax: applyTax,
         payment_status: 'pendiente',
       });
       toast.success('¡Proforma convertida exitosamente en Orden de Servicio!');
@@ -1321,16 +1324,32 @@ export function ProformaModalAir({
               </div>
             )}
 
-            {/* Financial Totals Summary Card (Exact match with specimen) */}
+            {/* Financial Totals Summary Card (NK-039: IVA Seleccionable) */}
             <div className="flex flex-col sm:flex-row justify-end">
-              <div className="w-full sm:w-80 border border-slate-300 rounded-xl overflow-hidden shadow-xs">
+              <div className="w-full sm:w-88 border border-slate-300 rounded-xl overflow-hidden shadow-xs">
+                <div className="p-2.5 bg-blue-50/70 border-b border-slate-200 flex items-center justify-between text-xs print:hidden">
+                  <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-800 select-none">
+                    <input
+                      type="checkbox"
+                      checked={applyTax}
+                      onChange={(e) => setApplyTax(e.target.checked)}
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <span>Aplicar {settings?.tax_name || 'IVA'} ({taxRatePercent}%)</span>
+                  </label>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${applyTax ? 'bg-blue-100 text-blue-800 border border-blue-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'}`}>
+                    {applyTax ? `Con ${settings?.tax_name || 'IVA'}` : 'Exento (0%)'}
+                  </span>
+                </div>
                 <div className="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center text-xs">
-                  <span className="font-bold text-slate-700 uppercase">Sub Total</span>
+                  <span className="font-bold text-slate-700 uppercase">Sub Total Neto</span>
                   <span className="font-mono font-bold text-slate-900">{formatAirPrice(subTotalDirecto, currencySymbol, countryCode)}</span>
                 </div>
                 <div className="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center text-xs">
-                  <span className="font-bold text-slate-700 uppercase">IVA ({taxRatePercent}% sobre Costo Directo)</span>
-                  <span className="font-mono font-bold text-slate-900">{formatAirPrice(montoIva, currencySymbol, countryCode)}</span>
+                  <span className="font-bold text-slate-700 uppercase">{settings?.tax_name || 'IVA'} ({applyTax ? `${taxRatePercent}%` : '0%'})</span>
+                  <span className="font-mono font-bold text-slate-900">
+                    {applyTax ? formatAirPrice(montoIva, currencySymbol, countryCode) : 'Exento (0%)'}
+                  </span>
                 </div>
                 <div className="p-4 bg-blue-600 text-white flex justify-between items-center text-sm font-black">
                   <span className="uppercase tracking-wide">Precio de Venta Total</span>

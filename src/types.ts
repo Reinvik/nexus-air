@@ -32,6 +32,8 @@ export interface AirEquipment {
   brand: string;
   model: string;
   serial_number?: string;
+  serial_number_evaporator?: string; // NK-040: Serial Evap. / Unidad Interior
+  serial_number_condenser?: string;  // NK-040: Serial Cond. / Unidad Exterior
   btu: number;
   type: EquipmentType;
   technology: 'inverter' | 'on_off';
@@ -95,6 +97,23 @@ export interface HVACInspectionChecklist {
   suction_pressure_psi?: number; // Presión baja PSI
   discharge_pressure_psi?: number; // Presión alta PSI
   amperage_amps?: number; // Consumo eléctrico medido en Amperes
+  // NK-040: Parámetros y mediciones técnicas forma Venefrio
+  serial_evaporator?: string;
+  serial_condenser?: string;
+  work_start_time?: string;
+  work_end_time?: string;
+  amp_initial?: number;
+  amp_final?: number;
+  voltage_initial?: number;
+  voltage_final?: number;
+  psi_low_initial?: number;
+  psi_low_final?: number;
+  psi_high_initial?: number;
+  psi_high_final?: number;
+  capacitance_mfd?: number;
+  technician_signature_name?: string;
+  customer_signature_name?: string;
+  customer_id_document?: string;
   technician_notes?: string;
   photos_before?: string[];
   photos_after?: string[];
@@ -154,8 +173,14 @@ export interface ServiceOrder {
   subtotal: number;
   tax: number;
   total: number;
+  apply_tax?: boolean; // NK-039: IVA Seleccionable
   payment_status: 'pendiente' | 'pagado' | 'abono';
   payment_method?: 'transferencia' | 'efectivo' | 'tarjeta' | 'webpay';
+  payment_reference?: string; // NK-041: N° de Referencia de pago
+  payment_proof_url?: string; // NK-041: Captura o comprobante de pago
+  paid_amount?: number;       // NK-041: Monto pagado
+  payment_date?: string;      // NK-041: Fecha de pago
+  payment_notes?: string;     // NK-041: Notas de cobro
   invoice_number?: string;
   folio?: string;
   created_at: string;
@@ -242,7 +267,13 @@ export interface AirSettings {
   address: string;
   commune: string;
   website: string;
-  maintenance_interval_months: number; // 6 meses
+  city?: string;
+  company_slogan?: string;
+  maintenance_interval_months: number; // 6 meses por defecto
+  quality_control_days?: number; // NK-038: Días para control de calidad (ej: 7 días)
+  inactive_recovery_months?: number; // NK-038: Meses para recuperación de inactivos (ej: 9 meses)
+  pre_expiration_warning_days?: number; // NK-038: Días de aviso de vencimiento (ej: 30 días)
+  default_apply_tax?: boolean; // NK-039: IVA Seleccionable por defecto
   standard_maintenance_price: number;
   standard_installation_price: number;
   whatsapp_template_recaptacion: string;

@@ -20,7 +20,11 @@ import {
   Play,
   Image as ImageIcon,
   ExternalLink,
-  UploadCloud
+  UploadCloud,
+  Clock,
+  PenTool,
+  Hash,
+  ShieldCheck
 } from 'lucide-react';
 import { parseVideoUrl } from '../lib/videoUtils';
 
@@ -63,6 +67,22 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
     suction_pressure_psi: order?.checklist?.suction_pressure_psi ?? 120,
     discharge_pressure_psi: order?.checklist?.discharge_pressure_psi ?? 350,
     amperage_amps: order?.checklist?.amperage_amps ?? 4.5,
+    work_start_time: order?.checklist?.work_start_time || '',
+    work_end_time: order?.checklist?.work_end_time || '',
+    serial_evaporator: order?.checklist?.serial_evaporator || order?.equipment?.serial_number_evaporator || order?.equipment?.serial_number || '',
+    serial_condenser: order?.checklist?.serial_condenser || order?.equipment?.serial_number_condenser || '',
+    amp_initial: order?.checklist?.amp_initial,
+    amp_final: order?.checklist?.amp_final ?? order?.checklist?.amperage_amps,
+    voltage_initial: order?.checklist?.voltage_initial,
+    voltage_final: order?.checklist?.voltage_final,
+    psi_low_initial: order?.checklist?.psi_low_initial,
+    psi_low_final: order?.checklist?.psi_low_final ?? order?.checklist?.suction_pressure_psi,
+    psi_high_initial: order?.checklist?.psi_high_initial,
+    psi_high_final: order?.checklist?.psi_high_final ?? order?.checklist?.discharge_pressure_psi,
+    capacitance_mfd: order?.checklist?.capacitance_mfd,
+    technician_signature_name: order?.checklist?.technician_signature_name || order?.assigned_technician?.name || '',
+    customer_signature_name: order?.checklist?.customer_signature_name || order?.customer?.name || '',
+    customer_id_document: order?.checklist?.customer_id_document || order?.customer?.rut || '',
     technician_notes: order?.checklist?.technician_notes || '',
     photos_before: Array.isArray(order?.checklist?.photos_before) ? order!.checklist.photos_before : [],
     photos_after: Array.isArray(order?.checklist?.photos_after) ? order!.checklist.photos_after : [],
@@ -84,6 +104,22 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
         suction_pressure_psi: order.checklist?.suction_pressure_psi ?? 120,
         discharge_pressure_psi: order.checklist?.discharge_pressure_psi ?? 350,
         amperage_amps: order.checklist?.amperage_amps ?? 4.5,
+        work_start_time: order.checklist?.work_start_time || '',
+        work_end_time: order.checklist?.work_end_time || '',
+        serial_evaporator: order.checklist?.serial_evaporator || order.equipment?.serial_number_evaporator || order.equipment?.serial_number || '',
+        serial_condenser: order.checklist?.serial_condenser || order.equipment?.serial_number_condenser || '',
+        amp_initial: order.checklist?.amp_initial,
+        amp_final: order.checklist?.amp_final ?? order.checklist?.amperage_amps,
+        voltage_initial: order.checklist?.voltage_initial,
+        voltage_final: order.checklist?.voltage_final,
+        psi_low_initial: order.checklist?.psi_low_initial,
+        psi_low_final: order.checklist?.psi_low_final ?? order.checklist?.suction_pressure_psi,
+        psi_high_initial: order.checklist?.psi_high_initial,
+        psi_high_final: order.checklist?.psi_high_final ?? order.checklist?.discharge_pressure_psi,
+        capacitance_mfd: order.checklist?.capacitance_mfd,
+        technician_signature_name: order.checklist?.technician_signature_name || order.assigned_technician?.name || '',
+        customer_signature_name: order.checklist?.customer_signature_name || order.customer?.name || '',
+        customer_id_document: order.checklist?.customer_id_document || order.customer?.rut || '',
         technician_notes: order.checklist?.technician_notes || '',
         photos_before: Array.isArray(order.checklist?.photos_before) ? order.checklist.photos_before : [],
         photos_after: Array.isArray(order.checklist?.photos_after) ? order.checklist.photos_after : [],
@@ -262,6 +298,55 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
             {/* COLUMNA IZQUIERDA: Checklist, Mediciones y Observaciones */}
             <div className="lg:col-span-6 space-y-4">
+              {/* Datos de Servicio y Seriales de Equipo (Forma Venefrio) */}
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-700 flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-cyan-600" />
+                  Horarios y Seriales de Unidad (Forma Venefrio)
+                </h4>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-1">Hora Inicio</label>
+                    <input
+                      type="time"
+                      value={checklist.work_start_time || ''}
+                      onChange={(e) => setChecklist(prev => ({ ...prev, work_start_time: e.target.value }))}
+                      className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 focus:border-cyan-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-1">Hora Término</label>
+                    <input
+                      type="time"
+                      value={checklist.work_end_time || ''}
+                      onChange={(e) => setChecklist(prev => ({ ...prev, work_end_time: e.target.value }))}
+                      className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 focus:border-cyan-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-1">Serial Evap (Int.)</label>
+                    <input
+                      type="text"
+                      placeholder="EVAP-..."
+                      value={checklist.serial_evaporator || ''}
+                      onChange={(e) => setChecklist(prev => ({ ...prev, serial_evaporator: e.target.value }))}
+                      className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 font-mono focus:border-cyan-500 focus:outline-none uppercase"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-1">Serial Cond (Ext.)</label>
+                    <input
+                      type="text"
+                      placeholder="COND-..."
+                      value={checklist.serial_condenser || ''}
+                      onChange={(e) => setChecklist(prev => ({ ...prev, serial_condenser: e.target.value }))}
+                      className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 font-mono focus:border-cyan-500 focus:outline-none uppercase"
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Checklist Protocol */}
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-700 flex items-center gap-2">
@@ -303,19 +388,156 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
                 </div>
               </div>
 
-              {/* Thermodynamic Measurements */}
+              {/* Tabla Comparativa de Mediciones Técnicas (Forma Venefrio) */}
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-700 flex items-center gap-2">
-                  <Gauge className="w-4 h-4 text-cyan-600" />
-                  Medición de Parámetros Termodinámicos y Eléctricos
-                </h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-700 flex items-center gap-2">
+                    <Gauge className="w-4 h-4 text-cyan-600" />
+                    Mediciones Técnicas: Inicio vs Final (Venefrio)
+                  </h4>
+                  <span className="text-[10px] text-slate-500 font-mono">Comparativa</span>
+                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* Delta T */}
-                  <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-2">
+                <div className="overflow-x-auto bg-white rounded-xl border border-slate-200">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-100/75 border-b border-slate-200 text-slate-700 font-bold">
+                      <tr>
+                        <th className="py-2 px-3 text-[10px] uppercase">Parámetro</th>
+                        <th className="py-2 px-3 text-[10px] uppercase text-center w-24">Inicio</th>
+                        <th className="py-2 px-3 text-[10px] uppercase text-center w-24">Final</th>
+                        <th className="py-2 px-2 text-[10px] uppercase text-center w-14">Unidad</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      <tr>
+                        <td className="py-1.5 px-3 font-semibold text-slate-800">Amperaje</td>
+                        <td className="py-1.5 px-2">
+                          <input
+                            type="number"
+                            step="0.1"
+                            placeholder="-"
+                            value={checklist.amp_initial ?? ''}
+                            onChange={(e) => setChecklist(prev => ({ ...prev, amp_initial: parseFloat(e.target.value) || undefined }))}
+                            className="w-full px-2 py-1 text-center bg-slate-50 border border-slate-200 rounded font-mono text-xs focus:bg-white focus:border-cyan-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="py-1.5 px-2">
+                          <input
+                            type="number"
+                            step="0.1"
+                            placeholder="4.5"
+                            value={checklist.amp_final ?? checklist.amperage_amps ?? ''}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || undefined;
+                              setChecklist(prev => ({ ...prev, amp_final: val, amperage_amps: val || 0 }));
+                            }}
+                            className="w-full px-2 py-1 text-center bg-slate-50 border border-slate-200 rounded font-mono text-xs font-bold text-cyan-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="py-1.5 px-2 text-center text-slate-500 font-mono text-[11px]">Amp</td>
+                      </tr>
+                      <tr>
+                        <td className="py-1.5 px-3 font-semibold text-slate-800">Voltaje</td>
+                        <td className="py-1.5 px-2">
+                          <input
+                            type="number"
+                            step="1"
+                            placeholder="-"
+                            value={checklist.voltage_initial ?? ''}
+                            onChange={(e) => setChecklist(prev => ({ ...prev, voltage_initial: parseFloat(e.target.value) || undefined }))}
+                            className="w-full px-2 py-1 text-center bg-slate-50 border border-slate-200 rounded font-mono text-xs focus:bg-white focus:border-cyan-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="py-1.5 px-2">
+                          <input
+                            type="number"
+                            step="1"
+                            placeholder="220"
+                            value={checklist.voltage_final ?? ''}
+                            onChange={(e) => setChecklist(prev => ({ ...prev, voltage_final: parseFloat(e.target.value) || undefined }))}
+                            className="w-full px-2 py-1 text-center bg-slate-50 border border-slate-200 rounded font-mono text-xs font-bold text-cyan-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="py-1.5 px-2 text-center text-slate-500 font-mono text-[11px]">V</td>
+                      </tr>
+                      <tr>
+                        <td className="py-1.5 px-3 font-semibold text-slate-800">Presión Baja</td>
+                        <td className="py-1.5 px-2">
+                          <input
+                            type="number"
+                            step="1"
+                            placeholder="-"
+                            value={checklist.psi_low_initial ?? ''}
+                            onChange={(e) => setChecklist(prev => ({ ...prev, psi_low_initial: parseFloat(e.target.value) || undefined }))}
+                            className="w-full px-2 py-1 text-center bg-slate-50 border border-slate-200 rounded font-mono text-xs focus:bg-white focus:border-cyan-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="py-1.5 px-2">
+                          <input
+                            type="number"
+                            step="1"
+                            placeholder="120"
+                            value={checklist.psi_low_final ?? checklist.suction_pressure_psi ?? ''}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || undefined;
+                              setChecklist(prev => ({ ...prev, psi_low_final: val, suction_pressure_psi: val || 0 }));
+                            }}
+                            className="w-full px-2 py-1 text-center bg-slate-50 border border-slate-200 rounded font-mono text-xs font-bold text-cyan-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="py-1.5 px-2 text-center text-slate-500 font-mono text-[11px]">PSI</td>
+                      </tr>
+                      <tr>
+                        <td className="py-1.5 px-3 font-semibold text-slate-800">Presión Alta</td>
+                        <td className="py-1.5 px-2">
+                          <input
+                            type="number"
+                            step="1"
+                            placeholder="-"
+                            value={checklist.psi_high_initial ?? ''}
+                            onChange={(e) => setChecklist(prev => ({ ...prev, psi_high_initial: parseFloat(e.target.value) || undefined }))}
+                            className="w-full px-2 py-1 text-center bg-slate-50 border border-slate-200 rounded font-mono text-xs focus:bg-white focus:border-cyan-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="py-1.5 px-2">
+                          <input
+                            type="number"
+                            step="1"
+                            placeholder="350"
+                            value={checklist.psi_high_final ?? checklist.discharge_pressure_psi ?? ''}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || undefined;
+                              setChecklist(prev => ({ ...prev, psi_high_final: val, discharge_pressure_psi: val || 0 }));
+                            }}
+                            className="w-full px-2 py-1 text-center bg-slate-50 border border-slate-200 rounded font-mono text-xs font-bold text-cyan-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="py-1.5 px-2 text-center text-slate-500 font-mono text-[11px]">PSI</td>
+                      </tr>
+                      <tr>
+                        <td className="py-1.5 px-3 font-semibold text-slate-800">Capacitancia</td>
+                        <td colSpan={2} className="py-1.5 px-2">
+                          <input
+                            type="number"
+                            step="0.5"
+                            placeholder="Ej: 35"
+                            value={checklist.capacitance_mfd ?? ''}
+                            onChange={(e) => setChecklist(prev => ({ ...prev, capacitance_mfd: parseFloat(e.target.value) || undefined }))}
+                            className="w-full px-2 py-1 text-center bg-slate-50 border border-slate-200 rounded font-mono text-xs focus:bg-white focus:border-cyan-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="py-1.5 px-2 text-center text-slate-500 font-mono text-[11px]">µF</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Delta T */}
+                <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-1.5">
+                  <div className="flex items-center justify-between">
                     <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
                       <Thermometer className="w-3.5 h-3.5 text-cyan-600" />
-                      Salto Térmico ΔT
+                      Salto Térmico ΔT Operacional:
                     </label>
                     <div className="flex items-center gap-1.5">
                       <input
@@ -323,51 +545,13 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
                         step="0.5"
                         value={checklist.delta_t_celsius || ''}
                         onChange={(e) => setChecklist(prev => ({ ...prev, delta_t_celsius: parseFloat(e.target.value) || 0 }))}
-                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
+                        className="w-16 px-2 py-1 bg-slate-50 border border-slate-200 rounded text-center text-xs text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
                       />
                       <span className="text-xs text-slate-500">°C</span>
                     </div>
-                    <div className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${deltaTStatus.color}`}>
-                      {deltaTStatus.text}
-                    </div>
                   </div>
-
-                  {/* Suction Pressure PSI */}
-                  <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-2">
-                    <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
-                      <Gauge className="w-3.5 h-3.5 text-blue-600" />
-                      Presión Succión
-                    </label>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="number"
-                        step="1"
-                        value={checklist.suction_pressure_psi || ''}
-                        onChange={(e) => setChecklist(prev => ({ ...prev, suction_pressure_psi: parseFloat(e.target.value) || 0 }))}
-                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
-                      />
-                      <span className="text-xs text-slate-500">PSI</span>
-                    </div>
-                    <p className="text-[10px] text-slate-500 leading-tight">R410A: 110-130 / R32: 120-135</p>
-                  </div>
-
-                  {/* Amperage */}
-                  <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-2">
-                    <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
-                      <Zap className="w-3.5 h-3.5 text-amber-500" />
-                      Consumo Eléctrico
-                    </label>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={checklist.amperage_amps || ''}
-                        onChange={(e) => setChecklist(prev => ({ ...prev, amperage_amps: parseFloat(e.target.value) || 0 }))}
-                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
-                      />
-                      <span className="text-xs text-slate-500">A</span>
-                    </div>
-                    <p className="text-[10px] text-slate-500 leading-tight">Verificar placa compresor</p>
+                  <div className={`text-[10px] px-2 py-1 rounded border font-medium ${deltaTStatus.color}`}>
+                    {deltaTStatus.text}
                   </div>
                 </div>
               </div>
@@ -378,12 +562,52 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
                   Observaciones del Técnico para el Informe del Cliente:
                 </label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={checklist.technician_notes || ''}
                   onChange={(e) => setChecklist(prev => ({ ...prev, technician_notes: e.target.value }))}
-                  placeholder="Ej: Se realizó prueba de calor y frío. Desagüe libre de sarro. Se recomienda próxima mantención preventiva en 6 meses antes de verano..."
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none leading-relaxed transition-colors"
+                  placeholder="Ej: Se realizó prueba de calor y frío. Desagüe libre de sarro. Se recomienda próxima mantención preventiva en 6 meses..."
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none leading-relaxed transition-colors"
                 />
+              </div>
+
+              {/* Firmas de Conformidad (Venefrio) */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-700 flex items-center gap-2">
+                  <PenTool className="w-4 h-4 text-cyan-600" />
+                  Firmas y Conformidad Técnica
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-1">Nombre / Firma Técnico</label>
+                    <input
+                      type="text"
+                      placeholder="Nombre del técnico"
+                      value={checklist.technician_signature_name || ''}
+                      onChange={(e) => setChecklist(prev => ({ ...prev, technician_signature_name: e.target.value }))}
+                      className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 focus:border-cyan-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-1">Nombre Cliente Receptor</label>
+                    <input
+                      type="text"
+                      placeholder="Quién recibe en domicilio"
+                      value={checklist.customer_signature_name || ''}
+                      onChange={(e) => setChecklist(prev => ({ ...prev, customer_signature_name: e.target.value }))}
+                      className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 focus:border-cyan-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-1">Cédula / RUT Receptor</label>
+                    <input
+                      type="text"
+                      placeholder="RUT / DNI"
+                      value={checklist.customer_id_document || ''}
+                      onChange={(e) => setChecklist(prev => ({ ...prev, customer_id_document: e.target.value }))}
+                      className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 font-mono focus:border-cyan-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 

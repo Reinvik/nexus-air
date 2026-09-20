@@ -73,6 +73,8 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
   const [eqBrand, setEqBrand] = useState('Anwo');
   const [eqModel, setEqModel] = useState('Inverter Eco 12k');
   const [eqSerial, setEqSerial] = useState('');
+  const [eqSerialEvap, setEqSerialEvap] = useState('');
+  const [eqSerialCond, setEqSerialCond] = useState('');
   const [eqBtu, setEqBtu] = useState(12000);
   const [eqType, setEqType] = useState<EquipmentType>('split_muro');
   const [eqTech, setEqTech] = useState<'inverter' | 'on_off'>('inverter');
@@ -261,6 +263,8 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
       brand: eqBrand,
       model: eqModel,
       serial_number: eqSerial.trim() || undefined,
+      serial_number_evaporator: eqSerialEvap.trim() || undefined,
+      serial_number_condenser: eqSerialCond.trim() || undefined,
       btu: eqBtu,
       type: eqType,
       technology: eqTech,
@@ -270,6 +274,8 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
     });
 
     setEqSerial('');
+    setEqSerialEvap('');
+    setEqSerialCond('');
     setIsAddEqModalOpen(false);
   };
 
@@ -616,7 +622,14 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
                                         <div className="text-[10px] font-mono text-cyan-700 font-bold">
                                           S/N: {eq.serial_number}
                                         </div>
-                                      ) : (
+                                      ) : null}
+                                      {(eq.serial_number_evaporator || eq.serial_number_condenser) && (
+                                        <div className="text-[9px] font-mono text-slate-600 flex items-center gap-1.5 flex-wrap">
+                                          {eq.serial_number_evaporator && <span>Evap: <b className="text-cyan-800">{eq.serial_number_evaporator}</b></span>}
+                                          {eq.serial_number_condenser && <span>Cond: <b className="text-cyan-800">{eq.serial_number_condenser}</b></span>}
+                                        </div>
+                                      )}
+                                      {!eq.serial_number && !eq.serial_number_evaporator && !eq.serial_number_condenser && (
                                         <div className="text-[10px] text-slate-400">Sin serial asignado</div>
                                       )}
                                     </div>
@@ -684,6 +697,20 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
                             <div className="text-[11px] text-cyan-800 font-mono font-bold flex items-center gap-1.5 pt-0.5">
                               <span className="text-slate-500 font-sans font-medium">Serial / Serie:</span>
                               <span className="bg-cyan-50 text-cyan-700 px-1.5 py-0.5 rounded border border-cyan-200">{eq.serial_number}</span>
+                            </div>
+                          )}
+                          {(eq.serial_number_evaporator || eq.serial_number_condenser) && (
+                            <div className="text-[11px] font-mono flex items-center gap-2 pt-0.5 flex-wrap">
+                              {eq.serial_number_evaporator && (
+                                <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
+                                  Evap: <b className="text-cyan-700">{eq.serial_number_evaporator}</b>
+                                </span>
+                              )}
+                              {eq.serial_number_condenser && (
+                                <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
+                                  Cond: <b className="text-cyan-700">{eq.serial_number_condenser}</b>
+                                </span>
+                              )}
                             </div>
                           )}
                         </div>
@@ -898,12 +925,36 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="text-slate-700 font-medium">N° de Serial / Serie</label>
+                  <label className="text-slate-700 font-medium">Serial General</label>
                   <input
                     type="text"
                     value={eqSerial}
                     placeholder="Ej: SN-2026-X88392"
                     onChange={(e) => setEqSerial(e.target.value)}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 mt-1 font-mono uppercase"
+                  />
+                </div>
+              </div>
+
+              {/* Dual Serials Venefrio */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-slate-700 font-medium">Serial Evap (Interior)</label>
+                  <input
+                    type="text"
+                    value={eqSerialEvap}
+                    placeholder="Ej: EVAP-99238"
+                    onChange={(e) => setEqSerialEvap(e.target.value)}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 mt-1 font-mono uppercase"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-700 font-medium">Serial Cond (Exterior)</label>
+                  <input
+                    type="text"
+                    value={eqSerialCond}
+                    placeholder="Ej: COND-44102"
+                    onChange={(e) => setEqSerialCond(e.target.value)}
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 mt-1 font-mono uppercase"
                   />
                 </div>

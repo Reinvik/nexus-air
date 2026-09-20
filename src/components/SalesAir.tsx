@@ -13,8 +13,14 @@ import {
   Clock,
   BarChart3,
   CalendarDays,
-  X
+  X,
+  Upload,
+  Receipt,
+  FileCheck2,
+  Trash2,
+  Image as ImageIcon
 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { 
   format, 
   isToday, 
@@ -34,12 +40,13 @@ import { es } from 'date-fns/locale';
 interface SalesAirProps {
   orders: ServiceOrder[];
   settings?: AirSettings;
+  onUpdateOrder?: (orderId: string, updates: Partial<ServiceOrder>) => void;
 }
 
 type DatePreset = 'all' | 'today' | 'yesterday' | 'this_week' | 'last_week' | 'this_month' | 'last_30_days' | 'custom';
 type ProgressViewMode = 'weekly' | 'daily';
 
-export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings }) => {
+export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings, onUpdateOrder }) => {
   const currencySymbol = settings?.currency_symbol || '₡';
   const countryCode = settings?.country_code || 'CR';
 
@@ -48,6 +55,58 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings }) => {
   const [customStartDate, setCustomStartDate] = useState<string>(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [customEndDate, setCustomEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [progressViewMode, setProgressViewMode] = useState<ProgressViewMode>('weekly');
+
+  // Payment Confirmation & Collection State (NK-041)
+  const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<ServiceOrder | null>(null);
+  const [payStatus, setPayStatus] = useState<'pendiente' | 'pagado' | 'abono'>('pagado');
+  const [payAmount, setPayAmount] = useState<number>(0);
+  const [payMethod, setPayMethod] = useState<ServiceOrder['payment_method']>('transferencia');
+  const [payReference, setPayReference] = useState('');
+  const [payDate, setPayDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [payNotes, setPayNotes] = useState('');
+  const [payProofUrl, setPayProofUrl] = useState('');
+
+  const handleOpenPaymentModal = (order: ServiceOrder) => {
+    setSelectedOrderForPayment(order);
+    setPayStatus(order.payment_status || 'pagado');
+    setPayAmount(order.paid_amount !== undefined ? order.paid_amount : order.total);
+    setPayMethod(order.payment_method || 'transferencia');
+    setPayReference(order.payment_reference || '');
+    setPayDate(order.payment_date || format(new Date(), 'yyyy-MM-dd'));
+    setPayNotes(order.payment_notes || '');
+    setPayProofUrl(order.payment_proof_url || '');
+  };
+
+  const handleSavePayment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedOrderForPayment) return;
+
+    if (onUpdateOrder) {
+      onUpdateOrder(selectedOrderForPayment.id, {
+        payment_status: payStatus,
+        paid_amount: payAmount,
+        payment_method: payMethod,
+        payment_reference: payReference.trim(),
+        payment_date: payDate,
+        payment_notes: payNotes.trim(),
+        payment_proof_url: payProofUrl.trim() || undefined,
+      });
+    }
+
+    toast.success(`Cobro de orden ${selectedOrderForPayment.ticket_number} guardado`);
+    setSelectedOrderForPayment(null);
+  };
+
+  const handleProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const b64 = event.target?.result as string;
+      setPayProofUrl(b64);
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Helper para parsear la fecha de una orden (scheduled_date o created_at)
   const parseOrderDate = (order: ServiceOrder): Date | null => {
@@ -773,12 +832,13 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings }) => {
                 <th className="py-3 px-4">Estado Orden</th>
                 <th className="py-3 px-4">Estado Pago</th>
                 <th className="py-3 px-4 text-right">Total Facturado</th>
+                <th className="py-3 px-4 text-center">Gestión Cobro</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-xs text-slate-400">
+                  <td colSpan={8} className="py-8 text-center text-xs text-slate-400">
                     No se encontraron órdenes para el rango de fechas seleccionado.
                   </td>
                 </tr>
@@ -807,16 +867,45 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings }) => {
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold capitalize ${
-                          o.payment_status === 'pagado' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                          o.payment_status === 'abono' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                          'bg-amber-50 text-amber-800 border border-amber-200'
-                        }`}>
-                          {o.payment_status}
-                        </span>
+                        <div className="space-y-0.5">
+                          <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold capitalize ${
+                            o.payment_status === 'pagado' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                            o.payment_status === 'abono' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                            'bg-amber-50 text-amber-800 border border-amber-200'
+                          }`}>
+                            {o.payment_status}
+                          </span>
+                          {o.payment_reference && (
+                            <div className="text-[9px] font-mono text-slate-500 font-medium truncate max-w-[120px]" title={o.payment_reference}>
+                              Ref: {o.payment_reference}
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className={`py-3 px-4 text-right font-mono font-black text-sm ${isCanceled ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
                         {formatAirPrice(o.total, currencySymbol, countryCode)}
+                        {o.payment_status === 'abono' && o.paid_amount !== undefined && (
+                          <div className="text-[10px] text-emerald-700 font-medium">
+                            Abonado: {formatAirPrice(o.paid_amount, currencySymbol, countryCode)}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenPaymentModal(o)}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer ${
+                            o.payment_status === 'pagado'
+                              ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                              : o.payment_status === 'abono'
+                              ? 'bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200'
+                              : 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/20'
+                          }`}
+                          title="Gestionar estado de pago, número de comprobante o referencia y voucher"
+                        >
+                          <CreditCard className="w-3.5 h-3.5" />
+                          <span>{o.payment_status === 'pagado' ? 'Ver Pago' : 'Registrar Cobro'}</span>
+                        </button>
                       </td>
                     </tr>
                   );
@@ -826,6 +915,226 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings }) => {
           </table>
         </div>
       </div>
+
+      {/* Modal de Confirmación y Gestión de Cobro (NK-041) */}
+      {selectedOrderForPayment && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedOrderForPayment(null);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 space-y-4 my-auto cursor-default text-slate-900"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
+                    Confirmación de Pago
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200 font-mono font-bold">
+                      {selectedOrderForPayment.ticket_number}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Cliente: <strong className="text-slate-700">{selectedOrderForPayment.customer?.name}</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedOrderForPayment(null)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Resumen del Monto */}
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+              <div>
+                <span className="text-[11px] text-slate-500 font-medium block">Total del Servicio:</span>
+                <span className="font-mono font-black text-base text-slate-900">
+                  {formatAirPrice(selectedOrderForPayment.total, currencySymbol, countryCode)}
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="text-[11px] text-slate-500 font-medium block">Estado Actual:</span>
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                  selectedOrderForPayment.payment_status === 'pagado' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                  selectedOrderForPayment.payment_status === 'abono' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                  'bg-amber-50 text-amber-800 border border-amber-200'
+                }`}>
+                  {selectedOrderForPayment.payment_status}
+                </span>
+              </div>
+            </div>
+
+            <form onSubmit={handleSavePayment} className="space-y-3.5 text-xs">
+              {/* Estado de Pago */}
+              <div>
+                <label className="text-slate-700 font-bold block mb-1.5">Nuevo Estado de Pago:</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'pagado', label: 'Pagado Total', color: 'peer-checked:bg-emerald-600 peer-checked:text-white peer-checked:border-emerald-600' },
+                    { id: 'abono', label: 'Abono Parcial', color: 'peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600' },
+                    { id: 'pendiente', label: 'Pendiente', color: 'peer-checked:bg-amber-500 peer-checked:text-white peer-checked:border-amber-500' },
+                  ].map((st) => (
+                    <label key={st.id} className="relative cursor-pointer">
+                      <input
+                        type="radio"
+                        name="payStatus"
+                        value={st.id}
+                        checked={payStatus === st.id}
+                        onChange={(e) => {
+                          const val = e.target.value as any;
+                          setPayStatus(val);
+                          if (val === 'pagado') {
+                            setPayAmount(selectedOrderForPayment.total);
+                          }
+                        }}
+                        className="sr-only peer"
+                      />
+                      <div className={`p-2 rounded-xl border border-slate-200 text-center font-bold text-xs transition-all bg-white text-slate-700 hover:bg-slate-50 shadow-2xs ${st.color}`}>
+                        {st.label}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Monto y Método */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-700 font-semibold block mb-1">Monto Cobrado / Abono:</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 font-bold text-slate-400">{currencySymbol}</span>
+                    <input
+                      type="number"
+                      value={payAmount}
+                      onChange={(e) => setPayAmount(parseFloat(e.target.value) || 0)}
+                      className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-slate-700 font-semibold block mb-1">Método de Pago:</label>
+                  <select
+                    value={payMethod}
+                    onChange={(e) => setPayMethod(e.target.value as any)}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium focus:bg-white focus:border-cyan-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value="transferencia">Transferencia Bancaria</option>
+                    <option value="efectivo">Efectivo</option>
+                    <option value="tarjeta_debito">Tarjeta de Débito (POS)</option>
+                    <option value="tarjeta_credito">Tarjeta de Crédito</option>
+                    <option value="sinpe_movil">SINPE Móvil / Pago Móvil</option>
+                    <option value="cheque">Cheque</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Referencia y Fecha */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-700 font-semibold block mb-1">N° Transacción / Referencia:</label>
+                  <input
+                    type="text"
+                    placeholder="Ej: TR-994182 o N° Operación"
+                    value={payReference}
+                    onChange={(e) => setPayReference(e.target.value)}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:border-cyan-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-700 font-semibold block mb-1">Fecha de Pago:</label>
+                  <input
+                    type="date"
+                    value={payDate}
+                    onChange={(e) => setPayDate(e.target.value)}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:border-cyan-500 focus:outline-none"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Comprobante / Voucher (NK-041) */}
+              <div>
+                <label className="text-slate-700 font-semibold block mb-1">Comprobante de Pago / Voucher (Captura):</label>
+                {payProofUrl ? (
+                  <div className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <img src={payProofUrl} alt="Comprobante" className="w-12 h-12 object-cover rounded-lg border border-slate-200" />
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-800 block">Comprobante adjuntado</span>
+                        <a href={payProofUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-cyan-600 hover:underline">
+                          Ver imagen completa
+                        </a>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPayProofUrl('')}
+                      className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 transition-colors"
+                      title="Eliminar comprobante"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="border border-dashed border-slate-300 hover:border-cyan-500 rounded-xl p-3 flex flex-col items-center justify-center gap-1 cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                    <Upload className="w-5 h-5 text-slate-400" />
+                    <span className="text-xs font-semibold text-slate-700">Subir foto o captura del comprobante</span>
+                    <span className="text-[10px] text-slate-400">JPG, PNG o WebP hasta 5MB</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleProofUpload}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+              </div>
+
+              {/* Notas de Pago */}
+              <div>
+                <label className="text-slate-700 font-semibold block mb-1">Notas u Observaciones del Cobro:</label>
+                <textarea
+                  rows={2}
+                  value={payNotes}
+                  onChange={(e) => setPayNotes(e.target.value)}
+                  placeholder="Ej: Cliente canceló vía transferencia BCI. Comprobante validado por contabilidad..."
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 leading-relaxed focus:bg-white focus:border-cyan-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="pt-3 flex justify-end gap-2.5 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setSelectedOrderForPayment(null)}
+                  className="px-4 py-2 rounded-xl text-slate-500 hover:text-slate-800 text-xs font-semibold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+                >
+                  <FileCheck2 className="w-4 h-4" />
+                  <span>Guardar Confirmación de Pago</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

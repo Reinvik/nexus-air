@@ -21,7 +21,9 @@ import {
   Users,
   Copy,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  Settings as SettingsIcon,
+  X
 } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { toast } from 'react-hot-toast';
@@ -35,6 +37,7 @@ interface RecaptacionSemestralProps {
   onMarkContacted: (equipmentId: string) => void;
   onScheduleService: (reminder: RecaptacionReminder) => void;
   generateWhatsAppUrl: (reminder: RecaptacionReminder) => string;
+  onUpdateSettings?: (updates: Partial<AirSettings>) => void;
 }
 
 export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
@@ -44,6 +47,7 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
   onMarkContacted,
   onScheduleService,
   generateWhatsAppUrl,
+  onUpdateSettings,
 }) => {
   const [activeTab, setActiveTab] = useState<RecaptacionTab>('preventive');
   const [filterStatus, setFilterStatus] = useState<'all' | 'vencido' | 'por_vencer' | 'contactado'>('all');
@@ -51,23 +55,49 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
 
   const currencySymbol = settings.currency_symbol || '₡';
 
-  // Clasificación por ciclo de vida (Lógica multietapa como en Nexus Garage)
+  // Timing Config Modal State (NK-038)
+  const [isTimingModalOpen, setIsTimingModalOpen] = useState(false);
+  const [timingIntervalMonths, setTimingIntervalMonths] = useState<number>(settings.maintenance_interval_months || 6);
+  const [timingQualityDays, setTimingQualityDays] = useState<number>(settings.quality_control_days || 7);
+  const [timingRecoveryMonths, setTimingRecoveryMonths] = useState<number>(settings.inactive_recovery_months || 9);
+  const [timingPreWarningDays, setTimingPreWarningDays] = useState<number>(settings.pre_expiration_warning_days || 15);
+
+  const handleSaveTiming = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (onUpdateSettings) {
+      onUpdateSettings({
+        maintenance_interval_months: timingIntervalMonths,
+        quality_control_days: timingQualityDays,
+        inactive_recovery_months: timingRecoveryMonths,
+        pre_expiration_warning_days: timingPreWarningDays,
+      });
+    }
+    toast.success('Plazos de recaptación actualizados correctamente');
+    setIsTimingModalOpen(false);
+  };
+
+  // Clasificación por ciclo de vida (Lógica multietapa dinámica NK-038)
   const categorized = useMemo(() => {
-    // 1. Preventivos: ciclo normal de 6 meses (180 días)
+    const intervalMonths = settings.maintenance_interval_months || 6;
+    const intervalDays = intervalMonths * 30;
+    const qualityDays = settings.quality_control_days || 7;
+    const recoveryMonths = settings.inactive_recovery_months || 9;
+    const recoveryThresholdDays = Math.max(30, (recoveryMonths * 30) - intervalDays);
+
+    // 1. Preventivos: ciclo normal según intervalo configurado
     const preventiveList = reminders.filter(r => {
-      // Vencidos hace menos de 90 días o por vencer
-      return r.days_until_due >= -90 && r.days_until_due <= 60;
+      return r.days_until_due >= -recoveryThresholdDays && r.days_until_due <= 60;
     });
 
-    // 2. Control de Calidad: servicios completados recientemente (últimos 3 a 20 días)
+    // 2. Control de Calidad: servicios completados recientemente (primeros días post servicio)
     const qualityList = reminders.filter(r => {
-      const daysSinceService = 180 - r.days_until_due;
-      return daysSinceService >= 2 && daysSinceService <= 25;
+      const daysSinceService = intervalDays - r.days_until_due;
+      return daysSinceService >= 1 && daysSinceService <= (qualityDays * 2);
     });
 
-    // 3. Recuperación: clientes inactivos con más de 270 días (9 meses+) o vencidos hace >90 días
+    // 3. Recuperación: clientes inactivos con más de los meses configurados
     const recoveryList = reminders.filter(r => {
-      return r.days_until_due < -90;
+      return r.days_until_due < -recoveryThresholdDays;
     });
 
     return {
@@ -75,7 +105,7 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
       quality: qualityList.length > 0 ? qualityList : reminders.slice(0, 3), // Fallback para demostración fluida
       recovery: recoveryList.length > 0 ? recoveryList : reminders.filter(r => r.status === 'vencido'),
     };
-  }, [reminders]);
+  }, [reminders, settings.maintenance_interval_months, settings.quality_control_days, settings.inactive_recovery_months]);
 
   // Lista activa según pestaña
   const currentList = useMemo(() => {
@@ -136,8 +166,9 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
         `¿Está enfriando a la perfección? ¿Quedó todo en orden con la visita del técnico? Queremos asegurarnos de que tu experiencia haya sido de 5 estrellas ⭐️⭐️⭐️⭐️⭐️.\n\n` +
         `¡Quedamos atentos a cualquier consulta!`;
     } else if (stage === 'recovery') {
+      const recMonths = settings.inactive_recovery_months || 9;
       text = `Hola ${reminder.customer_name}, te escribimos de *${companyName}* ❄️\n\n` +
-        `Revisando nuestros registros notamos que tu aire acondicionado *${reminder.equipment_brand}* lleva más de 9 meses sin su mantenimiento periódico.\n\n` +
+        `Revisando nuestros registros notamos que tu aire acondicionado *${reminder.equipment_brand}* lleva más de ${recMonths} meses sin su mantenimiento periódico.\n\n` +
         `Para evitar acumulación de hongos, malos olores y un aumento en el consumo eléctrico antes de la temporada, tenemos un *15% de descuento especial* en tu limpieza profunda de filtros y serpentín durante esta semana.\n\n` +
         `¿Te gustaría que coordinemos una visita técnica para tu comodidad?`;
     } else {
@@ -198,7 +229,7 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
           }`}
         >
           <ShieldCheck className="w-4 h-4 text-cyan-600" />
-          <span>1. Mantenimiento Preventivo (Semestral)</span>
+          <span>1. Mantenimiento Preventivo ({settings.maintenance_interval_months || 6}M)</span>
           <span className="px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-800 text-[10px] font-mono">
             {stats.totalPreventive}
           </span>
@@ -214,7 +245,7 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
           }`}
         >
           <Star className="w-4 h-4 text-amber-500" />
-          <span>2. Control de Calidad (Post-Servicio 3-14D)</span>
+          <span>2. Control de Calidad ({settings.quality_control_days || 7}D)</span>
           <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-mono">
             {stats.totalQuality}
           </span>
@@ -230,10 +261,26 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
           }`}
         >
           <RotateCcw className="w-4 h-4 text-rose-500" />
-          <span>3. Recuperación de Inactivos (&gt;9M)</span>
+          <span>3. Recuperación de Inactivos (&gt;{settings.inactive_recovery_months || 9}M)</span>
           <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-mono">
             {stats.totalRecovery}
           </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setTimingIntervalMonths(settings.maintenance_interval_months || 6);
+            setTimingQualityDays(settings.quality_control_days || 7);
+            setTimingRecoveryMonths(settings.inactive_recovery_months || 9);
+            setTimingPreWarningDays(settings.pre_expiration_warning_days || 15);
+            setIsTimingModalOpen(true);
+          }}
+          className="px-3.5 py-3 rounded-xl bg-white border border-slate-200 text-slate-700 hover:text-cyan-700 hover:border-cyan-300 text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center gap-1.5 shrink-0"
+          title="Configurar plazos y tiempos de recaptación"
+        >
+          <SettingsIcon className="w-4 h-4 text-cyan-600" />
+          <span>Configurar Plazos</span>
         </button>
       </div>
 
@@ -576,6 +623,139 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Modal Configuración de Tiempos de Recaptación (NK-038) */}
+      {isTimingModalOpen && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsTimingModalOpen(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 space-y-4 my-auto cursor-default text-slate-900"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-cyan-50 border border-cyan-200 text-cyan-600 flex items-center justify-center">
+                  <SettingsIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900">Configurar Tiempos de Recaptación</h3>
+                  <p className="text-xs text-slate-400">Personaliza los intervalos de recordatorio automático</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTimingModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveTiming} className="space-y-3.5 text-xs">
+              <div>
+                <label className="text-slate-700 font-bold block mb-1">
+                  1. Mantenimiento Preventivo Periódico (Meses):
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={24}
+                    value={timingIntervalMonths}
+                    onChange={(e) => setTimingIntervalMonths(parseInt(e.target.value) || 6)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
+                    required
+                  />
+                  <span className="text-slate-500 font-semibold shrink-0">meses</span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Estándar HVAC recomendado: 6 meses (semestral).
+                </p>
+              </div>
+
+              <div>
+                <label className="text-slate-700 font-bold block mb-1">
+                  2. Control de Calidad Post-Servicio (Días):
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={timingQualityDays}
+                    onChange={(e) => setTimingQualityDays(parseInt(e.target.value) || 7)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
+                    required
+                  />
+                  <span className="text-slate-500 font-semibold shrink-0">días</span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Tiempo posterior al servicio para enviar encuesta de satisfacción (rango típico: 3-14 días).
+                </p>
+              </div>
+
+              <div>
+                <label className="text-slate-700 font-bold block mb-1">
+                  3. Umbral de Recuperación de Inactivos (Meses):
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={6}
+                    max={36}
+                    value={timingRecoveryMonths}
+                    onChange={(e) => setTimingRecoveryMonths(parseInt(e.target.value) || 9)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
+                    required
+                  />
+                  <span className="text-slate-500 font-semibold shrink-0">meses</span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Clientes sin servicio posterior a este plazo son clasificados para campañas de reactivación.
+                </p>
+              </div>
+
+              <div>
+                <label className="text-slate-700 font-bold block mb-1">
+                  4. Anticipación de Alerta "Por Vencer" (Días):
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={60}
+                    value={timingPreWarningDays}
+                    onChange={(e) => setTimingPreWarningDays(parseInt(e.target.value) || 15)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
+                    required
+                  />
+                  <span className="text-slate-500 font-semibold shrink-0">días antes</span>
+                </div>
+              </div>
+
+              <div className="pt-3 flex justify-end gap-2.5 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsTimingModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-slate-500 hover:text-slate-800 text-xs font-semibold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#00d2ff] to-[#2563eb] hover:from-[#38bdf8] hover:to-[#1d4ed8] text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+                >
+                  Guardar Plazos
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

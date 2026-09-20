@@ -11,7 +11,10 @@ import {
   Check, 
   Receipt,
   Sparkles,
-  Percent
+  Percent,
+  Upload,
+  Trash2,
+  Image as ImageIcon
 } from 'lucide-react';
 import { LATIN_AMERICAN_COUNTRIES, findCountry, LatinCountry } from '../lib/countries';
 import { toast } from 'react-hot-toast';
@@ -37,6 +40,13 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
     tax_rate: settings.tax_rate !== undefined ? settings.tax_rate : 0.19,
     tax_name: settings.tax_name || 'IVA',
     division_label: settings.division_label || 'Comuna',
+    city: settings.city || 'Santiago',
+    company_slogan: settings.company_slogan || 'Especialistas en Climatización y Refrigeración',
+    default_apply_tax: settings.default_apply_tax !== false,
+    quality_control_days: settings.quality_control_days || 7,
+    inactive_recovery_months: settings.inactive_recovery_months || 9,
+    pre_expiration_warning_days: settings.pre_expiration_warning_days || 15,
+    logo_url: settings.logo_url || '',
   });
 
   useEffect(() => {
@@ -50,8 +60,27 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
       tax_rate: settings.tax_rate !== undefined ? settings.tax_rate : 0.19,
       tax_name: settings.tax_name || 'IVA',
       division_label: settings.division_label || 'Comuna',
+      city: settings.city || 'Santiago',
+      company_slogan: settings.company_slogan || 'Especialistas en Climatización y Refrigeración',
+      default_apply_tax: settings.default_apply_tax !== false,
+      quality_control_days: settings.quality_control_days || 7,
+      inactive_recovery_months: settings.inactive_recovery_months || 9,
+      pre_expiration_warning_days: settings.pre_expiration_warning_days || 15,
+      logo_url: settings.logo_url || '',
     });
   }, [settings]);
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const b64 = event.target?.result as string;
+      setFormData(prev => ({ ...prev, logo_url: b64 }));
+      toast.success('Logo cargado correctamente. Guarda los cambios para aplicar.');
+    };
+    reader.readAsDataURL(file);
+  };
 
   const selectedCountry = findCountry(formData.country_code || formData.country);
 
@@ -282,6 +311,53 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
             Identidad Corporativa de la Empresa
           </h3>
 
+          {/* Logo Corporativo (NK-042) */}
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+            <label className="text-slate-700 font-bold block text-xs">
+              Logotipo Oficial de la Empresa (Se refleja en proformas, comprobantes y barra lateral)
+            </label>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              {formData.logo_url ? (
+                <div className="relative group p-2 bg-white rounded-xl border border-slate-200 shadow-xs flex items-center justify-center min-w-[120px] max-h-24">
+                  <img
+                    src={formData.logo_url}
+                    alt="Logo Empresa"
+                    className="max-h-20 max-w-[180px] object-contain"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, logo_url: '' }))}
+                    className="absolute top-1 right-1 p-1 rounded bg-rose-600 text-white hover:bg-rose-700 shadow-xs cursor-pointer"
+                    title="Eliminar logo"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="w-24 h-24 rounded-xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 bg-white">
+                  <ImageIcon className="w-8 h-8 stroke-1" />
+                  <span className="text-[9px] font-medium mt-1">Sin logo</span>
+                </div>
+              )}
+
+              <div className="space-y-2 flex-1">
+                <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-300 hover:border-cyan-500 hover:bg-cyan-50/50 text-slate-700 hover:text-cyan-700 font-bold text-xs cursor-pointer transition-all shadow-2xs">
+                  <Upload className="w-4 h-4 text-cyan-600" />
+                  <span>Subir Imagen de Logotipo (PNG, JPG, SVG)</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                  />
+                </label>
+                <p className="text-[11px] text-slate-400">
+                  Recomendado: Imagen con fondo transparente (PNG/SVG) de aprox. 400x120px.
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
               <label className="text-slate-700 font-semibold block mb-1">Razón Social</label>
@@ -302,6 +378,17 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
                 onChange={(e) => setFormData(prev => ({ ...prev, fantasy_name: e.target.value }))}
                 className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
                 required
+              />
+            </div>
+
+            <div>
+              <label className="text-slate-700 font-semibold block mb-1">Slogan Corporativo</label>
+              <input
+                type="text"
+                value={formData.company_slogan || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, company_slogan: e.target.value }))}
+                placeholder="Ej: Especialistas en Climatización y Refrigeración"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
               />
             </div>
 
@@ -360,6 +447,37 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
                 className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
               />
             </div>
+
+            <div>
+              <label className="text-slate-700 font-semibold block mb-1">Ciudad de Operación</label>
+              <input
+                type="text"
+                value={formData.city || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                placeholder="Ej: Santiago, San José, Lima"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
+              />
+            </div>
+
+            {/* Toggle IVA por defecto (NK-039) */}
+            <div className="sm:col-span-2 pt-3 border-t border-slate-100">
+              <label className="flex items-start gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={formData.default_apply_tax !== false}
+                  onChange={(e) => setFormData(prev => ({ ...prev, default_apply_tax: e.target.checked }))}
+                  className="w-4 h-4 text-cyan-600 rounded border-slate-300 focus:ring-cyan-500 cursor-pointer mt-0.5"
+                />
+                <div>
+                  <span className="text-xs font-bold text-slate-800">
+                    Aplicar {formData.tax_name} ({Math.round((formData.tax_rate ?? 0.19) * 100)}%) por defecto en cotizaciones y proformas
+                  </span>
+                  <span className="block text-[11px] text-slate-400 leading-relaxed">
+                    Al desmarcar esta opción, todas las cotizaciones y proformas se generarán como exentas (0%) por omisión, permitiendo activarlo manualmente cuando aplique.
+                  </span>
+                </div>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -368,7 +486,7 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
               <DollarSign className="w-4 h-4 text-emerald-600" />
-              Tarifas Base & Ciclo Semestral de Recaptación
+              Tarifas Base & Ciclos de Recaptación y Fidelización (NK-038)
             </h3>
             <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200">
               Moneda: {formData.currency_symbol || '$'} {formData.currency_code || 'CLP'}
@@ -377,14 +495,51 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div>
-              <label className="text-slate-700 font-semibold block mb-1">Intervalo Mantención (Meses)</label>
-              <input
-                type="number"
-                value={formData.maintenance_interval_months}
-                onChange={(e) => setFormData(prev => ({ ...prev, maintenance_interval_months: parseInt(e.target.value) || 6 }))}
-                className="w-full p-2.5 bg-cyan-50 border border-cyan-300 rounded-xl text-cyan-900 font-mono font-bold focus:outline-none"
-              />
-              <span className="text-[10px] text-slate-400 mt-1 block">Fórmula HVAC: 6 meses (180 días)</span>
+              <label className="text-slate-700 font-semibold block mb-1">Intervalo Mantención Preventiva</label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  min={1}
+                  max={24}
+                  value={formData.maintenance_interval_months}
+                  onChange={(e) => setFormData(prev => ({ ...prev, maintenance_interval_months: parseInt(e.target.value) || 6 }))}
+                  className="w-full p-2.5 bg-cyan-50 border border-cyan-300 rounded-xl text-cyan-900 font-mono font-bold focus:outline-none"
+                />
+                <span className="text-slate-500 font-medium">meses</span>
+              </div>
+              <span className="text-[10px] text-slate-400 mt-1 block">Fórmula HVAC estándar: 6 meses</span>
+            </div>
+
+            <div>
+              <label className="text-slate-700 font-semibold block mb-1">Control de Calidad Post-Servicio</label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={formData.quality_control_days || 7}
+                  onChange={(e) => setFormData(prev => ({ ...prev, quality_control_days: parseInt(e.target.value) || 7 }))}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
+                />
+                <span className="text-slate-500 font-medium">días</span>
+              </div>
+              <span className="text-[10px] text-slate-400 mt-1 block">Encuesta de satisfacción (3-14 días)</span>
+            </div>
+
+            <div>
+              <label className="text-slate-700 font-semibold block mb-1">Recuperación de Inactivos</label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  min={6}
+                  max={36}
+                  value={formData.inactive_recovery_months || 9}
+                  onChange={(e) => setFormData(prev => ({ ...prev, inactive_recovery_months: parseInt(e.target.value) || 9 }))}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
+                />
+                <span className="text-slate-500 font-medium">meses</span>
+              </div>
+              <span className="text-[10px] text-slate-400 mt-1 block">Campaña de descuento reactivación</span>
             </div>
 
             <div>
@@ -415,6 +570,22 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
               <span className="text-[10px] text-slate-400 mt-1 block">
                 + {formData.tax_name} ({Math.round((formData.tax_rate ?? 0.19) * 100)}%): {formData.currency_symbol} {Math.round(formData.standard_installation_price * (1 + (formData.tax_rate ?? 0.19)))}
               </span>
+            </div>
+
+            <div>
+              <label className="text-slate-700 font-semibold block mb-1">Anticipación Alerta "Por Vencer"</label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={formData.pre_expiration_warning_days || 15}
+                  onChange={(e) => setFormData(prev => ({ ...prev, pre_expiration_warning_days: parseInt(e.target.value) || 15 }))}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
+                />
+                <span className="text-slate-500 font-medium">días</span>
+              </div>
+              <span className="text-[10px] text-slate-400 mt-1 block">Días previos para avisar al cliente</span>
             </div>
           </div>
         </div>

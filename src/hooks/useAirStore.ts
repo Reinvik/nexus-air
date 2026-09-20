@@ -801,6 +801,12 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       if (updates.items !== undefined) dbUpdates.items = updates.items;
       if (updates.completed_at !== undefined) dbUpdates.completed_at = updates.completed_at;
       if (updates.checklist !== undefined) dbUpdates.checklist = updates.checklist;
+      if (updates.apply_tax !== undefined) dbUpdates.apply_tax = updates.apply_tax;
+      if (updates.payment_reference !== undefined) dbUpdates.payment_reference = updates.payment_reference;
+      if (updates.payment_proof_url !== undefined) dbUpdates.payment_proof_url = updates.payment_proof_url;
+      if (updates.paid_amount !== undefined) dbUpdates.paid_amount = updates.paid_amount;
+      if (updates.payment_date !== undefined) dbUpdates.payment_date = updates.payment_date;
+      if (updates.payment_notes !== undefined) dbUpdates.payment_notes = updates.payment_notes;
 
       await supabaseAir
         .from('orders')
@@ -1118,6 +1124,9 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         btu: eqData.btu,
         technology: eqData.technology || 'inverter',
         refrigerant: eqData.refrigerant || 'R410A',
+        serial_number: eqData.serial_number,
+        serial_number_evaporator: eqData.serial_number_evaporator,
+        serial_number_condenser: eqData.serial_number_condenser,
         location_in_property: eqData.location_in_property,
         installation_date: eqData.installation_date,
         last_maintenance_date: eqData.last_maintenance_date,
@@ -1141,17 +1150,22 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     toast.success('Equipo actualizado');
 
     try {
+      const eqDbUpdates: any = {
+        updated_at: new Date().toISOString()
+      };
+      if (updates.brand !== undefined) eqDbUpdates.brand = updates.brand;
+      if (updates.btu !== undefined) eqDbUpdates.btu = updates.btu;
+      if (updates.technology !== undefined) eqDbUpdates.technology = updates.technology;
+      if (updates.refrigerant !== undefined) eqDbUpdates.refrigerant = updates.refrigerant;
+      if (updates.serial_number !== undefined) eqDbUpdates.serial_number = updates.serial_number;
+      if (updates.serial_number_evaporator !== undefined) eqDbUpdates.serial_number_evaporator = updates.serial_number_evaporator;
+      if (updates.serial_number_condenser !== undefined) eqDbUpdates.serial_number_condenser = updates.serial_number_condenser;
+      if (updates.location_in_property !== undefined) eqDbUpdates.location_in_property = updates.location_in_property;
+      if (updates.last_maintenance_date !== undefined) eqDbUpdates.last_maintenance_date = updates.last_maintenance_date;
+
       await supabaseAir
         .from('equipments')
-        .update({
-          brand: updates.brand,
-          btu: updates.btu,
-          technology: updates.technology,
-          refrigerant: updates.refrigerant,
-          location_in_property: updates.location_in_property,
-          last_maintenance_date: updates.last_maintenance_date,
-          updated_at: new Date().toISOString()
-        })
+        .update(eqDbUpdates)
         .eq('id', id);
     } catch (e) {
       console.warn('[useAirStore] Error updating equipment:', e);
@@ -1374,6 +1388,14 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       if (updates.tax_name !== undefined) dbUpdates.tax_name = updates.tax_name;
       if (updates.division_label !== undefined) dbUpdates.division_label = updates.division_label;
       if (updates.landing_config !== undefined) dbUpdates.landing_config = updates.landing_config;
+      if (updates.logo_url !== undefined) dbUpdates.logo_url = updates.logo_url;
+      if (updates.company_slogan !== undefined) dbUpdates.company_slogan = updates.company_slogan;
+      if (updates.city !== undefined) dbUpdates.city = updates.city;
+      if (updates.default_apply_tax !== undefined) dbUpdates.default_apply_tax = updates.default_apply_tax;
+      if (updates.maintenance_interval_months !== undefined) dbUpdates.maintenance_interval_months = updates.maintenance_interval_months;
+      if (updates.quality_control_days !== undefined) dbUpdates.quality_control_days = updates.quality_control_days;
+      if (updates.inactive_recovery_months !== undefined) dbUpdates.inactive_recovery_months = updates.inactive_recovery_months;
+      if (updates.pre_expiration_warning_days !== undefined) dbUpdates.pre_expiration_warning_days = updates.pre_expiration_warning_days;
 
       // Intentar update primero por company_id
       const { error: updateErr } = await supabaseAir
