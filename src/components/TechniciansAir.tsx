@@ -461,7 +461,24 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
 
       {/* Grid de Técnicos y Ayudantes */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filteredTechnicians.map((t) => {
+        {filteredTechnicians.length === 0 ? (
+          <div className="col-span-full py-12 px-4 text-center bg-white border border-slate-200/90 rounded-2xl space-y-3">
+            <Wrench className="w-10 h-10 text-slate-300 mx-auto" />
+            <h3 className="font-bold text-slate-700 text-sm">No hay técnicos o ayudantes registrados</h3>
+            <p className="text-xs text-slate-400 max-w-sm mx-auto">
+              Registra a los colaboradores de terreno para asignar órdenes de trabajo y calcular liquidaciones automáticas de comisión.
+            </p>
+            <button
+              type="button"
+              onClick={() => setIsAddModalOpen(true)}
+              className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-xs shadow-md transition-all cursor-pointer inline-flex items-center gap-2 mt-1"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Registrar Primer Colaborador</span>
+            </button>
+          </div>
+        ) : (
+          filteredTechnicians.map((t) => {
           const settlement = techSettlementMap.get(t.id) || { completedCount: 0, totalCommission: 0, services: [] };
           const isAyudante = t.role === 'ayudante';
 
@@ -606,7 +623,7 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
               </div>
             </div>
           );
-        })}
+        }))}
       </div>
 
       {/* Modal Agregar Personal (NK-029 & NK-012) */}

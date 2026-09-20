@@ -212,41 +212,56 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
           </div>
 
           <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
-            {filteredCustomers.map(c => {
-              const isSelected = selectedCustomer?.id === c.id;
-              const countEq = equipments.filter(e => e.customer_id === c.id).length;
-
-              return (
-                <div
-                  key={c.id}
-                  onClick={() => setSelectedCustomerId(c.id)}
-                  className={`p-3.5 rounded-xl border transition-all cursor-pointer space-y-1.5 ${
-                    isSelected
-                      ? 'bg-cyan-50/80 border-cyan-500 text-slate-900 shadow-xs'
-                      : 'bg-white border-slate-200/90 text-slate-700 hover:border-slate-300'
-                  }`}
+            {filteredCustomers.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 space-y-2 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                <Users className="w-8 h-8 mx-auto text-slate-300" />
+                <p className="text-xs font-semibold text-slate-600">No hay clientes registrados</p>
+                <p className="text-[11px] text-slate-400">Comienza registrando a tus clientes residenciales o comerciales.</p>
+                <button
+                  type="button"
+                  onClick={() => setIsAddCustModalOpen(true)}
+                  className="mt-2 text-xs text-cyan-600 hover:text-cyan-700 font-bold underline cursor-pointer inline-block"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-sm text-slate-900">{c.name}</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-slate-100 text-slate-700">
-                      {countEq} {countEq === 1 ? 'Aire' : 'Aires'}
-                    </span>
-                  </div>
+                  + Registrar Primer Cliente
+                </button>
+              </div>
+            ) : (
+              filteredCustomers.map(c => {
+                const isSelected = selectedCustomer?.id === c.id;
+                const countEq = equipments.filter(e => e.customer_id === c.id).length;
 
-                  <div className="text-xs text-slate-500 flex items-center gap-1.5 truncate">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span className="truncate">{c.address}, {c.commune}</span>
-                  </div>
+                return (
+                  <div
+                    key={c.id}
+                    onClick={() => setSelectedCustomerId(c.id)}
+                    className={`p-3.5 rounded-xl border transition-all cursor-pointer space-y-1.5 ${
+                      isSelected
+                        ? 'bg-cyan-50/80 border-cyan-500 text-slate-900 shadow-xs'
+                        : 'bg-white border-slate-200/90 text-slate-700 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sm text-slate-900">{c.name}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-slate-100 text-slate-700">
+                        {countEq} {countEq === 1 ? 'Aire' : 'Aires'}
+                      </span>
+                    </div>
 
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 font-mono">
-                    <span>{c.phone}</span>
-                    <span className="capitalize text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
-                      {c.customer_type}
-                    </span>
+                    <div className="text-xs text-slate-500 flex items-center gap-1.5 truncate">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="truncate">{c.address}, {c.commune}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 font-mono">
+                      <span>{c.phone}</span>
+                      <span className="capitalize text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
+                        {c.customer_type}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
 
@@ -360,8 +375,24 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
               </div>
             </div>
           ) : (
-            <div className="h-64 flex items-center justify-center text-slate-400 text-xs">
-              Selecciona un cliente para ver sus detalles.
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-12 text-center space-y-3 shadow-xs">
+              <Users className="w-12 h-12 mx-auto text-slate-300" />
+              <h4 className="font-bold text-slate-700 text-sm">Sin cliente seleccionado</h4>
+              <p className="text-slate-400 text-xs max-w-sm mx-auto">
+                {customers.length === 0 
+                  ? 'Aún no tienes clientes registrados en tu empresa. Añade tu primer cliente para comenzar a gestionar sus equipos de climatización.'
+                  : 'Selecciona un cliente de la lista izquierda para consultar sus detalles y parque de equipos.'}
+              </p>
+              {customers.length === 0 && (
+                <button
+                  type="button"
+                  onClick={() => setIsAddCustModalOpen(true)}
+                  className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-xs shadow-md transition-all cursor-pointer inline-flex items-center gap-2 mt-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Crear Primer Cliente</span>
+                </button>
+              )}
             </div>
           )}
         </div>

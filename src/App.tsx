@@ -67,6 +67,7 @@ export default function App() {
     deletePart,
     updateSettings,
     resetToDefaults,
+    refreshData,
     fetchPublicCompanyBySlug
   } = useAirStore(effectiveCompanyId);
 
@@ -466,6 +467,7 @@ export default function App() {
               currentCompanyId={effectiveCompanyId}
               activeCompanyOverride={activeCompanyOverride}
               onSwitchActiveCompany={switchActiveCompany}
+              onReloadStoreData={refreshData}
             />
           ) : (
             <div className="bg-white rounded-3xl p-8 border border-rose-200 text-center max-w-lg mx-auto my-12 space-y-4 shadow-sm">

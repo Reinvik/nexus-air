@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseAir } from '../lib/supabase';
+import { findCountry } from '../lib/countries';
 import { Company, ProfileUser, UserRole, AirSettings } from '../types';
 import { 
   Crown, 
@@ -66,6 +67,7 @@ export const NexusOwnerAir: React.FC<NexusOwnerAirProps> = ({
   const [newCompanyPhone, setNewCompanyPhone] = useState<string>('');
   const [newCompanyAddress, setNewCompanyAddress] = useState<string>('');
   const [newCompanyCountry, setNewCompanyCountry] = useState<string>('Chile');
+  const [newCompanyIsLobby, setNewCompanyIsLobby] = useState<boolean>(false);
   const [creatingCompanyLoading, setCreatingCompanyLoading] = useState<boolean>(false);
 
   // Modal: Crear Usuario
@@ -250,7 +252,7 @@ export const NexusOwnerAir: React.FC<NexusOwnerAirProps> = ({
           slug: cleanSlug,
           schema_name: 'air',
           allowed_apps: ['air'],
-          is_lobby: false,
+          is_lobby: newCompanyIsLobby,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }])
@@ -261,16 +263,27 @@ export const NexusOwnerAir: React.FC<NexusOwnerAirProps> = ({
 
       const companyId = createdCompany.id;
 
-      // 2. Inicializar ajustes en air.settings (o localStorage) para Nexus Air
+      // 2. Inicializar ajustes en air.settings y localStorage para Nexus Air
       try {
+        const countryData = findCountry(newCompanyCountry);
         const initialCompanySettings: Partial<AirSettings> = {
           company_id: companyId,
           company_name: newCompanyName.trim(),
           fantasy_name: newCompanyName.trim(),
+          company_slug: cleanSlug,
           email: newCompanyEmail.trim() || 'contacto@' + cleanSlug + '.cl',
           phone: newCompanyPhone.trim() || '+56 9 3005 7769',
           address: newCompanyAddress.trim() || 'Santiago, Chile',
-          country: newCompanyCountry,
+          country: countryData.name,
+          country_code: countryData.code,
+          currency_symbol: countryData.currency_symbol,
+          currency_code: countryData.currency_code,
+          tax_id_label: countryData.tax_id_label,
+          tax_rate: countryData.tax_rate,
+          tax_name: countryData.tax_name,
+          division_label: countryData.division_label,
+          standard_maintenance_price: countryData.standard_maintenance_price_default,
+          standard_installation_price: countryData.standard_installation_price_default,
           warranty_months: 6,
           maintenance_interval_months: 6
         };
@@ -278,18 +291,27 @@ export const NexusOwnerAir: React.FC<NexusOwnerAirProps> = ({
         // Guardar configuración local para el nuevo tenant
         localStorage.setItem(`nexus_air_settings_${companyId}`, JSON.stringify(initialCompanySettings));
 
-        // Guardar en schema air si la tabla está disponible
-        await supabase
-          .schema('air')
+        // Guardar en schema air
+        await supabaseAir
           .from('settings')
           .upsert([{
             company_id: companyId,
             company_name: newCompanyName.trim(),
             company_slug: cleanSlug,
-            email: newCompanyEmail.trim(),
-            phone: newCompanyPhone.trim(),
-            address: newCompanyAddress.trim()
-          }]);
+            email: newCompanyEmail.trim() || 'contacto@' + cleanSlug + '.cl',
+            phone: newCompanyPhone.trim() || '+56 9 3005 7769',
+            address: newCompanyAddress.trim() || 'Santiago, Chile',
+            country: countryData.name,
+            country_code: countryData.code,
+            currency_symbol: countryData.currency_symbol,
+            currency_code: countryData.currency_code,
+            tax_id_label: countryData.tax_id_label,
+            tax_rate: countryData.tax_rate,
+            tax_name: countryData.tax_name,
+            division_label: countryData.division_label,
+            standard_maintenance_price: countryData.standard_maintenance_price_default,
+            standard_installation_price: countryData.standard_installation_price_default,
+          }], { onConflict: 'company_id' });
       } catch (setErr) {
         console.warn('[NexusOwner] Ajustes de schema air inicializados localmente:', setErr);
       }
@@ -302,6 +324,7 @@ export const NexusOwnerAir: React.FC<NexusOwnerAirProps> = ({
       setNewCompanyEmail('');
       setNewCompanyPhone('');
       setNewCompanyAddress('');
+      setNewCompanyIsLobby(false);
       setIsCreateCompanyOpen(false);
 
       // Recargar datos
@@ -353,12 +376,19 @@ export const NexusOwnerAir: React.FC<NexusOwnerAirProps> = ({
         throw new Error(fnData.error);
       }
 
-      // Si la Edge Function respondió bien, asegurar que el rol esté actualizado
+      // Si la Edge Function respondió bien, asegurar que el perfil esté persistido con su empresa asignada
       if (fnData?.user?.id) {
         await supabase
           .from('profiles')
-          .update({ role: newUserRole, company_id: validCompanyId })
-          .eq('id', fnData.user.id);
+          .upsert({
+            id: fnData.user.id,
+            email: newUserEmail.trim(),
+            full_name: newUserName.trim(),
+            role: newUserRole,
+            company_id: validCompanyId,
+            is_active: true,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'id' });
       }
 
       toast.success(`Usuario ${newUserName} creado exitosamente.`);
@@ -670,7 +700,9 @@ export const NexusOwnerAir: React.FC<NexusOwnerAirProps> = ({
                                 <div className="font-bold text-slate-900 truncate flex items-center gap-1.5">
                                   <span>{p.full_name || 'Sin Nombre'}</span>
                                   {isOwnerRole && (
-                                    <Crown className="w-3.5 h-3.5 text-amber-500 shrink-0" title="Nexus Owner" />
+                                    <span title="Nexus Owner" className="inline-flex items-center">
+                                      <Crown className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                    </span>
                                   )}
                                 </div>
                                 <div className="text-[11px] text-slate-500 font-mono truncate">{p.email}</div>
@@ -810,20 +842,29 @@ export const NexusOwnerAir: React.FC<NexusOwnerAirProps> = ({
                           <Building2 className="w-5 h-5 text-cyan-600" />
                         </div>
                         <div>
-                          <h3 className="font-black text-slate-900 text-sm leading-snug">
-                            {comp.name}
-                          </h3>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h3 className="font-black text-slate-900 text-sm leading-snug">
+                              {comp.name}
+                            </h3>
+                            {comp.is_lobby && (
+                              <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200 text-[10px] font-black">
+                                LOBBY
+                              </span>
+                            )}
+                          </div>
                           <span className="text-[11px] font-mono text-slate-500">
                             slug: {comp.slug || 'sin-slug'}
                           </span>
                         </div>
                       </div>
 
-                      {isCurrent && (
-                        <span className="px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-900 border border-cyan-300 text-[10px] font-black">
-                          ACTIVA
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1">
+                        {isCurrent && (
+                          <span className="px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-900 border border-cyan-300 text-[10px] font-black">
+                            ACTIVA
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-xs">
@@ -933,7 +974,14 @@ export const NexusOwnerAir: React.FC<NexusOwnerAirProps> = ({
                         <Building2 className="w-4 h-4" />
                       </div>
                       <div>
-                        <div className="font-black text-xs text-slate-900">{comp.name}</div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-black text-xs text-slate-900">{comp.name}</span>
+                          {comp.is_lobby && (
+                            <span className="px-1.5 py-0.2 rounded-full bg-purple-100 text-purple-800 border border-purple-200 text-[9px] font-black">
+                              LOBBY
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[11px] text-slate-500 font-mono">slug: {comp.slug}</div>
                       </div>
                     </div>
@@ -1093,6 +1141,19 @@ export const NexusOwnerAir: React.FC<NexusOwnerAirProps> = ({
                   <option value="Internacional">🌐 Internacional (USD $)</option>
                 </select>
               </div>
+
+              <label className="flex items-start gap-3 p-3.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors select-none">
+                <input
+                  type="checkbox"
+                  checked={newCompanyIsLobby}
+                  onChange={e => setNewCompanyIsLobby(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded text-cyan-600 focus:ring-cyan-500 border-slate-300 cursor-pointer"
+                />
+                <div>
+                  <span className="text-xs font-bold text-slate-800 block">Es Organización Lobby (is_lobby)</span>
+                  <span className="text-[11px] text-slate-500 block">Establece esta empresa como la organización central o de bienvenida en la red Nexus.</span>
+                </div>
+              </label>
 
               <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
                 <button

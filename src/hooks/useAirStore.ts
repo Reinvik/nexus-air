@@ -25,57 +25,99 @@ import { toast } from 'react-hot-toast';
 export const DEFAULT_COMPANY_ID = 'a1111111-2222-3333-4444-555555555555';
 
 export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
+  const isMockCompany = (companyId === DEFAULT_COMPANY_ID);
+
   const [orders, setOrders] = useState<ServiceOrder[]>(() => {
     try {
-      const saved = localStorage.getItem(`nexus_air_orders_${companyId}`) || localStorage.getItem('nexus_air_orders');
+      const saved = localStorage.getItem(`nexus_air_orders_${companyId}`);
       if (saved) return JSON.parse(saved);
+      if (isMockCompany) {
+        const legacy = localStorage.getItem('nexus_air_orders');
+        if (legacy) return JSON.parse(legacy);
+        return INITIAL_SERVICE_ORDERS;
+      }
     } catch (e) {
       console.warn('Error reading orders from localStorage:', e);
     }
-    return INITIAL_SERVICE_ORDERS;
+    return isMockCompany ? INITIAL_SERVICE_ORDERS : [];
   });
 
   const [customers, setCustomers] = useState<Customer[]>(() => {
     try {
-      const saved = localStorage.getItem(`nexus_air_customers_${companyId}`) || localStorage.getItem('nexus_air_customers');
+      const saved = localStorage.getItem(`nexus_air_customers_${companyId}`);
       if (saved) return JSON.parse(saved);
+      if (isMockCompany) {
+        const legacy = localStorage.getItem('nexus_air_customers');
+        if (legacy) return JSON.parse(legacy);
+        return INITIAL_CUSTOMERS;
+      }
     } catch (e) {
       console.warn('Error reading customers from localStorage:', e);
     }
-    return INITIAL_CUSTOMERS;
+    return isMockCompany ? INITIAL_CUSTOMERS : [];
   });
 
   const [equipments, setEquipments] = useState<AirEquipment[]>(() => {
     try {
-      const saved = localStorage.getItem(`nexus_air_equipments_${companyId}`) || localStorage.getItem('nexus_air_equipments');
+      const saved = localStorage.getItem(`nexus_air_equipments_${companyId}`);
       if (saved) return JSON.parse(saved);
+      if (isMockCompany) {
+        const legacy = localStorage.getItem('nexus_air_equipments');
+        if (legacy) return JSON.parse(legacy);
+        return INITIAL_EQUIPMENTS;
+      }
     } catch (e) {
       console.warn('Error reading equipments from localStorage:', e);
     }
-    return INITIAL_EQUIPMENTS;
+    return isMockCompany ? INITIAL_EQUIPMENTS : [];
   });
 
   const [technicians, setTechnicians] = useState<Technician[]>(() => {
     try {
-      const saved = localStorage.getItem(`nexus_air_technicians_${companyId}`) || localStorage.getItem('nexus_air_technicians');
+      const saved = localStorage.getItem(`nexus_air_technicians_${companyId}`);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
+      }
+      if (isMockCompany) {
+        const legacy = localStorage.getItem('nexus_air_technicians');
+        if (legacy) {
+          const parsed = JSON.parse(legacy);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+        return INITIAL_TECHNICIANS;
       }
     } catch (e) {
       console.warn('Error reading technicians from localStorage:', e);
     }
-    return INITIAL_TECHNICIANS;
+    return isMockCompany ? INITIAL_TECHNICIANS : [];
   });
-  const [parts, setParts] = useState<AirPart[]>(INITIAL_PARTS);
+
+  const [parts, setParts] = useState<AirPart[]>(() => {
+    try {
+      const saved = localStorage.getItem(`nexus_air_parts_${companyId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+      if (isMockCompany) {
+        return INITIAL_PARTS;
+      }
+    } catch (e) {
+      console.warn('Error reading parts from localStorage:', e);
+    }
+    return isMockCompany ? INITIAL_PARTS : [];
+  });
+
   const [settings, setSettings] = useState<AirSettings>(() => {
     try {
-      const saved = 
-        localStorage.getItem(`nexus_air_settings_${companyId}`) ||
-        localStorage.getItem('nexus_air_active_settings') ||
-        localStorage.getItem('nexus_air_settings');
-      if (saved) {
-        return JSON.parse(saved);
+      const saved = localStorage.getItem(`nexus_air_settings_${companyId}`);
+      if (saved) return JSON.parse(saved);
+      if (isMockCompany) {
+        const legacy = 
+          localStorage.getItem('nexus_air_active_settings') ||
+          localStorage.getItem('nexus_air_settings');
+        if (legacy) return JSON.parse(legacy);
       }
     } catch (e) {
       console.warn('Error reading settings from localStorage:', e);
@@ -83,8 +125,12 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     return {
       ...INITIAL_SETTINGS,
       company_id: companyId,
+      company_name: isMockCompany ? 'HVAC Chile SpA' : 'Mi Empresa Climatizadora',
+      fantasy_name: isMockCompany ? 'HVAC Chile SpA' : 'Mi Empresa Climatizadora',
+      company_slug: isMockCompany ? 'nexus-air' : '',
     };
   });
+
   const [isLoaded, setIsLoaded] = useState(false);
   const [contactedReminderIds, setContactedReminderIds] = useState<Record<string, string>>(() => {
     try {
@@ -108,56 +154,154 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
   useEffect(() => {
     try {
       localStorage.setItem(`nexus_air_customers_${companyId}`, JSON.stringify(customers));
-      localStorage.setItem('nexus_air_customers', JSON.stringify(customers));
+      if (isMockCompany) {
+        localStorage.setItem('nexus_air_customers', JSON.stringify(customers));
+      }
     } catch (e) {
       console.warn('Error saving customers:', e);
     }
-  }, [customers, companyId]);
+  }, [customers, companyId, isMockCompany]);
 
   // Persistir equipos localmente
   useEffect(() => {
     try {
       localStorage.setItem(`nexus_air_equipments_${companyId}`, JSON.stringify(equipments));
-      localStorage.setItem('nexus_air_equipments', JSON.stringify(equipments));
+      if (isMockCompany) {
+        localStorage.setItem('nexus_air_equipments', JSON.stringify(equipments));
+      }
     } catch (e) {
       console.warn('Error saving equipments:', e);
     }
-  }, [equipments, companyId]);
+  }, [equipments, companyId, isMockCompany]);
 
   // Persistir órdenes localmente
   useEffect(() => {
     try {
       localStorage.setItem(`nexus_air_orders_${companyId}`, JSON.stringify(orders));
-      localStorage.setItem('nexus_air_orders', JSON.stringify(orders));
+      if (isMockCompany) {
+        localStorage.setItem('nexus_air_orders', JSON.stringify(orders));
+      }
     } catch (e) {
       console.warn('Error saving orders:', e);
     }
-  }, [orders, companyId]);
+  }, [orders, companyId, isMockCompany]);
 
   // Persistir técnicos localmente (NK-032)
   useEffect(() => {
     try {
       localStorage.setItem(`nexus_air_technicians_${companyId}`, JSON.stringify(technicians));
-      localStorage.setItem('nexus_air_technicians', JSON.stringify(technicians));
+      if (isMockCompany) {
+        localStorage.setItem('nexus_air_technicians', JSON.stringify(technicians));
+      }
     } catch (e) {
       console.warn('Error saving technicians:', e);
     }
-  }, [technicians, companyId]);
+  }, [technicians, companyId, isMockCompany]);
 
-  // Sincronizar settings si companyId cambia
+  // Persistir inventario localmente
   useEffect(() => {
-    if (companyId) {
-      try {
-        const saved = 
-          localStorage.getItem(`nexus_air_settings_${companyId}`) ||
-          localStorage.getItem('nexus_air_active_settings');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          setSettings(prev => ({ ...prev, ...parsed, company_id: companyId }));
-        }
-      } catch (e) {
-        console.warn('Error syncing settings on companyId change:', e);
+    try {
+      localStorage.setItem(`nexus_air_parts_${companyId}`, JSON.stringify(parts));
+    } catch (e) {
+      console.warn('Error saving parts:', e);
+    }
+  }, [parts, companyId]);
+
+  // Sincronizar estado en memoria inmediatamente al cambiar de empresa (switch o login)
+  useEffect(() => {
+    if (!companyId) return;
+    const isMock = companyId === DEFAULT_COMPANY_ID;
+
+    // 1. Sincronizar órdenes
+    try {
+      const savedOrders = localStorage.getItem(`nexus_air_orders_${companyId}`);
+      if (savedOrders) {
+        setOrders(JSON.parse(savedOrders));
+      } else {
+        setOrders(isMock ? INITIAL_SERVICE_ORDERS : []);
       }
+    } catch {
+      setOrders(isMock ? INITIAL_SERVICE_ORDERS : []);
+    }
+
+    // 2. Sincronizar clientes
+    try {
+      const savedCusts = localStorage.getItem(`nexus_air_customers_${companyId}`);
+      if (savedCusts) {
+        setCustomers(JSON.parse(savedCusts));
+      } else {
+        setCustomers(isMock ? INITIAL_CUSTOMERS : []);
+      }
+    } catch {
+      setCustomers(isMock ? INITIAL_CUSTOMERS : []);
+    }
+
+    // 3. Sincronizar equipos
+    try {
+      const savedEqs = localStorage.getItem(`nexus_air_equipments_${companyId}`);
+      if (savedEqs) {
+        setEquipments(JSON.parse(savedEqs));
+      } else {
+        setEquipments(isMock ? INITIAL_EQUIPMENTS : []);
+      }
+    } catch {
+      setEquipments(isMock ? INITIAL_EQUIPMENTS : []);
+    }
+
+    // 4. Sincronizar técnicos
+    try {
+      const savedTechs = localStorage.getItem(`nexus_air_technicians_${companyId}`);
+      if (savedTechs) {
+        setTechnicians(JSON.parse(savedTechs));
+      } else {
+        setTechnicians(isMock ? INITIAL_TECHNICIANS : []);
+      }
+    } catch {
+      setTechnicians(isMock ? INITIAL_TECHNICIANS : []);
+    }
+
+    // 5. Sincronizar repuestos
+    try {
+      const savedParts = localStorage.getItem(`nexus_air_parts_${companyId}`);
+      if (savedParts) {
+        setParts(JSON.parse(savedParts));
+      } else {
+        setParts(isMock ? INITIAL_PARTS : []);
+      }
+    } catch {
+      setParts(isMock ? INITIAL_PARTS : []);
+    }
+
+    // 6. Sincronizar settings
+    try {
+      const savedSettings = localStorage.getItem(`nexus_air_settings_${companyId}`);
+      if (savedSettings) {
+        setSettings(JSON.parse(savedSettings));
+      } else {
+        setSettings({
+          ...INITIAL_SETTINGS,
+          company_id: companyId,
+          company_name: isMock ? 'HVAC Chile SpA' : 'Mi Empresa Climatizadora',
+          fantasy_name: isMock ? 'HVAC Chile SpA' : 'Mi Empresa Climatizadora',
+          company_slug: isMock ? 'nexus-air' : '',
+        });
+      }
+    } catch {
+      setSettings({
+        ...INITIAL_SETTINGS,
+        company_id: companyId,
+        company_name: isMock ? 'HVAC Chile SpA' : 'Mi Empresa Climatizadora',
+        fantasy_name: isMock ? 'HVAC Chile SpA' : 'Mi Empresa Climatizadora',
+        company_slug: isMock ? 'nexus-air' : '',
+      });
+    }
+
+    // 7. Sincronizar recordatorios contactados
+    try {
+      const savedContacted = localStorage.getItem(`nexus_air_contacted_${companyId}`);
+      setContactedReminderIds(savedContacted ? JSON.parse(savedContacted) : {});
+    } catch {
+      setContactedReminderIds({});
     }
   }, [companyId]);
 
@@ -165,6 +309,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
   const fetchData = useCallback(async () => {
     try {
       const activeId = companyId || DEFAULT_COMPANY_ID;
+      const isMock = activeId === DEFAULT_COMPANY_ID;
 
       // 1. Settings
       const { data: dbSettings } = await supabaseAir
@@ -244,6 +389,33 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
 
           return merged;
         });
+      } else if (!isMock) {
+        // Fallback para empresas nuevas sin registro en air.settings: obtener de public.companies
+        try {
+          const { data: compData } = await supabase
+            .from('companies')
+            .select('*')
+            .eq('id', activeId)
+            .maybeSingle();
+
+          if (compData) {
+            setSettings(prev => {
+              const freshSettings: AirSettings = {
+                ...prev,
+                company_id: compData.id,
+                company_name: compData.name,
+                fantasy_name: compData.name,
+                company_slug: compData.slug || '',
+              };
+              try {
+                localStorage.setItem(`nexus_air_settings_${activeId}`, JSON.stringify(freshSettings));
+              } catch {}
+              return freshSettings;
+            });
+          }
+        } catch (e) {
+          console.warn('[useAirStore] Error fetching company data fallback:', e);
+        }
       }
 
       // 2. Clientes
@@ -295,6 +467,8 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
           created_at: c.created_at,
           equipments: (dbEquipments || []).filter((e: any) => e.customer_id === c.id)
         })));
+      } else if (!isMock) {
+        setCustomers([]);
       }
 
       if (dbEquipments && dbEquipments.length > 0) {
@@ -312,6 +486,8 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
           last_maintenance_date: e.last_maintenance_date,
           next_maintenance_date: e.next_maintenance_date || format(addDays(new Date(), 180), 'yyyy-MM-dd')
         })));
+      } else if (!isMock) {
+        setEquipments([]);
       }
 
       if (dbTechnicians && dbTechnicians.length > 0) {
@@ -334,6 +510,8 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
           commission_reparacion_value: t.commission_reparacion_value !== null && t.commission_reparacion_value !== undefined ? Number(t.commission_reparacion_value) : 15000,
           active_orders_count: 1
         })));
+      } else if (!isMock) {
+        setTechnicians([]);
       }
 
       if (dbInventory && dbInventory.length > 0) {
@@ -348,6 +526,8 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
           sale_price: Number(i.price) || 0,
           unit: i.unit || 'unidad'
         })));
+      } else if (!isMock) {
+        setParts([]);
       }
 
       if (dbOrders && dbOrders.length > 0) {
@@ -469,6 +649,8 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
           };
         });
         setOrders(mappedOrders);
+      } else if (!isMock) {
+        setOrders([]);
       }
     } catch (err) {
       console.warn('[useAirStore] Using offline/initial cache:', err);
@@ -1224,27 +1406,49 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     }
   }, [companyId]);
 
-  // Reset a valores de demostración
+  // Reset a valores de demostración o estado limpio
   const resetToDefaults = useCallback(() => {
-    setCustomers(INITIAL_CUSTOMERS);
-    setEquipments(INITIAL_EQUIPMENTS);
-    setTechnicians(INITIAL_TECHNICIANS);
-    setParts(INITIAL_PARTS);
-    setOrders(INITIAL_SERVICE_ORDERS);
-    setSettings({ ...INITIAL_SETTINGS, company_id: companyId });
-    setContactedReminderIds({});
-    try {
-      localStorage.removeItem(`nexus_air_settings_${companyId}`);
-      localStorage.removeItem('nexus_air_active_settings');
-      localStorage.removeItem(`nexus_air_customers_${companyId}`);
-      localStorage.removeItem('nexus_air_customers');
-      localStorage.removeItem(`nexus_air_equipments_${companyId}`);
-      localStorage.removeItem('nexus_air_equipments');
-      localStorage.removeItem(`nexus_air_orders_${companyId}`);
-      localStorage.removeItem('nexus_air_orders');
-    } catch {}
-    toast.success('Datos de demostración restaurados');
-  }, [companyId]);
+    const isMock = companyId === DEFAULT_COMPANY_ID;
+    if (isMock) {
+      setCustomers(INITIAL_CUSTOMERS);
+      setEquipments(INITIAL_EQUIPMENTS);
+      setTechnicians(INITIAL_TECHNICIANS);
+      setParts(INITIAL_PARTS);
+      setOrders(INITIAL_SERVICE_ORDERS);
+      setSettings({ ...INITIAL_SETTINGS, company_id: companyId });
+      setContactedReminderIds({});
+      try {
+        localStorage.removeItem(`nexus_air_settings_${companyId}`);
+        localStorage.removeItem('nexus_air_active_settings');
+        localStorage.removeItem(`nexus_air_customers_${companyId}`);
+        localStorage.removeItem('nexus_air_customers');
+        localStorage.removeItem(`nexus_air_equipments_${companyId}`);
+        localStorage.removeItem('nexus_air_equipments');
+        localStorage.removeItem(`nexus_air_orders_${companyId}`);
+        localStorage.removeItem('nexus_air_orders');
+        localStorage.removeItem(`nexus_air_technicians_${companyId}`);
+        localStorage.removeItem('nexus_air_technicians');
+        localStorage.removeItem(`nexus_air_parts_${companyId}`);
+      } catch {}
+      toast.success('Datos de demostración restaurados');
+    } else {
+      setCustomers([]);
+      setEquipments([]);
+      setTechnicians([]);
+      setParts([]);
+      setOrders([]);
+      setContactedReminderIds({});
+      try {
+        localStorage.removeItem(`nexus_air_customers_${companyId}`);
+        localStorage.removeItem(`nexus_air_equipments_${companyId}`);
+        localStorage.removeItem(`nexus_air_orders_${companyId}`);
+        localStorage.removeItem(`nexus_air_technicians_${companyId}`);
+        localStorage.removeItem(`nexus_air_parts_${companyId}`);
+      } catch {}
+      toast.success('Caché local de empresa limpiada');
+      fetchData();
+    }
+  }, [companyId, fetchData]);
 
   // Helper para consultar landing pública de empresa por slug
   const fetchPublicCompanyBySlug = useCallback(async (slug: string) => {

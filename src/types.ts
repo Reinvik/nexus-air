@@ -222,6 +222,7 @@ export interface ThermalCalculationResult {
 
 export interface AirSettings {
   company_id?: string;
+  company_slug?: string;
   company_name: string;
   fantasy_name: string;
   country?: string; // ej: 'Costa Rica', 'Venezuela', 'Perú', 'Chile', etc.

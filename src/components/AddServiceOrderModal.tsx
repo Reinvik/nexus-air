@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Customer, AirEquipment, Technician, ServiceOrder, ServiceType, AirSettings } from '../types';
-import { X, Plus, Calendar, Clock, User, Wrench, UserCheck, Users, Percent, DollarSign } from 'lucide-react';
+import { X, Plus, Calendar, Clock, User, Wrench, UserCheck, Users, Percent, DollarSign, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'react-hot-toast';
 
 interface AddServiceOrderModalProps {
   isOpen: boolean;
@@ -102,11 +103,18 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const selectedCust = customers.find(c => c.id === customerId);
-    if (!selectedCust) return;
+    if (customers.length === 0) {
+      toast.error('Debes registrar al menos un cliente antes de crear una orden de trabajo.');
+      return;
+    }
+    const selectedCust = customers.find(c => c.id === customerId) || customers[0];
+    if (!selectedCust) {
+      toast.error('Selecciona un cliente válido.');
+      return;
+    }
 
     onAddOrder({
-      customer_id: customerId,
+      customer_id: selectedCust.id,
       equipment_id: equipmentId || (clientEquipments[0]?.id),
       service_type: serviceType,
       status: 'ingresado',
@@ -197,11 +205,17 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                       className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:border-cyan-500 focus:outline-none transition-colors"
                       required
                     >
-                      {customers.map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} ({c.commune}) - {c.address}
+                      {customers.length === 0 ? (
+                        <option value="" disabled>
+                          ⚠️ Sin clientes registrados (Crea uno en la pestaña Clientes)
                         </option>
-                      ))}
+                      ) : (
+                        customers.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} ({c.commune || 'Sin comuna'}) - {c.address}
+                          </option>
+                        ))
+                      )}
                     </select>
                   </div>
 
@@ -350,11 +364,17 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                         className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs focus:border-cyan-500 focus:outline-none"
                         required
                       >
-                        {technicians.map(t => (
-                          <option key={t.id} value={t.id}>
-                            {t.name}
+                        {technicians.length === 0 ? (
+                          <option value="" disabled>
+                            ⚠️ Sin técnicos registrados (Crea uno en Técnicos)
                           </option>
-                        ))}
+                        ) : (
+                          technicians.map(t => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          ))
+                        )}
                       </select>
                     </div>
 

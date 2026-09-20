@@ -563,7 +563,7 @@ export function ProformaModalAir({
   const handleConvertToOrder = () => {
     if (onCreateOrder) {
       onCreateOrder({
-        service_type: isMultiMaintenance ? 'mantencion' : isRepair ? 'reparacion' : 'instalacion',
+        service_type: isMultiMaintenance ? 'mantencion_preventiva' : isRepair ? 'mantencion_correctiva' : 'instalacion',
         status: 'ingresado',
         customer_name: clientName,
         customer_phone: clientPhone,
