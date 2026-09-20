@@ -53,7 +53,7 @@ export interface Customer {
   address: string;
   commune: string;
   city: string;
-  customer_type: 'residencial' | 'comercial' | 'industrial';
+  customer_type: 'residencial' | 'comercial' | 'industrial' | 'empresarial';
   notes?: string;
   equipments?: AirEquipment[];
   created_at: string;
@@ -156,6 +156,8 @@ export interface ServiceOrder {
   total: number;
   payment_status: 'pendiente' | 'pagado' | 'abono';
   payment_method?: 'transferencia' | 'efectivo' | 'tarjeta' | 'webpay';
+  invoice_number?: string;
+  folio?: string;
   created_at: string;
   completed_at?: string;
 }

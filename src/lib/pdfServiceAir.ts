@@ -50,7 +50,7 @@ async function waitForImages(container: HTMLElement): Promise<void> {
 async function renderElementToPdf(container: HTMLElement, filename: string): Promise<void> {
   await waitForImages(container);
 
-  // Escala 1.5 con fondo blanco puro y renderizado nítido sin desfases de scroll
+  // Escala 1.5 con fondo blanco puro y renderizado nítido sin desfases de scroll ni cortes superiores
   const canvas = await html2canvas(container, {
     scale: 1.5,
     useCORS: true,
@@ -58,10 +58,17 @@ async function renderElementToPdf(container: HTMLElement, filename: string): Pro
     backgroundColor: '#ffffff',
     logging: false,
     windowWidth: 780,
-    scrollY: 0,
     scrollX: 0,
+    scrollY: 0,
     x: 0,
     y: 0,
+    onclone: (_clonedDoc, clonedEl) => {
+      clonedEl.style.position = 'static';
+      clonedEl.style.top = '0px';
+      clonedEl.style.left = '0px';
+      clonedEl.style.margin = '0 auto';
+      clonedEl.style.paddingTop = '16px';
+    }
   });
 
   // JPEG calidad 0.92 para garantizar peso ultraliviano y fidelidad de texto
@@ -111,10 +118,17 @@ export async function downloadElementAsCleanPng(container: HTMLElement, filename
     backgroundColor: '#ffffff',
     logging: false,
     windowWidth: 780,
-    scrollY: 0,
     scrollX: 0,
+    scrollY: 0,
     x: 0,
     y: 0,
+    onclone: (_clonedDoc, clonedEl) => {
+      clonedEl.style.position = 'static';
+      clonedEl.style.top = '0px';
+      clonedEl.style.left = '0px';
+      clonedEl.style.margin = '0 auto';
+      clonedEl.style.paddingTop = '16px';
+    }
   });
   const dataUrl = canvas.toDataURL('image/png');
   const a = document.createElement('a');
@@ -135,10 +149,17 @@ export async function copyElementAsCleanPng(container: HTMLElement, filenameFall
     backgroundColor: '#ffffff',
     logging: false,
     windowWidth: 780,
-    scrollY: 0,
     scrollX: 0,
+    scrollY: 0,
     x: 0,
     y: 0,
+    onclone: (_clonedDoc, clonedEl) => {
+      clonedEl.style.position = 'static';
+      clonedEl.style.top = '0px';
+      clonedEl.style.left = '0px';
+      clonedEl.style.margin = '0 auto';
+      clonedEl.style.paddingTop = '16px';
+    }
   });
 
   return new Promise<boolean>((resolve) => {
@@ -263,6 +284,12 @@ export function buildReceiptHtml(order: ServiceOrder, settings: AirSettings): st
   const taxPercent = getTaxPercentage(settings.tax_rate);
   const { dateFormatted, timeFormatted } = getReceiptDateTimeFormatted(order);
 
+  const rawTicketNum = order.ticket_number ? String(order.ticket_number).trim() : '';
+  const displayFolio = rawTicketNum 
+    ? (rawTicketNum.toUpperCase().startsWith('REC-') ? rawTicketNum : `REC-${rawTicketNum}`)
+    : `REC-${order.id ? order.id.slice(0, 8).toUpperCase() : '001'}`;
+  const invoiceDoc = order.invoice_number || order.folio || '';
+
   const calculatedTax = order.tax > 0 
     ? order.tax 
     : Math.round(order.total - (order.total / (1 + (taxPercent / 100))));
@@ -271,12 +298,12 @@ export function buildReceiptHtml(order: ServiceOrder, settings: AirSettings): st
     : (order.total - calculatedTax);
 
   return `
-    <div style="width: 760px; padding: 24px 28px; background: #ffffff; color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; box-sizing: border-box; font-size: 11px; line-height: 1.35;">
+    <div style="width: 760px; padding: 32px 28px 24px 28px; background: #ffffff; color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; box-sizing: border-box; font-size: 11px; line-height: 1.35;">
       
       <!-- ENCABEZADO OFICIAL -->
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px; border-bottom: 2px solid #0284c7; padding-bottom: 12px;">
         <tr>
-          <td style="vertical-align: top; width: 60%;">
+          <td style="vertical-align: top; width: 58%;">
             <div style="font-size: 18px; font-weight: 900; color: #0369a1; letter-spacing: -0.5px; text-transform: uppercase;">
               ${settings.fantasy_name || settings.company_name || 'NEXUS AIR CLIMATIZACIÓN'}
             </div>
@@ -292,14 +319,22 @@ export function buildReceiptHtml(order: ServiceOrder, settings: AirSettings): st
               <strong>${settings.tax_id_label || 'RUT/ID'}:</strong> ${settings.rut || '77.892.410-K'} • <strong>País:</strong> ${settings.country || 'Chile'}
             </div>
           </td>
-          <td style="vertical-align: top; width: 40%; text-align: right;">
-            <div style="display: inline-block; border: 2px solid #0284c7; border-radius: 8px; padding: 10px 16px; background: #f0f9ff; text-align: center; min-width: 200px;">
+          <td style="vertical-align: top; width: 42%; text-align: right;">
+            <div style="display: inline-block; border: 2px solid #0284c7; border-radius: 8px; padding: 12px 18px; background: #f0f9ff; text-align: center; min-width: 210px;">
               <div style="font-size: 8.5px; font-weight: 800; color: #0369a1; text-transform: uppercase; letter-spacing: 0.5px;">
                 COMPROBANTE DE SERVICIO TÉCNICO
               </div>
-              <div style="font-family: monospace; font-size: 16px; font-weight: 900; color: #0c4a6e; margin: 3px 0;">
-                REC-${order.ticket_number}
+              <div style="font-family: monospace; font-size: 17px; font-weight: 900; color: #0c4a6e; margin: 4px 0;">
+                ${displayFolio}
               </div>
+              <div style="font-size: 9.5px; color: #0284c7; font-weight: 800; margin-bottom: 3px;">
+                N° Folio: <strong style="font-family: monospace; color: #0c4a6e;">${displayFolio}</strong>
+              </div>
+              ${invoiceDoc ? `
+                <div style="font-size: 9.5px; color: #475569; font-weight: 700; margin-bottom: 3px;">
+                  Factura / Doc: <strong style="color: #0f172a; font-family: monospace;">${invoiceDoc}</strong>
+                </div>
+              ` : ''}
               <div style="font-size: 10px; color: #334155; margin-top: 3px; font-weight: 700;">
                 <span>Fecha:</span> <strong style="color: #0f172a;">${dateFormatted}</strong>
               </div>
@@ -529,12 +564,12 @@ export function buildProformaHtml(data: ProformaPdfData, settings: AirSettings):
   );
 
   return `
-    <div style="width: 760px; padding: 24px 28px; background: #ffffff; color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; box-sizing: border-box; font-size: 11px; line-height: 1.35;">
+    <div style="width: 760px; padding: 32px 28px 24px 28px; background: #ffffff; color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; box-sizing: border-box; font-size: 11px; line-height: 1.35;">
       
       <!-- ENCABEZADO -->
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px; border-bottom: 2px solid #0891b2; padding-bottom: 12px;">
         <tr>
-          <td style="vertical-align: top; width: 60%;">
+          <td style="vertical-align: top; width: 58%;">
             <div style="font-size: 18px; font-weight: 900; color: #0e7490; letter-spacing: -0.5px; text-transform: uppercase;">
               ${settings.fantasy_name || settings.company_name || 'NEXUS AIR CLIMATIZACIÓN'}
             </div>
@@ -550,18 +585,21 @@ export function buildProformaHtml(data: ProformaPdfData, settings: AirSettings):
               <strong>${settings.tax_id_label || 'RUT/ID'}:</strong> ${settings.rut || '77.892.410-K'} • <strong>País:</strong> ${settings.country || 'Costa Rica'}
             </div>
           </td>
-          <td style="vertical-align: top; width: 40%; text-align: right;">
-            <div style="display: inline-block; border: 2px solid #0891b2; border-radius: 8px; padding: 8px 14px; background: #ecfeff; text-align: center; min-width: 190px;">
-              <div style="font-size: 8px; font-weight: 800; color: #0e7490; text-transform: uppercase; letter-spacing: 0.5px;">
+          <td style="vertical-align: top; width: 42%; text-align: right;">
+            <div style="display: inline-block; border: 2px solid #0891b2; border-radius: 8px; padding: 12px 18px; background: #ecfeff; text-align: center; min-width: 210px;">
+              <div style="font-size: 8.5px; font-weight: 800; color: #0e7490; text-transform: uppercase; letter-spacing: 0.5px;">
                 ${categoryTitle}
               </div>
-              <div style="font-family: monospace; font-size: 16px; font-weight: 900; color: #155e75; margin: 2px 0;">
-                ${data.folio}
+              <div style="font-family: monospace; font-size: 17px; font-weight: 900; color: #155e75; margin: 4px 0;">
+                ${data.folio || 'PRO-001'}
               </div>
-              <div style="font-size: 9px; color: #475569;">
+              <div style="font-size: 9.5px; color: #0e7490; font-weight: 800; margin-bottom: 2px;">
+                N° Folio: <strong style="font-family: monospace; color: #155e75;">${data.folio || 'PRO-001'}</strong>
+              </div>
+              <div style="font-size: 9.5px; color: #475569;">
                 <strong>Fecha:</strong> ${data.date}
               </div>
-              <div style="font-size: 8px; color: #0891b2; font-weight: 700; margin-top: 2px;">
+              <div style="font-size: 8.5px; color: #0891b2; font-weight: 700; margin-top: 4px;">
                 Vigencia: 30 Días
               </div>
             </div>

@@ -328,7 +328,10 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
                 COMPROBANTE DE SERVICIO
               </span>
               <div className="font-mono text-base font-black text-cyan-800">
-                REC-{order.ticket_number}
+                {order.ticket_number ? (order.ticket_number.toUpperCase().startsWith('REC-') ? order.ticket_number : `REC-${order.ticket_number}`) : `REC-${order.id ? order.id.slice(0, 8).toUpperCase() : '001'}`}
+              </div>
+              <div className="text-[11px] text-cyan-700 font-bold">
+                N° Folio: <span className="font-mono text-slate-900">{order.ticket_number ? (order.ticket_number.toUpperCase().startsWith('REC-') ? order.ticket_number : `REC-${order.ticket_number}`) : `REC-${order.id ? order.id.slice(0, 8).toUpperCase() : '001'}`}</span>
               </div>
               <div className="text-[11px] text-slate-700 font-medium">
                 Fecha: <strong className="text-slate-900">{dateFormatted}</strong>

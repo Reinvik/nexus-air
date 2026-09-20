@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { calculateThermalLoad, getCostaRicaTableBtu } from '../lib/thermalCalculator';
+import { getTaxPercentage } from '../lib/countries';
 import { ThermalCalculationInput, AirPart, ServiceOrder, AirSettings, CustomerAir } from '../types';
 import { 
   Calculator, 
@@ -92,7 +93,8 @@ export const ThermalQuoterAir: React.FC<ThermalQuoterAirProps> = ({
   const extraCopperPrice = extraMetersCopper * 12000;
 
   const subtotal = equipmentPrice + installationBasePrice + pumpPrice + extraCopperPrice;
-  const taxRate = (settings?.tax_rate !== undefined ? settings.tax_rate : 13) / 100;
+  const taxRatePercent = getTaxPercentage(settings?.tax_rate);
+  const taxRate = taxRatePercent / 100;
   const iva = Math.round(subtotal * taxRate);
   const total = subtotal + iva;
 
@@ -149,7 +151,7 @@ export const ThermalQuoterAir: React.FC<ThermalQuoterAirProps> = ({
       (includeInstallation ? `• Instalación y Materiales: ${currencySymbol}${installationBasePrice.toLocaleString()}\n` : '') +
       (includeCondensatePump ? `• Bomba de Condensado: ${currencySymbol}${pumpPrice.toLocaleString()}\n` : '') +
       `• Subtotal: ${currencySymbol}${subtotal.toLocaleString()}\n` +
-      `• IVA (${Math.round(taxRate * 100)}%): ${currencySymbol}${iva.toLocaleString()}\n` +
+      `• IVA (${taxRatePercent}%): ${currencySymbol}${iva.toLocaleString()}\n` +
       `• *TOTAL FINAL:* ${currencySymbol}${total.toLocaleString()}\n\n` +
       `Incluye garantía formal de instalación. ¡Responde a este mensaje para coordinar la visita técnica!`;
 
@@ -588,7 +590,7 @@ export const ThermalQuoterAir: React.FC<ThermalQuoterAirProps> = ({
                 </div>
               )}
               <div className="flex justify-between py-1 text-slate-400 text-[11px]">
-                <span>IVA ({Math.round(taxRate * 100)}%)</span>
+                <span>IVA ({taxRatePercent}%)</span>
                 <span className="font-mono">{currencySymbol}{iva.toLocaleString()}</span>
               </div>
               <div className="flex justify-between pt-2 text-base font-black text-slate-900">

@@ -796,13 +796,14 @@ export function ProformaModalAir({
                 {isMultiMaintenance ? 'MANTENCIÓN MULTIEQUIPO' : isRepair ? 'REPARACIÓN & DIAGNÓSTICO' : 'PROFORMA'}
               </div>
               <div className="p-2.5 bg-slate-50 text-xs font-mono space-y-1">
-                <div className="flex justify-between gap-4">
-                  <span className="text-slate-500 font-sans">N° Folio:</span>
+                <div className="flex justify-between gap-4 items-center">
+                  <span className="text-slate-500 font-sans font-bold">N° Folio:</span>
+                  <span className="print:inline hidden font-mono font-black text-cyan-900">{proformaFolio}</span>
                   <input
                     type="text"
                     value={proformaFolio}
                     onChange={e => setProformaFolio(e.target.value)}
-                    className="font-bold text-slate-800 text-right bg-transparent border-b border-dashed border-slate-300 w-24 focus:outline-none"
+                    className="print:hidden font-bold font-mono text-cyan-900 text-right bg-white border border-slate-300 rounded px-1.5 py-0.5 w-28 focus:outline-none focus:ring-1 focus:ring-cyan-500"
                   />
                 </div>
                 <div className="flex justify-between gap-4">
