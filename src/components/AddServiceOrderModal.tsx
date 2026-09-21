@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Customer, AirEquipment, Technician, ServiceOrder, ServiceType, AirSettings } from '../types';
-import { X, Plus, Calendar, Clock, User, Wrench, UserCheck, Users, Percent, DollarSign, AlertTriangle } from 'lucide-react';
+import { X, Plus, Calendar, Clock, User, Wrench, UserCheck, Users, Percent, DollarSign, AlertTriangle, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
+import { QuickCreateCustomerModal } from './QuickCreateCustomerModal';
 
 interface AddServiceOrderModalProps {
   isOpen: boolean;
@@ -12,6 +13,8 @@ interface AddServiceOrderModalProps {
   technicians: Technician[];
   settings?: AirSettings;
   onAddOrder: (orderData: Partial<ServiceOrder>) => void;
+  onAddCustomer?: (customer: Omit<Customer, 'id' | 'created_at'>) => Promise<Customer | void> | void;
+  onAddEquipment?: (equipment: Omit<AirEquipment, 'id' | 'next_maintenance_date'>) => Promise<AirEquipment | void> | void;
 }
 
 export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
@@ -22,6 +25,8 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
   technicians,
   settings,
   onAddOrder,
+  onAddCustomer,
+  onAddEquipment,
 }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -50,6 +55,17 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
   const [assistantPayoutValue, setAssistantPayoutValue] = useState<number>(10000);
   const [description, setDescription] = useState('');
   const [totalPrice, setTotalPrice] = useState(45000);
+  const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
+
+  const handleCustomerCreated = (newCust: Customer, newEq?: AirEquipment) => {
+    setCustomerId(newCust.id);
+    if (newEq) {
+      setEquipmentId(newEq.id);
+    }
+    if (!description) {
+      setDescription(`Servicio de ${serviceType.replace('_', ' ')} para ${newCust.name}`);
+    }
+  };
 
   const clientEquipments = equipments.filter(e => e.customer_id === customerId);
 
@@ -192,10 +208,23 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                 {/* Cliente & Equipo */}
                 <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
                   <div className="space-y-1.5">
-                    <label className="font-semibold text-slate-700 flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5 text-cyan-600" />
-                      Seleccionar Cliente
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="font-semibold text-slate-700 flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 text-cyan-600" />
+                        Seleccionar Cliente
+                      </label>
+                      {onAddCustomer && (
+                        <button
+                          type="button"
+                          onClick={() => setIsAddCustomerModalOpen(true)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-700 hover:text-cyan-800 font-bold text-[11px] transition-colors cursor-pointer border border-cyan-300/40 shadow-2xs"
+                          title="Crear un nuevo cliente sin salir de este ticket"
+                        >
+                          <UserPlus className="w-3.5 h-3.5" />
+                          <span>+ Nuevo Cliente</span>
+                        </button>
+                      )}
+                    </div>
                     <select
                       value={customerId}
                       onChange={(e) => {
@@ -207,7 +236,7 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                     >
                       {customers.length === 0 ? (
                         <option value="" disabled>
-                          ⚠️ Sin clientes registrados (Crea uno en la pestaña Clientes)
+                          ⚠️ Sin clientes registrados (Presiona "+ Nuevo Cliente" arriba)
                         </option>
                       ) : (
                         customers.map(c => (
@@ -217,6 +246,18 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                         ))
                       )}
                     </select>
+                    {customers.length === 0 && onAddCustomer && (
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setIsAddCustomerModalOpen(true)}
+                          className="w-full py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                        >
+                          <UserPlus className="w-4 h-4" />
+                          <span>Crear Primer Cliente Ahora</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-1.5 pt-2 border-t border-slate-200/70">
@@ -507,6 +548,18 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Submodal para Crear Cliente Directo desde el Ticket */}
+      {isAddCustomerModalOpen && onAddCustomer && (
+        <QuickCreateCustomerModal
+          isOpen={isAddCustomerModalOpen}
+          onClose={() => setIsAddCustomerModalOpen(false)}
+          settings={settings}
+          onAddCustomer={onAddCustomer}
+          onAddEquipment={onAddEquipment}
+          onCustomerCreated={handleCustomerCreated}
+        />
+      )}
     </div>
   );
 };

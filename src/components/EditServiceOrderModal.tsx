@@ -1,17 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { ServiceOrder, Technician, OrderStatus, ServiceType, AirSettings } from '../types';
-import { X, Save, Trash2, Calendar, Clock, Wrench, DollarSign, CheckCircle, Navigation, Radio, MapPin, Users, Percent, Check, FileText } from 'lucide-react';
+import { ServiceOrder, Technician, OrderStatus, ServiceType, AirSettings, Customer, AirEquipment } from '../types';
+import { X, Save, Trash2, Calendar, Clock, Wrench, DollarSign, CheckCircle, Navigation, Radio, MapPin, Users, Percent, Check, FileText, User, UserPlus } from 'lucide-react';
 import { calculateLiveRouteETA, getCustomerCoordinates, RouteETA } from '../lib/routingService';
+import { QuickCreateCustomerModal } from './QuickCreateCustomerModal';
+import { toast } from 'react-hot-toast';
 
 interface EditServiceOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   order: ServiceOrder | null;
   technicians: Technician[];
+  customers?: Customer[];
+  equipments?: AirEquipment[];
   settings?: AirSettings;
   onUpdateOrder: (id: string, updates: Partial<ServiceOrder>) => void;
   onDeleteOrder: (id: string) => void;
   onOpenReceipt?: (order: ServiceOrder) => void;
+  onAddCustomer?: (customer: Omit<Customer, 'id' | 'created_at'>) => Promise<Customer | void> | void;
+  onAddEquipment?: (equipment: Omit<AirEquipment, 'id' | 'next_maintenance_date'>) => Promise<AirEquipment | void> | void;
 }
 
 export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
@@ -19,10 +25,14 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
   onClose,
   order,
   technicians,
+  customers,
+  equipments,
   settings,
   onUpdateOrder,
   onDeleteOrder,
   onOpenReceipt,
+  onAddCustomer,
+  onAddEquipment,
 }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -46,6 +56,10 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
   const [assistantPayoutType, setAssistantPayoutType] = useState<'fixed' | 'percentage'>(order?.assistant_payout_type || 'fixed');
   const [assistantPayoutValue, setAssistantPayoutValue] = useState<number>(order?.assistant_payout_value ?? 10000);
 
+  const [customerId, setCustomerId] = useState(order?.customer_id || '');
+  const [equipmentId, setEquipmentId] = useState(order?.equipment_id || '');
+  const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
+
   const [scheduledDate, setScheduledDate] = useState(order?.scheduled_date || '');
   const [scheduledSlot, setScheduledSlot] = useState(order?.scheduled_time_slot || '');
   const [description, setDescription] = useState(order?.description || '');
@@ -64,6 +78,8 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
 
   useEffect(() => {
     if (order) {
+      setCustomerId(order.customer_id || '');
+      setEquipmentId(order.equipment_id || '');
       setStatus(order.status);
       setTechnicianId(order.assigned_technician_id || '');
       setAssistantId(order.assigned_assistant_id || '');
@@ -189,6 +205,8 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
     const tax = total - subtotal;
 
     onUpdateOrder(order.id, {
+      customer_id: customerId,
+      equipment_id: equipmentId || undefined,
       status,
       assigned_technician_id: technicianId,
       assigned_assistant_id: assistantId || undefined,
@@ -272,6 +290,66 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
               {/* COLUMNA IZQUIERDA: Estados, Agendamiento, Cuadrilla y GPS */}
               <div className="lg:col-span-6 space-y-4">
+                {/* Cliente & Equipo Asignado */}
+                {customers && customers.length > 0 && (
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="font-semibold text-slate-700 flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-cyan-600" />
+                          Cliente Asociado
+                        </label>
+                        {onAddCustomer && (
+                          <button
+                            type="button"
+                            onClick={() => setIsAddCustomerModalOpen(true)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-700 hover:text-cyan-800 font-bold text-[11px] transition-colors cursor-pointer border border-cyan-300/40 shadow-2xs"
+                            title="Crear un nuevo cliente y asociarlo a esta orden"
+                          >
+                            <UserPlus className="w-3.5 h-3.5" />
+                            <span>+ Nuevo Cliente</span>
+                          </button>
+                        )}
+                      </div>
+                      <select
+                        value={customerId}
+                        onChange={(e) => {
+                          setCustomerId(e.target.value);
+                          setEquipmentId('');
+                        }}
+                        className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 font-medium focus:border-cyan-500 focus:outline-none transition-colors"
+                      >
+                        {customers.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} ({c.commune || 'Sin comuna'}) - {c.address}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {equipments && (
+                      <div className="space-y-1.5 pt-2 border-t border-slate-200/70">
+                        <label className="font-semibold text-slate-700 flex items-center gap-1.5">
+                          <Wrench className="w-3.5 h-3.5 text-blue-600" />
+                          Equipo Asignado
+                        </label>
+                        <select
+                          value={equipmentId}
+                          onChange={(e) => setEquipmentId(e.target.value)}
+                          className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:border-cyan-500 focus:outline-none transition-colors"
+                        >
+                          <option value="">Sin equipo registrado (Asignación abierta)</option>
+                          {equipments.filter(e => e.customer_id === customerId).map(eq => (
+                            <option key={eq.id} value={eq.id}>
+                              {eq.brand} {eq.btu} BTU - {eq.location_in_property} ({eq.type})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Status & Payment Status */}
                 <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -650,6 +728,24 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Submodal para Crear Cliente Directo */}
+      {isAddCustomerModalOpen && onAddCustomer && (
+        <QuickCreateCustomerModal
+          isOpen={isAddCustomerModalOpen}
+          onClose={() => setIsAddCustomerModalOpen(false)}
+          settings={settings}
+          onAddCustomer={onAddCustomer}
+          onAddEquipment={onAddEquipment}
+          onCustomerCreated={(newCust, newEq) => {
+            setCustomerId(newCust.id);
+            if (newEq) {
+              setEquipmentId(newEq.id);
+            }
+            toast.success(`Cliente ${newCust.name} asignado a la orden`);
+          }}
+        />
+      )}
     </div>
   );
 };

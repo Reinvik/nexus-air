@@ -502,6 +502,8 @@ export default function App() {
           technicians={technicians}
           settings={tenantSettings || settings}
           onAddOrder={addOrder}
+          onAddCustomer={addCustomer}
+          onAddEquipment={addEquipment}
         />
       )}
 
@@ -514,6 +516,8 @@ export default function App() {
           }}
           order={selectedOrder}
           technicians={technicians}
+          customers={customers}
+          equipments={equipments}
           settings={tenantSettings || settings}
           onOpenReceipt={(ord) => {
             setIsEditOrderModalOpen(false);
@@ -521,6 +525,8 @@ export default function App() {
           }}
           onUpdateOrder={updateOrder}
           onDeleteOrder={deleteOrder}
+          onAddCustomer={addCustomer}
+          onAddEquipment={addEquipment}
         />
       )}
 
