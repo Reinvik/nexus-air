@@ -634,7 +634,7 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
               <Wind className="w-5 h-5 text-cyan-600" />
               Tus Equipos de Aire Acondicionado ({clientEquipments.length})
             </h3>
-            <span className="text-xs text-slate-500 font-medium">Ciclo de Mantención Semestral (180 Días)</span>
+            <span className="text-xs text-slate-500 font-medium">Ciclo de Mantención Preventiva ({settings?.maintenance_interval_months || 6} Meses)</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -663,7 +663,7 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
                     <span className="text-slate-800 font-mono font-medium">{eq.last_maintenance_date || 'Instalación nueva'}</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-cyan-700 font-semibold">Próxima Mantención (6 Meses):</span>
+                    <span className="text-cyan-700 font-semibold">Próxima Mantención ({settings?.maintenance_interval_months || 6} Meses):</span>
                     <span className="text-cyan-600 font-mono font-bold">{eq.next_maintenance_date}</span>
                   </div>
 

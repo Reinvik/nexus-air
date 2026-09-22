@@ -92,8 +92,14 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
 
   const [settings, setSettings] = useState<AirSettings>(() => {
     try {
-      const saved = localStorage.getItem(`nexus_air_settings_${companyId}`);
-      if (saved) return JSON.parse(saved);
+      const saved = localStorage.getItem(`nexus_air_settings_${companyId}`) || localStorage.getItem('nexus_air_active_settings');
+      if (saved) {
+        return {
+          ...INITIAL_SETTINGS,
+          ...JSON.parse(saved),
+          company_id: companyId,
+        };
+      }
     } catch (e) {
       console.warn('Error reading settings from localStorage:', e);
     }
@@ -249,9 +255,14 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
 
     // 6. Sincronizar settings
     try {
-      const savedSettings = localStorage.getItem(`nexus_air_settings_${companyId}`);
+      const savedSettings = localStorage.getItem(`nexus_air_settings_${companyId}`) || localStorage.getItem('nexus_air_active_settings');
       if (savedSettings) {
-        setSettings(JSON.parse(savedSettings));
+        setSettings(prev => ({
+          ...INITIAL_SETTINGS,
+          ...prev,
+          ...JSON.parse(savedSettings),
+          company_id: companyId,
+        }));
       } else {
         setSettings({
           ...INITIAL_SETTINGS,
@@ -356,6 +367,24 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
             email: dbSettings.email || prev.email,
             address: dbSettings.address || prev.address,
             landing_config: dbSettings.landing_config || prev.landing_config,
+            logo_url: dbSettings.logo_url || localSaved?.logo_url || prev.logo_url,
+            company_slogan: dbSettings.company_slogan || localSaved?.company_slogan || prev.company_slogan,
+            city: dbSettings.city || localSaved?.city || prev.city,
+            default_apply_tax: localSaved?.default_apply_tax !== undefined 
+              ? localSaved.default_apply_tax 
+              : (dbSettings.default_apply_tax !== undefined ? dbSettings.default_apply_tax : (prev.default_apply_tax !== false)),
+            maintenance_interval_months: dbSettings.maintenance_interval_months !== null && dbSettings.maintenance_interval_months !== undefined
+              ? Number(dbSettings.maintenance_interval_months)
+              : (localSaved?.maintenance_interval_months ?? prev.maintenance_interval_months ?? 6),
+            quality_control_days: dbSettings.quality_control_days !== null && dbSettings.quality_control_days !== undefined
+              ? Number(dbSettings.quality_control_days)
+              : (localSaved?.quality_control_days ?? prev.quality_control_days ?? 7),
+            inactive_recovery_months: dbSettings.inactive_recovery_months !== null && dbSettings.inactive_recovery_months !== undefined
+              ? Number(dbSettings.inactive_recovery_months)
+              : (localSaved?.inactive_recovery_months ?? prev.inactive_recovery_months ?? 9),
+            pre_expiration_warning_days: dbSettings.pre_expiration_warning_days !== null && dbSettings.pre_expiration_warning_days !== undefined
+              ? Number(dbSettings.pre_expiration_warning_days)
+              : (localSaved?.pre_expiration_warning_days ?? prev.pre_expiration_warning_days ?? 15),
           };
 
           try {
@@ -659,10 +688,14 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     };
   }, [companyId, fetchData]);
 
-  // Motor de Recaptación Semestral (Cada 6 meses = 180 días)
+  // Motor de Recaptación Dinámica por Empresa (Intervalo configurable en meses y días de alerta)
   const reminders = useMemo<RecaptacionReminder[]>(() => {
     const today = new Date();
     const result: RecaptacionReminder[] = [];
+
+    const intervalMonths = settings.maintenance_interval_months || 6;
+    const intervalDays = intervalMonths * 30;
+    const warningDays = settings.pre_expiration_warning_days ?? 15;
 
     equipments.forEach(eq => {
       const customer = customers.find(c => c.id === eq.customer_id);
@@ -672,8 +705,8 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       let baseDate = parseISO(baseDateStr);
       if (isNaN(baseDate.getTime())) baseDate = today;
 
-      // Fecha límite: 6 meses (180 días)
-      const dueDate = addDays(baseDate, 180);
+      // Fecha límite: calculada dinámicamente según la empresa (intervalMonths * 30 días)
+      const dueDate = addDays(baseDate, intervalDays);
       const daysUntilDue = differenceInDays(dueDate, today);
 
       let status: RecaptacionReminder['status'] = 'al_dia';
@@ -681,7 +714,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         status = 'contactado';
       } else if (daysUntilDue < 0) {
         status = 'vencido';
-      } else if (daysUntilDue <= 30) {
+      } else if (daysUntilDue <= warningDays) {
         status = 'por_vencer';
       }
 
@@ -708,7 +741,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     });
 
     return result.sort((a, b) => a.days_until_due - b.days_until_due);
-  }, [equipments, customers, contactedReminderIds]);
+  }, [equipments, customers, contactedReminderIds, settings.maintenance_interval_months, settings.pre_expiration_warning_days]);
 
   // Órdenes enriquecidas con relaciones
   const enrichedOrders = useMemo<ServiceOrder[]>(() => {
@@ -735,15 +768,16 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       if (o.id !== orderId) return o;
       const completedAt = newStatus === 'completado' ? (o.completed_at || completedAtStr) : o.completed_at;
       
-      // Si se completa, actualizar fecha de mantenimiento en equipo a hoy (+180 días próxima)
+      // Si se completa, actualizar fecha de mantenimiento en equipo a hoy (+ intervalo configurado)
       if (newStatus === 'completado' && o.equipment_id) {
         const todayStr = format(new Date(), 'yyyy-MM-dd');
+        const intervalDays = (settings.maintenance_interval_months || 6) * 30;
         setEquipments(eqPrev => eqPrev.map(eq => {
           if (eq.id === o.equipment_id) {
             return {
               ...eq,
               last_maintenance_date: todayStr,
-              next_maintenance_date: format(addDays(new Date(), 180), 'yyyy-MM-dd'),
+              next_maintenance_date: format(addDays(new Date(), intervalDays), 'yyyy-MM-dd'),
             };
           }
           return eq;
@@ -771,7 +805,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     } catch (e) {
       console.warn('[useAirStore] Failed to sync order status to DB:', e);
     }
-  }, []);
+  }, [settings.maintenance_interval_months]);
 
   const updateOrder = useCallback(async (orderId: string, updates: Partial<ServiceOrder>) => {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o));
@@ -992,7 +1026,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       equipment_id: reminder.equipment_id,
       service_type: 'mantencion_preventiva',
       status: 'ingresado',
-      description: `Mantención preventiva semestral recaptada (6 meses). Equipo ${reminder.equipment_brand} ${reminder.equipment_btu} BTU en ${reminder.equipment_location}.`,
+      description: `Mantención preventiva periódica recaptada (${settings.maintenance_interval_months || 6} meses). Equipo ${reminder.equipment_brand} ${reminder.equipment_btu} BTU en ${reminder.equipment_location}.`,
       scheduled_date: format(addDays(new Date(), 2), 'yyyy-MM-dd'),
       scheduled_time_slot: '10:00 - 12:00',
       items: [
@@ -1012,7 +1046,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
 
     markReminderContacted(reminder.equipment_id);
     return newOrder;
-  }, [addOrder, markReminderContacted, settings.standard_maintenance_price, settings.tax_rate]);
+  }, [addOrder, markReminderContacted, settings.standard_maintenance_price, settings.tax_rate, settings.maintenance_interval_months]);
 
   const generateWhatsAppUrl = useCallback((reminder: RecaptacionReminder) => {
     let text = settings.whatsapp_template_recaptacion;
@@ -1105,7 +1139,8 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     const activeId = companyId || DEFAULT_COMPANY_ID;
     const newId = crypto.randomUUID();
     const baseDate = eqData.last_maintenance_date || eqData.installation_date || format(new Date(), 'yyyy-MM-dd');
-    const nextDate = format(addDays(parseISO(baseDate), 180), 'yyyy-MM-dd');
+    const intervalDays = (settings.maintenance_interval_months || 6) * 30;
+    const nextDate = format(addDays(parseISO(baseDate), intervalDays), 'yyyy-MM-dd');
 
     const newEq: AirEquipment = {
       ...eqData,
@@ -1136,14 +1171,15 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       console.warn('[useAirStore] Error inserting equipment:', e);
     }
     return newEq;
-  }, [companyId]);
+  }, [companyId, settings.maintenance_interval_months]);
 
   const updateEquipment = useCallback(async (id: string, updates: Partial<AirEquipment>) => {
+    const intervalDays = (settings.maintenance_interval_months || 6) * 30;
     setEquipments(prev => prev.map(eq => {
       if (eq.id !== id) return eq;
       const updated = { ...eq, ...updates };
       if (updates.last_maintenance_date) {
-        updated.next_maintenance_date = format(addDays(parseISO(updates.last_maintenance_date), 180), 'yyyy-MM-dd');
+        updated.next_maintenance_date = format(addDays(parseISO(updates.last_maintenance_date), intervalDays), 'yyyy-MM-dd');
       }
       return updated;
     }));
@@ -1161,7 +1197,10 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       if (updates.serial_number_evaporator !== undefined) eqDbUpdates.serial_number_evaporator = updates.serial_number_evaporator;
       if (updates.serial_number_condenser !== undefined) eqDbUpdates.serial_number_condenser = updates.serial_number_condenser;
       if (updates.location_in_property !== undefined) eqDbUpdates.location_in_property = updates.location_in_property;
-      if (updates.last_maintenance_date !== undefined) eqDbUpdates.last_maintenance_date = updates.last_maintenance_date;
+      if (updates.last_maintenance_date !== undefined) {
+        eqDbUpdates.last_maintenance_date = updates.last_maintenance_date;
+        eqDbUpdates.next_maintenance_date = format(addDays(parseISO(updates.last_maintenance_date), intervalDays), 'yyyy-MM-dd');
+      }
 
       await supabaseAir
         .from('equipments')
@@ -1170,7 +1209,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     } catch (e) {
       console.warn('[useAirStore] Error updating equipment:', e);
     }
-  }, []);
+  }, [settings.maintenance_interval_months]);
 
   const deleteEquipment = useCallback(async (id: string) => {
     setEquipments(prev => prev.filter(eq => eq.id !== id));

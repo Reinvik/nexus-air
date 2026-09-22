@@ -118,6 +118,9 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
     e.preventDefault();
     try {
       localStorage.setItem('nexus_air_active_settings', JSON.stringify(formData));
+      if (formData.company_id) {
+        localStorage.setItem(`nexus_air_settings_${formData.company_id}`, JSON.stringify(formData));
+      }
     } catch {}
     onUpdateSettings(formData);
   };
@@ -600,7 +603,7 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
           <div className="space-y-4 text-xs">
             <div>
               <label className="text-slate-700 font-semibold block">
-                Plantilla de Recaptación Semestral (Cada 6 Meses)
+                Plantilla de Recaptación Periódica ({formData.maintenance_interval_months || 6} Meses)
               </label>
               <p className="text-[11px] text-slate-400 mb-1">
                 Variables soportadas: {'{cliente}'}, {'{marca}'}, {'{btu}'}, {'{ubicacion}'}, {'{link}'}

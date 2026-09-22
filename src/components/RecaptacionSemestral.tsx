@@ -62,6 +62,13 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
   const [timingRecoveryMonths, setTimingRecoveryMonths] = useState<number>(settings.inactive_recovery_months || 9);
   const [timingPreWarningDays, setTimingPreWarningDays] = useState<number>(settings.pre_expiration_warning_days || 15);
 
+  React.useEffect(() => {
+    setTimingIntervalMonths(settings.maintenance_interval_months || 6);
+    setTimingQualityDays(settings.quality_control_days || 7);
+    setTimingRecoveryMonths(settings.inactive_recovery_months || 9);
+    setTimingPreWarningDays(settings.pre_expiration_warning_days || 15);
+  }, [settings.maintenance_interval_months, settings.quality_control_days, settings.inactive_recovery_months, settings.pre_expiration_warning_days]);
+
   const handleSaveTiming = (e: React.FormEvent) => {
     e.preventDefault();
     if (onUpdateSettings) {
@@ -199,8 +206,9 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
           </h2>
           <p className="text-xs md:text-sm text-slate-600 leading-relaxed">
             Ecosistema automatizado de 3 tiempos para maximizar la vida útil del cliente: 
-            <strong> Control de Calidad</strong> a los pocos días, <strong>Mantenimiento Semestral</strong> periódico y 
-            <strong> Recuperación de Inactivos</strong> con ofertas de reactivación.
+            <strong> Control de Calidad</strong> a los {settings.quality_control_days || 7} días, 
+            <strong> Mantenimiento Preventivo</strong> cada {settings.maintenance_interval_months || 6} meses y 
+            <strong> Recuperación de Inactivos</strong> a los {settings.inactive_recovery_months || 9} meses con ofertas de reactivación.
           </p>
         </div>
 
@@ -289,7 +297,7 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-in fade-in duration-150">
           <div className="p-5 rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-md shadow-red-500/20 space-y-1">
             <div className="flex items-center justify-between text-white/90 text-xs font-bold uppercase">
-              <span>Vencidos (&gt; 6 Meses)</span>
+              <span>Vencidos (&gt; {settings.maintenance_interval_months || 6} Meses)</span>
               <AlertTriangle className="w-4 h-4" />
             </div>
             <p className="text-3xl font-black">{stats.vencidos}</p>
@@ -298,7 +306,7 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
 
           <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/20 space-y-1">
             <div className="flex items-center justify-between text-white/90 text-xs font-bold uppercase">
-              <span>Por Vencer (&lt; 30 días)</span>
+              <span>Por Vencer (&lt; {settings.pre_expiration_warning_days || 15} días)</span>
               <Clock className="w-4 h-4" />
             </div>
             <p className="text-3xl font-black">{stats.porVencer}</p>
@@ -333,7 +341,7 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
               <Star className="w-4 h-4" />
             </div>
             <p className="text-3xl font-black">{stats.totalQuality}</p>
-            <p className="text-[11px] text-white/80">Visitas técnicas en últimos 3-14 días</p>
+            <p className="text-[11px] text-white/80">Visitas técnicas en últimos {settings.quality_control_days || 7} días</p>
           </div>
 
           <div className="p-5 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/20 space-y-1">
@@ -360,7 +368,7 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in duration-150">
           <div className="p-5 rounded-2xl bg-gradient-to-br from-rose-500 to-red-600 text-white shadow-md shadow-rose-500/20 space-y-1">
             <div className="flex items-center justify-between text-white/90 text-xs font-bold uppercase">
-              <span>Clientes Inactivos (&gt; 9 Meses)</span>
+              <span>Clientes Inactivos (&gt; {settings.inactive_recovery_months || 9} Meses)</span>
               <Users className="w-4 h-4" />
             </div>
             <p className="text-3xl font-black">{stats.totalRecovery}</p>
@@ -438,14 +446,14 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
           {activeTab === 'quality' && (
             <div className="text-xs font-bold text-amber-800 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 flex items-center gap-1.5">
               <Star className="w-3.5 h-3.5 text-amber-600" />
-              <span>Mostrando servicios completados recientemente (Ventana de 3 a 14 días)</span>
+              <span>Mostrando servicios completados recientemente (Ventana de {settings.quality_control_days || 7} días)</span>
             </div>
           )}
 
           {activeTab === 'recovery' && (
             <div className="text-xs font-bold text-rose-800 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200 flex items-center gap-1.5">
               <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
-              <span>Clientes sin mantención hace más de 9 meses (Mensaje con 15% Descuento)</span>
+              <span>Clientes sin mantención hace más de {settings.inactive_recovery_months || 9} meses (Mensaje con 15% Descuento)</span>
             </div>
           )}
         </div>
@@ -472,7 +480,7 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
                 <th className="py-3.5 px-4">Equipo & Ubicación</th>
                 <th className="py-3.5 px-4">Último Servicio</th>
                 <th className="py-3.5 px-4">
-                  {activeTab === 'quality' ? 'Días desde Visita' : activeTab === 'recovery' ? 'Tiempo Inactivo' : 'Vencimiento (6M)'}
+                  {activeTab === 'quality' ? 'Días desde Visita' : activeTab === 'recovery' ? 'Tiempo Inactivo' : `Vencimiento (${settings.maintenance_interval_months || 6}M)`}
                 </th>
                 <th className="py-3.5 px-4">Objetivo de Contacto</th>
                 <th className="py-3.5 px-4 text-right">Acción Rápida</th>
@@ -487,7 +495,8 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
                 </tr>
               ) : (
                 currentList.map((r) => {
-                  const daysSinceService = Math.max(0, 180 - r.days_until_due);
+                  const intervalDays = (settings.maintenance_interval_months || 6) * 30;
+                  const daysSinceService = Math.max(0, intervalDays - r.days_until_due);
                   return (
                     <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
                       {/* Cliente */}
@@ -527,12 +536,12 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
                         ) : activeTab === 'recovery' ? (
                           <div>
                             <span className="font-bold text-rose-700">{Math.abs(r.days_until_due)} días de retraso</span>
-                            <div className="text-[10px] text-slate-400">Más de 9 meses sin servicio</div>
+                            <div className="text-[10px] text-slate-400">Más de {settings.inactive_recovery_months || 9} meses sin servicio</div>
                           </div>
                         ) : (
                           <div>
                             <div className="text-slate-900 font-bold">{r.next_maintenance_due}</div>
-                            <div className="text-[10px] text-slate-400">180 días exactos</div>
+                            <div className="text-[10px] text-slate-400">{intervalDays} días ({settings.maintenance_interval_months || 6}M)</div>
                           </div>
                         )}
                       </td>

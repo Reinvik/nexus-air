@@ -61,7 +61,7 @@ export const Layout: React.FC<LayoutProps> = ({
     { id: 'dashboard', label: 'Tablero Órdenes', icon: Kanban, badge: activeOrdersCount },
     { 
       id: 'recaptacion', 
-      label: 'Recaptación 6M', 
+      label: `Recaptación ${settings?.maintenance_interval_months || 6}M`, 
       icon: Clock, 
       badge: overdueRecaptacionCount, 
       badgeColor: overdueRecaptacionCount > 0 ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : undefined 
@@ -330,7 +330,7 @@ export const Layout: React.FC<LayoutProps> = ({
                 {[...mainNav, ...manageNav].find(i => i.id === activeTab)?.label || 'Panel de Climatización'}
               </h1>
               <p className="text-[10px] sm:text-[11px] text-slate-500 truncate max-w-[180px] sm:max-w-none">
-                {settings.company_name} • Mantenimiento Preventivo Semestral
+                {settings.company_name} • Mantenimiento Preventivo ({settings.maintenance_interval_months || 6}M)
               </p>
             </div>
           </div>
@@ -342,7 +342,7 @@ export const Layout: React.FC<LayoutProps> = ({
                 className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-800 text-[11px] sm:text-xs font-bold hover:bg-amber-100 transition-all cursor-pointer shadow-xs"
               >
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                <span className="hidden sm:inline">{overdueRecaptacionCount} Equipos por Recaptar (6M)</span>
+                <span className="hidden sm:inline">{overdueRecaptacionCount} Equipos por Recaptar ({settings.maintenance_interval_months || 6}M)</span>
                 <span className="sm:hidden">{overdueRecaptacionCount}</span>
               </button>
             )}
