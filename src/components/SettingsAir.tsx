@@ -14,7 +14,8 @@ import {
   Percent,
   Upload,
   Trash2,
-  Image as ImageIcon
+  Image as ImageIcon,
+  CreditCard
 } from 'lucide-react';
 import { LATIN_AMERICAN_COUNTRIES, findCountry, LatinCountry } from '../lib/countries';
 import { toast } from 'react-hot-toast';
@@ -47,6 +48,12 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
     inactive_recovery_months: settings.inactive_recovery_months || 9,
     pre_expiration_warning_days: settings.pre_expiration_warning_days || 15,
     logo_url: settings.logo_url || '',
+    bank_name: settings.bank_name || '',
+    bank_account_type: settings.bank_account_type || '',
+    bank_account_number: settings.bank_account_number || '',
+    bank_account_rut: settings.bank_account_rut || '',
+    bank_account_email: settings.bank_account_email || '',
+    whatsapp_template_cobro: settings.whatsapp_template_cobro || '',
   });
 
   useEffect(() => {
@@ -67,6 +74,12 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
       inactive_recovery_months: settings.inactive_recovery_months || 9,
       pre_expiration_warning_days: settings.pre_expiration_warning_days || 15,
       logo_url: settings.logo_url || '',
+      bank_name: settings.bank_name || '',
+      bank_account_type: settings.bank_account_type || '',
+      bank_account_number: settings.bank_account_number || '',
+      bank_account_rut: settings.bank_account_rut || '',
+      bank_account_email: settings.bank_account_email || '',
+      whatsapp_template_cobro: settings.whatsapp_template_cobro || '',
     });
   }, [settings]);
 
@@ -627,6 +640,87 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
                 rows={2}
                 value={formData.whatsapp_template_agendamiento}
                 onChange={(e) => setFormData(prev => ({ ...prev, whatsapp_template_agendamiento: e.target.value }))}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 leading-relaxed focus:bg-white focus:border-cyan-500 focus:outline-none"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* SECCIÓN 5: DATOS BANCARIOS PARA COBROS Y TRANSFERENCIAS (NK-044) */}
+        <div className="p-6 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-4">
+          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+            <CreditCard className="w-4 h-4 text-emerald-600" />
+            Datos Bancarios Oficiales para Cobros & Transferencias (NK-044)
+          </h3>
+          <p className="text-[11px] text-slate-400">
+            Esta información se cargará por defecto al enviar recordatorios de pago a clientes por WhatsApp en Ventas & Finanzas.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+            <div>
+              <label className="text-slate-700 font-semibold block mb-1">Nombre del Banco</label>
+              <input
+                type="text"
+                value={formData.bank_name || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, bank_name: e.target.value }))}
+                placeholder="Ej: Banco Santander / Banco de Chile"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="text-slate-700 font-semibold block mb-1">Tipo de Cuenta</label>
+              <input
+                type="text"
+                value={formData.bank_account_type || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, bank_account_type: e.target.value }))}
+                placeholder="Ej: Cuenta Corriente / Vista"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="text-slate-700 font-semibold block mb-1">Número de Cuenta</label>
+              <input
+                type="text"
+                value={formData.bank_account_number || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, bank_account_number: e.target.value }))}
+                placeholder="Ej: 1234567890"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:border-cyan-500 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="text-slate-700 font-semibold block mb-1">RUT / Identificación Titular</label>
+              <input
+                type="text"
+                value={formData.bank_account_rut || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, bank_account_rut: e.target.value }))}
+                placeholder="Ej: 76.543.210-K"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:border-cyan-500 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="text-slate-700 font-semibold block mb-1">Email para Notificación de Transferencias</label>
+              <input
+                type="email"
+                value={formData.bank_account_email || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, bank_account_email: e.target.value }))}
+                placeholder="Ej: pagos@tuempresa.cl"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
+              />
+            </div>
+
+            <div className="sm:col-span-2 lg:col-span-3">
+              <label className="text-slate-700 font-semibold block mb-1">
+                Plantilla Base de Recordatorio de Cobro WhatsApp
+              </label>
+              <textarea
+                rows={3}
+                value={formData.whatsapp_template_cobro || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, whatsapp_template_cobro: e.target.value }))}
+                placeholder="Hola {cliente}, le saludamos de {empresa}. Recordatorio de saldo pendiente de la orden {ticket}..."
                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 leading-relaxed focus:bg-white focus:border-cyan-500 focus:outline-none"
               />
             </div>

@@ -85,6 +85,22 @@ export interface Technician {
   active_orders_count?: number;
 }
 
+export interface TechnicianPayout {
+  id: string;
+  payout_number: string; // ej: "LIQ-2026-001"
+  technician_id: string;
+  technician_name: string;
+  technician_role: 'tecnico' | 'ayudante';
+  period_month: string; // ej: "2026-09"
+  amount: number;
+  payment_date: string; // YYYY-MM-DD
+  payment_method: 'transferencia' | 'efectivo' | 'cheque' | 'otro';
+  payment_reference?: string;
+  notes?: string;
+  order_ids: string[];
+  created_at: string;
+}
+
 export interface HVACInspectionChecklist {
   clean_evaporator_coil: boolean;
   clean_turbine_fan: boolean;
@@ -279,6 +295,12 @@ export interface AirSettings {
   whatsapp_template_recaptacion: string;
   whatsapp_template_agendamiento: string;
   whatsapp_template_terminado: string;
+  whatsapp_template_cobro?: string; // NK-044: Plantilla recordatorio de cobro / pago
+  bank_name?: string;               // NK-044: Banco receptor
+  bank_account_type?: string;       // NK-044: Tipo de cuenta (Corriente, Vista, Ahorro, etc.)
+  bank_account_number?: string;     // NK-044: N° de cuenta
+  bank_account_rut?: string;        // NK-044: RUT o Identificación de cuenta
+  bank_account_email?: string;      // NK-044: Email para comprobante de transferencia
   warranty_months?: number;
   logo_url?: string;
   tax_id?: string;

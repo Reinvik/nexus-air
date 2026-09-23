@@ -9,7 +9,8 @@ import {
   AirSettings, 
   OrderStatus,
   RecaptacionReminder,
-  HVACInspectionChecklist
+  HVACInspectionChecklist,
+  TechnicianPayout
 } from '../types';
 import { 
   INITIAL_SETTINGS, 
@@ -88,6 +89,19 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       console.warn('Error reading parts from localStorage:', e);
     }
     return isMockCompany ? INITIAL_PARTS : [];
+  });
+
+  const [technicianPayouts, setTechnicianPayouts] = useState<TechnicianPayout[]>(() => {
+    try {
+      const saved = localStorage.getItem(`nexus_air_technician_payouts_${companyId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.warn('Error reading technician payouts from localStorage:', e);
+    }
+    return [];
   });
 
   const [settings, setSettings] = useState<AirSettings>(() => {
@@ -187,6 +201,15 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       console.warn('Error saving parts:', e);
     }
   }, [parts, companyId]);
+
+  // Persistir liquidaciones de técnicos localmente (NK-043)
+  useEffect(() => {
+    try {
+      localStorage.setItem(`nexus_air_technician_payouts_${companyId}`, JSON.stringify(technicianPayouts));
+    } catch (e) {
+      console.warn('Error saving technician payouts:', e);
+    }
+  }, [technicianPayouts, companyId]);
 
   // Sincronizar estado en memoria inmediatamente al cambiar de empresa (switch o login)
   useEffect(() => {
@@ -289,6 +312,18 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     } catch {
       setContactedReminderIds({});
     }
+
+    // 8. Sincronizar liquidaciones de técnicos (NK-043)
+    try {
+      const savedPayouts = localStorage.getItem(`nexus_air_technician_payouts_${companyId}`);
+      if (savedPayouts) {
+        setTechnicianPayouts(JSON.parse(savedPayouts));
+      } else {
+        setTechnicianPayouts([]);
+      }
+    } catch {
+      setTechnicianPayouts([]);
+    }
   }, [companyId]);
 
   // Cargar datos desde Supabase (Schema 'air')
@@ -385,6 +420,12 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
             pre_expiration_warning_days: dbSettings.pre_expiration_warning_days !== null && dbSettings.pre_expiration_warning_days !== undefined
               ? Number(dbSettings.pre_expiration_warning_days)
               : (localSaved?.pre_expiration_warning_days ?? prev.pre_expiration_warning_days ?? 15),
+            bank_name: dbSettings.bank_name || localSaved?.bank_name || prev.bank_name || '',
+            bank_account_type: dbSettings.bank_account_type || localSaved?.bank_account_type || prev.bank_account_type || '',
+            bank_account_number: dbSettings.bank_account_number || localSaved?.bank_account_number || prev.bank_account_number || '',
+            bank_account_rut: dbSettings.bank_account_rut || localSaved?.bank_account_rut || prev.bank_account_rut || '',
+            bank_account_email: dbSettings.bank_account_email || localSaved?.bank_account_email || prev.bank_account_email || '',
+            whatsapp_template_cobro: dbSettings.whatsapp_template_cobro || localSaved?.whatsapp_template_cobro || prev.whatsapp_template_cobro || '',
           };
 
           try {
@@ -660,6 +701,35 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       } else if (!isMock) {
         setOrders([]);
       }
+
+      // 7. Liquidaciones de Técnicos (NK-043)
+      const { data: dbPayouts } = await supabaseAir
+        .from('technician_payouts')
+        .select('*')
+        .eq('company_id', activeId)
+        .order('payment_date', { ascending: false });
+
+      if (dbPayouts && dbPayouts.length > 0) {
+        setTechnicianPayouts(dbPayouts.map((p: any) => ({
+          id: p.id,
+          company_id: p.company_id,
+          payout_number: p.payout_number,
+          technician_id: p.technician_id,
+          technician_name: p.technician_name,
+          technician_role: p.technician_role,
+          period_month: p.period_month,
+          amount: Number(p.amount) || 0,
+          payment_date: p.payment_date,
+          payment_method: p.payment_method,
+          payment_reference: p.payment_reference,
+          notes: p.notes,
+          order_ids: Array.isArray(p.order_ids) ? p.order_ids : [],
+          created_at: p.created_at,
+          updated_at: p.updated_at
+        })));
+      } else if (!isMock) {
+        setTechnicianPayouts([]);
+      }
     } catch (err) {
       console.warn('[useAirStore] Using offline/initial cache:', err);
     } finally {
@@ -679,6 +749,9 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         fetchData();
       })
       .on('postgres_changes', { event: '*', schema: 'air', table: 'settings' }, () => {
+        fetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'air', table: 'technician_payouts' }, () => {
         fetchData();
       })
       .subscribe();
@@ -1435,6 +1508,12 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       if (updates.quality_control_days !== undefined) dbUpdates.quality_control_days = updates.quality_control_days;
       if (updates.inactive_recovery_months !== undefined) dbUpdates.inactive_recovery_months = updates.inactive_recovery_months;
       if (updates.pre_expiration_warning_days !== undefined) dbUpdates.pre_expiration_warning_days = updates.pre_expiration_warning_days;
+      if (updates.bank_name !== undefined) dbUpdates.bank_name = updates.bank_name;
+      if (updates.bank_account_type !== undefined) dbUpdates.bank_account_type = updates.bank_account_type;
+      if (updates.bank_account_number !== undefined) dbUpdates.bank_account_number = updates.bank_account_number;
+      if (updates.bank_account_rut !== undefined) dbUpdates.bank_account_rut = updates.bank_account_rut;
+      if (updates.bank_account_email !== undefined) dbUpdates.bank_account_email = updates.bank_account_email;
+      if (updates.whatsapp_template_cobro !== undefined) dbUpdates.whatsapp_template_cobro = updates.whatsapp_template_cobro;
 
       // Intentar update primero por company_id
       const { error: updateErr } = await supabaseAir
@@ -1453,6 +1532,71 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     }
   }, [companyId]);
 
+  // Liquidación de Honorarios a Técnicos (NK-043)
+  const addTechnicianPayout = useCallback(async (payoutData: Omit<TechnicianPayout, 'id' | 'company_id' | 'created_at'>) => {
+    const activeId = companyId || DEFAULT_COMPANY_ID;
+    const newId = crypto.randomUUID();
+    const payoutNumber = payoutData.payout_number || `LIQ-${format(new Date(), 'yyyyMM')}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const newPayout: TechnicianPayout = {
+      ...payoutData,
+      id: newId,
+      company_id: activeId,
+      payout_number: payoutNumber,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    setTechnicianPayouts(prev => [newPayout, ...prev]);
+    toast.success('Pago de honorarios registrado exitosamente');
+
+    try {
+      const { error } = await supabaseAir
+        .from('technician_payouts')
+        .insert({
+          id: newId,
+          company_id: activeId,
+          payout_number: payoutNumber,
+          technician_id: newPayout.technician_id,
+          technician_name: newPayout.technician_name,
+          technician_role: newPayout.technician_role,
+          period_month: newPayout.period_month,
+          amount: newPayout.amount,
+          payment_date: newPayout.payment_date,
+          payment_method: newPayout.payment_method,
+          payment_reference: newPayout.payment_reference,
+          notes: newPayout.notes,
+          order_ids: newPayout.order_ids || []
+        });
+
+      if (error) {
+        console.warn('[useAirStore] Error saving technician payout to Supabase:', error);
+      }
+    } catch (err) {
+      console.warn('[useAirStore] Exception saving technician payout:', err);
+    }
+
+    return newPayout;
+  }, [companyId]);
+
+  const deleteTechnicianPayout = useCallback(async (id: string) => {
+    setTechnicianPayouts(prev => prev.filter(p => p.id !== id));
+    toast.success('Liquidación eliminada');
+
+    try {
+      const { error } = await supabaseAir
+        .from('technician_payouts')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.warn('[useAirStore] Error deleting technician payout from Supabase:', error);
+      }
+    } catch (err) {
+      console.warn('[useAirStore] Exception deleting technician payout:', err);
+    }
+  }, []);
+
   // Reset a valores de demostración o estado limpio
   const resetToDefaults = useCallback(() => {
     const isMock = companyId === DEMO_SANDBOX_COMPANY_ID;
@@ -1462,6 +1606,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       setTechnicians(INITIAL_TECHNICIANS);
       setParts(INITIAL_PARTS);
       setOrders(INITIAL_SERVICE_ORDERS);
+      setTechnicianPayouts([]);
       setSettings({ ...INITIAL_SETTINGS, company_id: companyId });
       setContactedReminderIds({});
       try {
@@ -1476,6 +1621,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         localStorage.removeItem(`nexus_air_technicians_${companyId}`);
         localStorage.removeItem('nexus_air_technicians');
         localStorage.removeItem(`nexus_air_parts_${companyId}`);
+        localStorage.removeItem(`nexus_air_technician_payouts_${companyId}`);
       } catch {}
       toast.success('Datos de demostración restaurados');
     } else {
@@ -1484,6 +1630,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       setTechnicians([]);
       setParts([]);
       setOrders([]);
+      setTechnicianPayouts([]);
       setContactedReminderIds({});
       try {
         localStorage.removeItem(`nexus_air_customers_${companyId}`);
@@ -1491,6 +1638,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         localStorage.removeItem(`nexus_air_orders_${companyId}`);
         localStorage.removeItem(`nexus_air_technicians_${companyId}`);
         localStorage.removeItem(`nexus_air_parts_${companyId}`);
+        localStorage.removeItem(`nexus_air_technician_payouts_${companyId}`);
       } catch {}
       toast.success('Caché local de empresa limpiada');
       fetchData();
@@ -1522,6 +1670,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     inventory: parts,
     orders: enrichedOrders,
     rawOrders: orders,
+    technicianPayouts,
     reminders,
     settings,
     addOrder,
@@ -1541,6 +1690,8 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     addTechnician,
     updateTechnician,
     deleteTechnician,
+    addTechnicianPayout,
+    deleteTechnicianPayout,
     addPart,
     updatePart,
     deletePart,

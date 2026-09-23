@@ -69,7 +69,10 @@ export default function App() {
     updateSettings,
     resetToDefaults,
     refreshData,
-    fetchPublicCompanyBySlug
+    fetchPublicCompanyBySlug,
+    technicianPayouts,
+    addTechnicianPayout,
+    deleteTechnicianPayout
   } = useAirStore(effectiveCompanyId);
 
   // Tenant slug detection (ej: ?t=nexus-air)
@@ -454,9 +457,12 @@ export default function App() {
             technicians={technicians}
             orders={orders}
             settings={tenantSettings || settings}
+            technicianPayouts={technicianPayouts}
             onAddTechnician={addTechnician}
             onUpdateTechnician={updateTechnician}
             onDeleteTechnician={deleteTechnician}
+            onAddTechnicianPayout={addTechnicianPayout}
+            onDeleteTechnicianPayout={deleteTechnicianPayout}
           />
         )}
 
@@ -464,6 +470,7 @@ export default function App() {
           <SalesAir 
             orders={orders} 
             settings={tenantSettings || settings}
+            technicianPayouts={technicianPayouts}
             onUpdateOrder={updateOrder}
           />
         )}

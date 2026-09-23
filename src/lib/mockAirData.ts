@@ -33,6 +33,12 @@ export const INITIAL_SETTINGS: AirSettings = {
   whatsapp_template_recaptacion: 'Hola {cliente}, te saludamos de Nexus Air. Tu equipo de aire acondicionado {marca} ({btu} BTU) instalado en {ubicacion} está cumpliendo 6 meses desde su última mantención preventiva. Para asegurar aire puro, evitar malos olores y optimizar el consumo eléctrico para esta temporada, te invitamos a agendar con tu técnico asignado aquí: {link}',
   whatsapp_template_agendamiento: 'Estimado/a {cliente}, tu servicio técnico para {tipo_servicio} ha sido programado para el día {fecha} en el bloque {hora}. El técnico asignado es {tecnico}.',
   whatsapp_template_terminado: 'Estimado/a {cliente}, el servicio de {tipo_servicio} para tu equipo {marca} ha finalizado con éxito. Tu salto térmico medido fue de {delta_t}°C y presiones en norma. Tu próxima mantención preventiva está programada para dentro de 6 meses ({proxima_fecha}). ¡Gracias por confiar en Nexus Air!',
+  whatsapp_template_cobro: 'Hola {cliente}, le saludamos de {empresa}. Le recordamos que mantiene un saldo pendiente de {saldo} por el servicio {servicio} (Folio {ticket}).\n\nDatos de transferencia:\nBanco: {banco}\nTipo de Cuenta: {tipo_cuenta}\nN° de Cuenta: {numero_cuenta}\nTitular / RUT: {rut}\nEmail de confirmación: {email}\n\nAgradecemos remitir su comprobante a este chat para actualizar su estado de pago. ¡Muchas gracias!',
+  bank_name: 'Banco de Chile / BAC Credomatic',
+  bank_account_type: 'Cuenta Corriente',
+  bank_account_number: '00-12345-67',
+  bank_account_rut: '77.890.123-K',
+  bank_account_email: 'pagos@nexusair.cl',
 };
 
 export const INITIAL_TECHNICIANS: Technician[] = [
