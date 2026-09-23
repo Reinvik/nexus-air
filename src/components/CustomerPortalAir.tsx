@@ -197,6 +197,7 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
   equipments,
   orders,
   settings,
+  isStaff,
   onBackToApp,
   onOpenBooking,
 }) => {

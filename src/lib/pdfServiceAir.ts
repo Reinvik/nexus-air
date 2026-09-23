@@ -300,10 +300,10 @@ export function buildReceiptHtml(order: ServiceOrder, settings: AirSettings): st
     : (applyTax ? (order.total - calculatedTax) : order.total);
   const calculatedTotal = applyTax ? order.total : calculatedSubtotal;
 
-  const customerName = order.customer?.name || order.customer_name || 'Cliente Particular';
+  const customerName = order.customer?.name || (order as any).customer_name || 'Cliente Particular';
   const customerRut = order.customer?.rut || (order as any).customer_rut || '—';
-  const customerPhone = order.customer?.phone || order.customer_phone || '—';
-  const customerAddress = order.customer?.address || order.customer_address || '';
+  const customerPhone = order.customer?.phone || (order as any).customer_phone || '—';
+  const customerAddress = order.customer?.address || (order as any).customer_address || '';
   const customerCommune = order.customer?.commune || (order.customer as any)?.city || '';
 
   const serialEvap = order.checklist?.serial_evaporator || order.equipment?.serial_number_evaporator || order.equipment?.serial_number || '—';
