@@ -23,7 +23,8 @@ import {
   Menu,
   X,
   Crown,
-  ShieldAlert
+  ShieldAlert,
+  Globe
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -75,6 +76,7 @@ export const Layout: React.FC<LayoutProps> = ({
     { id: 'customers', label: 'Clientes', icon: Users },
     { id: 'technicians', label: 'Técnicos HVAC', icon: Wrench },
     { id: 'sales', label: 'Ventas & Finanzas', icon: TrendingUp },
+    { id: 'landingpage', label: 'Mi Landing Page', icon: Globe },
     { id: 'settings', label: 'Configuración', icon: Settings },
   ];
 

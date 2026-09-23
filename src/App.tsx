@@ -18,6 +18,7 @@ import { PublicBookingModal, BookingPrefill } from './components/PublicBookingMo
 import { ReceiptModalAir } from './components/ReceiptModalAir';
 import { LandingNexusAir } from './components/LandingNexusAir';
 import { LandingTenantAir } from './components/LandingTenantAir';
+import { LandingEditorAir } from './components/LandingEditorAir';
 import { LoginAir } from './components/LoginAir';
 import { CustomerPortalAir } from './components/CustomerPortalAir';
 import { NexusOwnerAir } from './components/NexusOwnerAir';
@@ -89,11 +90,20 @@ export default function App() {
           setTenantSettings({
             ...settings,
             company_id: data.company_id,
-            company_name: data.company_name,
-            fantasy_name: data.company_name,
+            company_name: data.company_name || settings.company_name,
+            fantasy_name: data.fantasy_name || data.company_name || settings.fantasy_name,
+            company_slug: data.company_slug || settings.company_slug,
+            logo_url: data.logo_url || settings.logo_url,
+            company_slogan: data.company_slogan || settings.company_slogan,
             phone: data.phone || settings.phone,
+            whatsapp_number: data.whatsapp_number || data.phone || settings.whatsapp_number,
             email: data.email || settings.email,
             address: data.address || settings.address,
+            city: data.city || settings.city,
+            commune: data.commune || settings.commune,
+            country: data.country || settings.country,
+            currency_symbol: data.currency_symbol || settings.currency_symbol,
+            currency_code: data.currency_code || settings.currency_code,
             landing_config: data.landing_config || settings.landing_config
           });
         }
@@ -241,7 +251,7 @@ export default function App() {
         <Toaster position="top-right" />
         <LandingTenantAir
           settings={currentSettings}
-          onOpenBooking={() => handleOpenBooking()}
+          onOpenBooking={(svcTitle) => handleOpenBooking(undefined, undefined, undefined, svcTitle ? `Servicio solicitado: ${svcTitle}` : undefined)}
           onOpenPortal={() => setView('customer')}
           onAdminAccess={() => setView('login')}
         />
@@ -359,7 +369,10 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onOpenNewOrder={() => setIsAddOrderModalOpen(true)}
-        onOpenLanding={() => setView(tenantSlug ? 'tenant_landing' : 'landing')}
+        onOpenLanding={() => {
+          const slug = tenantSlug || settings.company_slug || 'nexus-air';
+          window.open(`/?t=${slug}`, '_blank');
+        }}
         onOpenPortal={() => setView('customer')}
         overdueRecaptacionCount={overdueCount}
         activeOrdersCount={activeOrdersCount}
@@ -452,6 +465,14 @@ export default function App() {
             orders={orders} 
             settings={tenantSettings || settings}
             onUpdateOrder={updateOrder}
+          />
+        )}
+
+        {activeTab === 'landingpage' && (
+          <LandingEditorAir
+            settings={settings}
+            onUpdateSettings={updateSettings}
+            onBackToDashboard={() => setActiveTab('dashboard')}
           />
         )}
 

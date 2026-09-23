@@ -285,17 +285,68 @@ export interface AirSettings {
   phone_prefix?: string;
   sample_cities?: string[];
   default_country?: string;
-  landing_config?: {
-    hero_title?: string;
-    hero_subtitle?: string;
-    hero_badge?: string;
-    phone?: string;
-    email?: string;
-    address?: string;
-    country?: string;
-    currency_symbol?: string;
-    services?: Array<{ title: string; desc: string; price: number }>;
-  };
+  landing_config?: LandingPageConfig;
+}
+
+export interface LandingServiceItem {
+  id?: string;
+  title: string;
+  desc: string;
+  price: number;
+  icon?: string;
+  badge?: string;
+  active?: boolean;
+}
+
+export interface LandingPageConfig {
+  show_landing_page?: boolean;
+  // Identidad y Encabezado
+  header_logo_url?: string;
+  favicon_url?: string;
+  fantasy_name?: string;
+  slogan?: string;
+  footer_copyright?: string;
+
+  // Tema y Colores
+  theme_primary_color?: string;
+  theme_accent_color?: string;
+  theme_secondary_color?: string;
+  theme_is_dark?: boolean;
+  theme_background_color?: string;
+
+  // Hero Section
+  hero_badge?: string;
+  hero_title?: string;
+  hero_subtitle?: string;
+  hero_cta_text?: string;
+  hero_phone?: string;
+  hero_image_url?: string;
+  hero_stat1_value?: string;
+  hero_stat1_label?: string;
+  hero_stat2_value?: string;
+  hero_stat2_label?: string;
+
+  // Servicios
+  services?: LandingServiceItem[];
+  show_prices?: boolean;
+  show_thermal_calculator?: boolean;
+
+  // Cobertura y Contacto
+  coverage_communes?: string[];
+  phone?: string;
+  email?: string;
+  address?: string;
+  business_hours?: string;
+  google_maps_url?: string;
+  whatsapp_custom_message?: string;
+
+  // Redes y Reputación
+  google_reviews_rating?: string;
+  google_reviews_count?: string;
+  google_reviews_url?: string;
+  social_instagram_url?: string;
+  social_facebook_url?: string;
+  social_tiktok_url?: string;
 }
 
 export type ViewTab = 
@@ -308,6 +359,7 @@ export type ViewTab =
   | 'technicians' 
   | 'sales' 
   | 'settings'
+  | 'landingpage'
   | 'nexus_owner';
 
 export type UserRole = 'nexus_owner' | 'admin' | 'tecnico' | 'ayudante' | 'user';
