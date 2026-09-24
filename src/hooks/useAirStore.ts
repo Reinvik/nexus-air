@@ -510,11 +510,28 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
           email: c.email || '',
           address: c.address,
           commune: c.commune,
-          city: 'Santiago',
-          customer_type: 'residencial',
+          city: c.city || 'Santiago',
+          customer_type: c.customer_type || 'residencial',
           notes: c.notes,
           created_at: c.created_at,
-          equipments: (dbEquipments || []).filter((e: any) => e.customer_id === c.id)
+          equipments: (dbEquipments || []).filter((e: any) => e.customer_id === c.id).map((e: any) => ({
+            id: e.id,
+            customer_id: e.customer_id,
+            brand: e.brand,
+            model: e.model || e.technology || 'Split Inverter',
+            serial_number: e.serial_number,
+            serial_number_evaporator: e.serial_number_evaporator,
+            serial_number_condenser: e.serial_number_condenser,
+            btu: e.btu,
+            type: e.type || 'split_muro',
+            technology: e.technology || 'inverter',
+            refrigerant: e.refrigerant || 'R410A',
+            location_in_property: e.location_in_property,
+            installation_date: e.installation_date,
+            last_maintenance_date: e.last_maintenance_date,
+            next_maintenance_date: e.next_maintenance_date || format(addDays(new Date(), 180), 'yyyy-MM-dd'),
+            notes: e.notes,
+          }))
         })));
       } else if (!isMock) {
         setCustomers([]);
@@ -525,15 +542,19 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
           id: e.id,
           customer_id: e.customer_id,
           brand: e.brand,
-          model: e.technology || 'Split Inverter',
+          model: e.model || e.technology || 'Split Inverter',
+          serial_number: e.serial_number,
+          serial_number_evaporator: e.serial_number_evaporator,
+          serial_number_condenser: e.serial_number_condenser,
           btu: e.btu,
-          type: 'split_muro',
+          type: e.type || 'split_muro',
           technology: e.technology || 'inverter',
           refrigerant: e.refrigerant || 'R410A',
           location_in_property: e.location_in_property,
           installation_date: e.installation_date,
           last_maintenance_date: e.last_maintenance_date,
-          next_maintenance_date: e.next_maintenance_date || format(addDays(new Date(), 180), 'yyyy-MM-dd')
+          next_maintenance_date: e.next_maintenance_date || format(addDays(new Date(), 180), 'yyyy-MM-dd'),
+          notes: e.notes,
         })));
       } else if (!isMock) {
         setEquipments([]);
@@ -611,15 +632,19 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
               id: eq.id,
               customer_id: eq.customer_id,
               brand: eq.brand,
-              model: eq.technology || 'Split Inverter',
+              model: eq.model || eq.technology || 'Split Inverter',
+              serial_number: eq.serial_number,
+              serial_number_evaporator: eq.serial_number_evaporator,
+              serial_number_condenser: eq.serial_number_condenser,
               btu: eq.btu,
-              type: 'split_muro',
+              type: eq.type || 'split_muro',
               technology: eq.technology || 'inverter',
               refrigerant: eq.refrigerant || 'R410A',
               location_in_property: eq.location_in_property,
               installation_date: eq.installation_date,
               last_maintenance_date: eq.last_maintenance_date,
-              next_maintenance_date: eq.next_maintenance_date
+              next_maintenance_date: eq.next_maintenance_date,
+              notes: eq.notes
             } : undefined,
             assigned_technician_id: o.assigned_technician_id,
             assigned_technician: tech ? {
@@ -694,7 +719,15 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
             payment_method: o.payment_method,
             technician_location: o.technician_location,
             created_at: o.created_at || new Date().toISOString(),
-            completed_at: o.completed_at
+            completed_at: o.completed_at,
+            apply_tax: o.apply_tax !== undefined ? o.apply_tax : true,
+            payment_reference: o.payment_reference,
+            payment_proof_url: o.payment_proof_url,
+            paid_amount: o.paid_amount !== null && o.paid_amount !== undefined ? Number(o.paid_amount) : undefined,
+            payment_date: o.payment_date,
+            payment_notes: o.payment_notes,
+            invoice_number: o.invoice_number,
+            folio: o.folio
           };
         });
         setOrders(mappedOrders);
@@ -1043,7 +1076,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     toast.success(`Orden ${ticketNumber} creada`);
 
     try {
-      await supabaseAir.from('orders').insert([{
+      const { error } = await supabaseAir.from('orders').insert([{
         id: newId,
         company_id: activeId,
         ticket_number: ticketNumber,
@@ -1069,10 +1102,23 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         payment_method: newOrder.payment_method,
         technician_location: newOrder.technician_location || null,
         checklist: newOrder.checklist,
-        completed_at: newOrder.completed_at ? new Date().toISOString() : null
+        completed_at: newOrder.completed_at ? new Date().toISOString() : null,
+        apply_tax: (orderData as any).apply_tax ?? true,
+        payment_reference: (orderData as any).payment_reference || null,
+        payment_proof_url: (orderData as any).payment_proof_url || null,
+        paid_amount: (orderData as any).paid_amount || null,
+        payment_date: (orderData as any).payment_date || null,
+        payment_notes: (orderData as any).payment_notes || null,
+        invoice_number: (orderData as any).invoice_number || null,
+        folio: (orderData as any).folio || null
       }]);
-    } catch (e) {
+      if (error) {
+        console.error('[useAirStore] Failed to insert order into DB:', error);
+        toast.error(`Error al registrar orden en la nube: ${error.message}`);
+      }
+    } catch (e: any) {
       console.warn('[useAirStore] Failed to insert order into DB:', e);
+      toast.error(`Error de conexión al guardar orden: ${e?.message || e}`);
     }
 
     return newOrder;
@@ -1221,27 +1267,44 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       next_maintenance_date: nextDate,
     };
     setEquipments(prev => [...prev, newEq]);
+    setCustomers(prev => prev.map(c => {
+      if (c.id === eqData.customer_id) {
+        return {
+          ...c,
+          equipments: [...(c.equipments || []).filter(e => e.id !== newId), newEq]
+        };
+      }
+      return c;
+    }));
     toast.success(`Equipo ${newEq.brand} ${newEq.btu} BTU registrado`);
 
     try {
-      await supabaseAir.from('equipments').insert([{
+      const { error } = await supabaseAir.from('equipments').insert([{
         id: newId,
         company_id: activeId,
         customer_id: eqData.customer_id,
         brand: eqData.brand,
+        model: eqData.model || null,
+        type: eqData.type || 'split_muro',
         btu: eqData.btu,
         technology: eqData.technology || 'inverter',
         refrigerant: eqData.refrigerant || 'R410A',
-        serial_number: eqData.serial_number,
-        serial_number_evaporator: eqData.serial_number_evaporator,
-        serial_number_condenser: eqData.serial_number_condenser,
-        location_in_property: eqData.location_in_property,
-        installation_date: eqData.installation_date,
-        last_maintenance_date: eqData.last_maintenance_date,
-        next_maintenance_date: nextDate
+        serial_number: eqData.serial_number || null,
+        serial_number_evaporator: eqData.serial_number_evaporator || null,
+        serial_number_condenser: eqData.serial_number_condenser || null,
+        location_in_property: eqData.location_in_property || null,
+        installation_date: eqData.installation_date || null,
+        last_maintenance_date: eqData.last_maintenance_date || null,
+        next_maintenance_date: nextDate,
+        notes: eqData.notes || null,
       }]);
-    } catch (e) {
+      if (error) {
+        console.error('[useAirStore] Error inserting equipment:', error);
+        toast.error(`Error al registrar equipo en la nube: ${error.message}`);
+      }
+    } catch (e: any) {
       console.warn('[useAirStore] Error inserting equipment:', e);
+      toast.error(`Error de conexión al guardar equipo: ${e?.message || e}`);
     }
     return newEq;
   }, [companyId, settings.maintenance_interval_months]);
@@ -1256,6 +1319,17 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       }
       return updated;
     }));
+    setCustomers(prev => prev.map(c => ({
+      ...c,
+      equipments: (c.equipments || []).map(eq => {
+        if (eq.id !== id) return eq;
+        const updated = { ...eq, ...updates };
+        if (updates.last_maintenance_date) {
+          updated.next_maintenance_date = format(addDays(parseISO(updates.last_maintenance_date), intervalDays), 'yyyy-MM-dd');
+        }
+        return updated;
+      })
+    })));
     toast.success('Equipo actualizado');
 
     try {
@@ -1263,6 +1337,8 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         updated_at: new Date().toISOString()
       };
       if (updates.brand !== undefined) eqDbUpdates.brand = updates.brand;
+      if (updates.model !== undefined) eqDbUpdates.model = updates.model;
+      if (updates.type !== undefined) eqDbUpdates.type = updates.type;
       if (updates.btu !== undefined) eqDbUpdates.btu = updates.btu;
       if (updates.technology !== undefined) eqDbUpdates.technology = updates.technology;
       if (updates.refrigerant !== undefined) eqDbUpdates.refrigerant = updates.refrigerant;
@@ -1270,28 +1346,44 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       if (updates.serial_number_evaporator !== undefined) eqDbUpdates.serial_number_evaporator = updates.serial_number_evaporator;
       if (updates.serial_number_condenser !== undefined) eqDbUpdates.serial_number_condenser = updates.serial_number_condenser;
       if (updates.location_in_property !== undefined) eqDbUpdates.location_in_property = updates.location_in_property;
+      if (updates.notes !== undefined) eqDbUpdates.notes = updates.notes;
+      if (updates.installation_date !== undefined) eqDbUpdates.installation_date = updates.installation_date;
       if (updates.last_maintenance_date !== undefined) {
         eqDbUpdates.last_maintenance_date = updates.last_maintenance_date;
         eqDbUpdates.next_maintenance_date = format(addDays(parseISO(updates.last_maintenance_date), intervalDays), 'yyyy-MM-dd');
       }
 
-      await supabaseAir
+      const { error } = await supabaseAir
         .from('equipments')
         .update(eqDbUpdates)
         .eq('id', id);
-    } catch (e) {
+      if (error) {
+        console.error('[useAirStore] Error updating equipment:', error);
+        toast.error(`Error al actualizar equipo: ${error.message}`);
+      }
+    } catch (e: any) {
       console.warn('[useAirStore] Error updating equipment:', e);
+      toast.error(`Error de conexión al actualizar equipo: ${e?.message || e}`);
     }
   }, [settings.maintenance_interval_months]);
 
   const deleteEquipment = useCallback(async (id: string) => {
     setEquipments(prev => prev.filter(eq => eq.id !== id));
+    setCustomers(prev => prev.map(c => ({
+      ...c,
+      equipments: (c.equipments || []).filter(eq => eq.id !== id)
+    })));
     toast.success('Equipo eliminado');
 
     try {
-      await supabaseAir.from('equipments').delete().eq('id', id);
-    } catch (e) {
+      const { error } = await supabaseAir.from('equipments').delete().eq('id', id);
+      if (error) {
+        console.error('[useAirStore] Error deleting equipment:', error);
+        toast.error(`Error al eliminar equipo: ${error.message}`);
+      }
+    } catch (e: any) {
       console.warn('[useAirStore] Error deleting equipment:', e);
+      toast.error(`Error de conexión al eliminar equipo: ${e?.message || e}`);
     }
   }, []);
 
