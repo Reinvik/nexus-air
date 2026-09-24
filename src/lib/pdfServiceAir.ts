@@ -348,7 +348,7 @@ export function buildReceiptHtml(order: ServiceOrder, settings: AirSettings): st
                   <div style="font-size: 19px; font-weight: 900; color: #0f172a; line-height: 1.1; letter-spacing: -0.4px;">
                     ${settings.fantasy_name || settings.company_name || 'NEXUS AIR'}
                   </div>
-                  <div style="font-size: 9.5px; font-weight: 800; color: #0284c7; text-transform: uppercase; letter-spacing: 0.6px; margin-top: 3px;">
+                  <div style="font-size: 9.5px; font-weight: 800; color: #0284c7; text-transform: uppercase; margin-top: 3px;">
                     ${settings.company_slogan || 'ESPECIALISTAS EN CLIMATIZACIÓN Y REFRIGERACIÓN'}
                   </div>
                 </td>
@@ -372,29 +372,51 @@ export function buildReceiptHtml(order: ServiceOrder, settings: AirSettings): st
 
           <!-- Rectángulo Comprobante (Estilo Moderno Imagen 2) -->
           <td style="vertical-align: top; width: 38%; text-align: right;">
-            <div style="display: inline-block; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 12px 16px; text-align: right; min-width: 200px; box-sizing: border-box;">
-              <div style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.6px;">
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 10px 14px; width: 220px; margin-left: auto; box-sizing: border-box; text-align: right;">
+              <div style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 2px;">
                 COMPROBANTE DE SERVICIO
               </div>
-              <div style="font-family: monospace; font-size: 16px; font-weight: 900; color: #0369a1; margin: 3px 0 2px 0;">
+              <div style="font-family: monospace; font-size: 16px; font-weight: 900; color: #0369a1; margin-bottom: 4px;">
                 ${displayFolio}
               </div>
-              <div style="font-size: 10.5px; color: #0284c7; font-weight: 700; margin-bottom: 2px;">
-                N° Folio: <span style="font-family: monospace; color: #0f172a; font-weight: 800;">${displayFolio}</span>
-              </div>
-              ${invoiceDoc ? `
-                <div style="font-size: 10px; color: #475569; font-weight: 600; margin-bottom: 2px;">
-                  Doc / Factura: <span style="font-family: monospace; color: #0f172a; font-weight: 700;">${invoiceDoc}</span>
-                </div>
-              ` : ''}
-              <div style="font-size: 10.5px; color: #334155; margin-top: 2px; font-weight: 500;">
-                Fecha: <strong style="color: #0f172a;">${dateFormatted}</strong>
-              </div>
-              <div style="font-size: 10.5px; color: #334155; margin-top: 1px; font-weight: 500;">
-                Hora: <strong style="color: #0f172a;">${timeFormatted}</strong>
-              </div>
-              <div style="margin-top: 6px;">
-                <span style="display: inline-block; padding: 2.5px 12px; border-radius: 9999px; font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; ${statusBadgeStyle}">
+              <table style="width: 100%; border-collapse: collapse; margin-top: 2px;">
+                <tr>
+                  <td style="font-size: 10px; color: #0284c7; font-weight: 700; text-align: right; padding: 1.5px 4px 1.5px 0;">
+                    N° Folio:
+                  </td>
+                  <td style="font-size: 10px; font-family: monospace; color: #0f172a; font-weight: 800; text-align: right; padding: 1.5px 0; width: 1%; white-space: nowrap;">
+                    ${displayFolio}
+                  </td>
+                </tr>
+                ${invoiceDoc ? `
+                  <tr>
+                    <td style="font-size: 10px; color: #475569; font-weight: 600; text-align: right; padding: 1.5px 4px 1.5px 0;">
+                      Doc / Factura:
+                    </td>
+                    <td style="font-size: 10px; font-family: monospace; color: #0f172a; font-weight: 700; text-align: right; padding: 1.5px 0; width: 1%; white-space: nowrap;">
+                      ${invoiceDoc}
+                    </td>
+                  </tr>
+                ` : ''}
+                <tr>
+                  <td style="font-size: 10px; color: #475569; font-weight: 500; text-align: right; padding: 1.5px 4px 1.5px 0;">
+                    Fecha:
+                  </td>
+                  <td style="font-size: 10px; font-weight: 700; color: #0f172a; text-align: right; padding: 1.5px 0; width: 1%; white-space: nowrap;">
+                    ${dateFormatted}
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-size: 10px; color: #475569; font-weight: 500; text-align: right; padding: 1.5px 4px 1.5px 0;">
+                    Hora:
+                  </td>
+                  <td style="font-size: 10px; font-weight: 700; color: #0f172a; text-align: right; padding: 1.5px 0; width: 1%; white-space: nowrap;">
+                    ${timeFormatted}
+                  </td>
+                </tr>
+              </table>
+              <div style="margin-top: 6px; text-align: right;">
+                <span style="display: inline-block; padding: 2.5px 12px; border-radius: 9999px; font-size: 9px; font-weight: 800; text-transform: uppercase; ${statusBadgeStyle}">
                   ${statusBadgeLabel}
                 </span>
               </div>
@@ -412,7 +434,7 @@ export function buildReceiptHtml(order: ServiceOrder, settings: AirSettings): st
           <!-- Cliente -->
           <td style="width: 50%; vertical-align: top; padding-right: 6px;">
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 12px 14px; box-sizing: border-box; min-height: 110px;">
-              <div style="font-size: 9.5px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.6px;">
+              <div style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase;">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px; display: inline-block;">
                   <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
                 </svg>
@@ -438,7 +460,7 @@ export function buildReceiptHtml(order: ServiceOrder, settings: AirSettings): st
           <!-- Equipo & Técnico -->
           <td style="width: 50%; vertical-align: top; padding-left: 6px;">
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 12px 14px; box-sizing: border-box; min-height: 110px;">
-              <div style="font-size: 9.5px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.6px;">
+              <div style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase;">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px; display: inline-block;">
                   <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
                 </svg>
@@ -468,7 +490,7 @@ export function buildReceiptHtml(order: ServiceOrder, settings: AirSettings): st
       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 12px 14px; margin-bottom: 12px; box-sizing: border-box;">
         <table style="width: 100%; border-collapse: collapse; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 8px;">
           <tr>
-            <td style="font-size: 10.5px; font-weight: 800; color: #1e293b; text-transform: uppercase; letter-spacing: 0.4px;">
+            <td style="font-size: 10.5px; font-weight: 800; color: #1e293b; text-transform: uppercase;">
               INFORME DE TRABAJO & DIAGNÓSTICO TÉCNICO
             </td>
             <td style="text-align: right; font-size: 9.5px; font-weight: 800; color: #0284c7; text-transform: uppercase;">
@@ -492,7 +514,7 @@ export function buildReceiptHtml(order: ServiceOrder, settings: AirSettings): st
         <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #e2e8f0;">
           <table style="width: 100%; border-collapse: collapse; margin-bottom: 6px;">
             <tr>
-              <td style="font-size: 9.5px; font-weight: 800; color: #334155; text-transform: uppercase; letter-spacing: 0.4px;">
+              <td style="font-size: 10px; font-weight: 800; color: #334155; text-transform: uppercase;">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; display: inline-block;">
                   <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>
                 </svg>
@@ -573,25 +595,30 @@ export function buildReceiptHtml(order: ServiceOrder, settings: AirSettings): st
         </table>
 
         <!-- Totals Footer Box -->
-        <div style="background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 10px 14px; text-align: right;">
-          <table style="border-collapse: collapse; margin-left: auto; width: 250px; font-size: 10.5px;">
+        <div style="background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 12px 16px; text-align: right;">
+          <table style="border-collapse: separate; border-spacing: 0; margin-left: auto; width: 260px; font-size: 11px;">
             <tr>
-              <td style="padding: 2px 0; color: #64748b; text-align: left;">Subtotal Neto:</td>
-              <td style="padding: 2px 0; text-align: right; font-family: monospace; font-weight: 700; color: #0f172a;">
+              <td style="padding: 2.5px 0; color: #64748b; text-align: left;">Subtotal Neto:</td>
+              <td style="padding: 2.5px 0; text-align: right; font-family: monospace; font-weight: 700; color: #0f172a;">
                 ${formatAirPrice(calculatedSubtotal, currencySymbol, countryCode)}
               </td>
             </tr>
             <tr>
-              <td style="padding: 2px 0; color: #64748b; text-align: left;">${settings.tax_name || 'IVA'} (${applyTax ? `${taxPercent}%` : '0%'}):</td>
-              <td style="padding: 2px 0; text-align: right; font-family: monospace; font-weight: 700; color: #0f172a;">
+              <td style="padding: 2.5px 0; color: #64748b; text-align: left;">${settings.tax_name || 'IVA'} (${applyTax ? `${taxPercent}%` : '0%'}):</td>
+              <td style="padding: 2.5px 0; text-align: right; font-family: monospace; font-weight: 700; color: #0f172a;">
                 ${applyTax ? formatAirPrice(calculatedTax, currencySymbol, countryCode) : 'Exento (0%)'}
               </td>
             </tr>
             <tr>
-              <td style="padding: 6px 0 2px 0; border-top: 1px solid #cbd5e1; font-size: 11px; font-weight: 900; color: #0f172a; text-transform: uppercase; text-align: left;">
+              <td colspan="2" style="padding: 6px 0;">
+                <div style="height: 1px; background: #cbd5e1; width: 100%; font-size: 1px; line-height: 1px;"></div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 2px 0 0 0; font-size: 11px; font-weight: 900; color: #0f172a; text-transform: uppercase; text-align: left;">
                 TOTAL COMPROBANTE:
               </td>
-              <td style="padding: 6px 0 2px 0; border-top: 1px solid #cbd5e1; text-align: right; font-family: monospace; font-size: 13.5px; font-weight: 900; color: #0369a1;">
+              <td style="padding: 2px 0 0 0; text-align: right; font-family: monospace; font-size: 14px; font-weight: 900; color: #0369a1;">
                 ${formatAirPrice(calculatedTotal, currencySymbol, countryCode)}
               </td>
             </tr>
@@ -638,7 +665,7 @@ export function buildReceiptHtml(order: ServiceOrder, settings: AirSettings): st
       </table>
 
       <!-- PIE DE PÁGINA -->
-      <div style="text-align: center; font-size: 8.5px; color: #94a3b8; margin-top: 12px; border-top: 1px solid #f1f5f9; padding-top: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+      <div style="text-align: center; font-size: 8.5px; color: #94a3b8; margin-top: 12px; border-top: 1px solid #f1f5f9; padding-top: 6px; text-transform: uppercase;">
         ${settings.fantasy_name || settings.company_name || 'NEXUS AIR'} • SISTEMA DE GESTIÓN CLIMATIZACIÓN MULTI-TENANT • CONTROL OFICIAL HVAC
       </div>
 

@@ -541,7 +541,8 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
                       {applyTax ? formatAirPrice(taxAmount, currencySymbol, countryCode) : 'Exento (0%)'}
                     </span>
                   </div>
-                  <div className="flex justify-between w-64 pt-2 border-t border-slate-300 text-sm font-black text-slate-900">
+                  <div className="w-64 my-1.5 border-t border-slate-300"></div>
+                  <div className="flex justify-between w-64 text-sm font-black text-slate-900">
                     <span className="uppercase">TOTAL COMPROBANTE:</span>
                     <span className="font-mono text-base text-cyan-800">
                       {formatAirPrice(finalTotal, currencySymbol, countryCode)}
