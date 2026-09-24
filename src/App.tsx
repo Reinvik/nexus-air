@@ -152,6 +152,7 @@ export default function App() {
   const [isInspectionModalOpen, setIsInspectionModalOpen] = useState(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [bookingPrefill, setBookingPrefill] = useState<BookingPrefill | null>(null);
+  const [dashboardSearchTerm, setDashboardSearchTerm] = useState('');
 
   const handleOpenBooking = (customer?: Customer, equipment?: AirEquipment, serviceType?: ServiceType, notes?: string) => {
     setBookingPrefill({ customer, equipment, serviceType, notes });
@@ -382,6 +383,8 @@ export default function App() {
         settings={settings}
         currentUserProfile={currentProfile}
         isNexusOwner={isNexusOwner}
+        searchTerm={dashboardSearchTerm}
+        onSearchChange={setDashboardSearchTerm}
         onLogout={async () => {
           await logout();
           setView('landing');
@@ -393,6 +396,8 @@ export default function App() {
             orders={orders}
             technicians={technicians}
             settings={settings}
+            searchTerm={dashboardSearchTerm}
+            setSearchTerm={setDashboardSearchTerm}
             onOpenNewOrder={() => setIsAddOrderModalOpen(true)}
             onEditOrder={handleOpenEdit}
             onOpenInspection={handleOpenInspection}

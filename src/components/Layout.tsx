@@ -24,7 +24,8 @@ import {
   X,
   Crown,
   ShieldAlert,
-  Globe
+  Globe,
+  Search
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -39,6 +40,8 @@ interface LayoutProps {
   currentUserProfile?: any;
   isNexusOwner?: boolean;
   onLogout?: () => void;
+  searchTerm?: string;
+  onSearchChange?: (val: string) => void;
   children: React.ReactNode;
 }
 
@@ -54,6 +57,8 @@ export const Layout: React.FC<LayoutProps> = ({
   currentUserProfile,
   isNexusOwner,
   onLogout,
+  searchTerm,
+  onSearchChange,
   children,
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -316,59 +321,97 @@ export const Layout: React.FC<LayoutProps> = ({
       {/* Main Content Area - CRISP LIGHT CONTRAST (Estilo Nexus Lean) */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50">
         {/* Top Navbar */}
-        <header className="h-16 border-b border-slate-200/80 bg-white/90 backdrop-blur-md px-4 sm:px-8 flex items-center justify-between shrink-0 shadow-xs">
-          <div className="flex items-center gap-3 sm:gap-4">
+        {/* Top Navbar - Compactado y Optimizado en el Eje X */}
+        <header className="h-14 sm:h-16 border-b border-slate-200/80 bg-white/95 backdrop-blur-md px-3 sm:px-6 flex items-center justify-between gap-3 shrink-0 shadow-xs sticky top-0 z-30">
+          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
             {/* Hamburger Button for Mobile */}
             <button
               onClick={() => setIsMobileMenuOpen(true)}
-              className="p-2 -ml-1.5 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100 md:hidden transition-colors cursor-pointer"
+              className="p-1.5 -ml-1 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100 md:hidden transition-colors cursor-pointer"
               title="Abrir menú"
             >
               <Menu className="w-5 h-5" />
             </button>
 
             <div>
-              <h1 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+              <h1 className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight flex items-center gap-1.5">
                 {[...mainNav, ...manageNav].find(i => i.id === activeTab)?.label || 'Panel de Climatización'}
               </h1>
-              <p className="text-[10px] sm:text-[11px] text-slate-500 truncate max-w-[180px] sm:max-w-none">
-                {settings.company_name} • Mantenimiento Preventivo ({settings.maintenance_interval_months || 6}M)
+              <p className="text-[10px] text-slate-500 truncate max-w-[130px] sm:max-w-none">
+                {settings.company_name} • Mantenimiento ({settings.maintenance_interval_months || 6}M)
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          {/* Buscador Global en el Centro de la Cabecera (Optimiza el Eje X) */}
+          {activeTab === 'dashboard' && onSearchChange && (
+            <div className="flex-1 max-w-md mx-2 hidden sm:block">
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Buscar ticket, cliente, comuna o equipo..."
+                  value={searchTerm || ''}
+                  onChange={(e) => onSearchChange(e.target.value)}
+                  className="w-full pl-9 pr-7 py-1.5 bg-slate-100/90 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-all shadow-2xs"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => onSearchChange('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer font-bold"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Acciones Rápidas en la Cabecera: Nueva Orden, Portal y Landing */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {overdueRecaptacionCount > 0 && (
               <button
                 onClick={() => setActiveTab('recaptacion')}
-                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-800 text-[11px] sm:text-xs font-bold hover:bg-amber-100 transition-all cursor-pointer shadow-xs"
+                className="flex items-center gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-800 text-[11px] font-bold hover:bg-amber-100 transition-all cursor-pointer shadow-xs"
               >
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                <span className="hidden sm:inline">{overdueRecaptacionCount} Equipos por Recaptar ({settings.maintenance_interval_months || 6}M)</span>
-                <span className="sm:hidden">{overdueRecaptacionCount}</span>
+                <span className="hidden lg:inline">{overdueRecaptacionCount} Equipos por Recaptar</span>
+                <span className="lg:hidden">{overdueRecaptacionCount}</span>
               </button>
             )}
 
+            {/* Botón "+ Nueva Orden" en la Cabecera */}
+            <button
+              onClick={onOpenNewOrder}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#00d2ff] to-[#2563eb] hover:from-[#38bdf8] hover:to-[#1d4ed8] text-white font-bold text-xs shadow-sm shadow-blue-500/25 transition-all cursor-pointer active:scale-95 shrink-0"
+              title="Crear nueva orden técnica"
+            >
+              <Plus className="w-3.5 h-3.5 stroke-[3]" />
+              <span className="hidden sm:inline">Nueva Orden</span>
+            </button>
+
             <button
               onClick={onOpenPortal}
-              className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 hover:text-slate-900 transition-all cursor-pointer shadow-xs"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 hover:text-slate-900 transition-all cursor-pointer shadow-xs shrink-0"
+              title="Portal Cliente"
             >
-              <UserCheck className="w-4 h-4 text-cyan-600" />
+              <UserCheck className="w-3.5 h-3.5 text-cyan-600" />
               <span className="hidden md:inline">Portal Cliente</span>
             </button>
 
             <button
               onClick={onOpenLanding}
-              className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 hover:text-slate-900 transition-all cursor-pointer shadow-xs"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 hover:text-slate-900 transition-all cursor-pointer shadow-xs shrink-0"
+              title="Landing Pública"
             >
-              <ExternalLink className="w-4 h-4 text-cyan-600" />
+              <ExternalLink className="w-3.5 h-3.5 text-cyan-600" />
               <span className="hidden md:inline">Landing Pública</span>
             </button>
           </div>
         </header>
 
-        {/* Tab Viewport */}
-        <main className="flex-1 overflow-y-auto bg-slate-50 p-4 sm:p-6 lg:p-8">
+        {/* Tab Viewport - Reducción de padding en dashboard para aprovechar el eje X y eje Y */}
+        <main className={`flex-1 overflow-y-auto bg-slate-50 ${activeTab === 'dashboard' ? 'p-2.5 sm:p-3.5 lg:p-4' : 'p-4 sm:p-6 lg:p-8'}`}>
           {children}
         </main>
       </div>

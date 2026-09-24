@@ -31,6 +31,8 @@ interface KanbanBoardAirProps {
   onOpenInspection: (order: ServiceOrder) => void;
   onUpdateStatus: (orderId: string, status: OrderStatus) => void;
   onOpenReceipt?: (order: ServiceOrder) => void;
+  searchTerm?: string;
+  setSearchTerm?: (val: string) => void;
 }
 
 type DateRangeMode = 'today' | 'yesterday' | 'specific_day' | 'last_7_days' | 'this_month' | 'all';
@@ -71,8 +73,12 @@ export const KanbanBoardAir: React.FC<KanbanBoardAirProps> = ({
   onOpenInspection,
   onUpdateStatus,
   onOpenReceipt,
+  searchTerm: externalSearchTerm,
+  setSearchTerm: setExternalSearchTerm,
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [internalSearchTerm, setInternalSearchTerm] = useState('');
+  const searchTerm = externalSearchTerm !== undefined ? externalSearchTerm : internalSearchTerm;
+  const setSearchTerm = setExternalSearchTerm || setInternalSearchTerm;
   const [filterType, setFilterType] = useState<string>('all');
   const [filterTech, setFilterTech] = useState<string>('all');
 
@@ -235,236 +241,216 @@ export const KanbanBoardAir: React.FC<KanbanBoardAirProps> = ({
   }, [dateRangeMode, selectedDate, todayStr, yesterdayStr]);
 
   return (
-    <div className="flex flex-col h-full space-y-4">
-      {/* 1. Barra Principal de Filtros & Control */}
-      <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-3.5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-3 flex-1">
-            {/* Buscador de Órdenes */}
-            <div className="relative min-w-[260px] flex-1 sm:flex-initial">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Buscar ticket, cliente, comuna o equipo..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:bg-white transition-colors"
-              />
-            </div>
-
-            {/* Filtro por Tipo de Servicio */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs">
-              <Filter className="w-3.5 h-3.5 text-slate-400" />
-              <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-                className="bg-transparent text-slate-700 font-medium focus:outline-none cursor-pointer"
-              >
-                <option value="all">Todos los Servicios</option>
-                <option value="mantencion_preventiva">Mantención Semestral (6M)</option>
-                <option value="instalacion">Instalación Nueva</option>
-                <option value="mantencion_correctiva">Reparación / Fuga</option>
-                <option value="visita_tecnica">Visita Factibilidad</option>
-                <option value="recarga_gas">Carga Gas R410A/R32</option>
-              </select>
-            </div>
-
-            {/* Filtro por Técnico */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs">
-              <select
-                value={filterTech}
-                onChange={(e) => setFilterTech(e.target.value)}
-                className="bg-transparent text-slate-700 font-medium focus:outline-none cursor-pointer"
-              >
-                <option value="all">Todos los Técnicos</option>
-                {technicians.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} {t.sec_certified ? '(SEC)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
+    <div className="flex flex-col h-full space-y-2.5">
+      {/* 1. Barra Compacta Unificada de Filtros & Control */}
+      <div className="px-3 py-2 rounded-xl bg-white border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-2 text-xs">
+        {/* Filtros Izquierda: Búsqueda móvil, Servicios, Técnicos, Rango de Días */}
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
+          {/* Buscador solo en móvil (en desktop está en el navbar superior) */}
+          <div className="relative sm:hidden w-full mb-1">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Buscar orden, cliente, comuna..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-8 pr-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-cyan-500"
+            />
           </div>
 
-          {/* Botón Nueva Orden */}
+          {/* Filtro por Tipo de Servicio */}
+          <div className="flex items-center gap-1 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-lg px-2 py-1 text-xs transition-colors">
+            <Filter className="w-3 h-3 text-slate-400 shrink-0" />
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="bg-transparent text-slate-700 font-medium focus:outline-none cursor-pointer text-xs"
+            >
+              <option value="all">Servicios: Todos</option>
+              <option value="mantencion_preventiva">Mantención (6M)</option>
+              <option value="instalacion">Instalación Nueva</option>
+              <option value="mantencion_correctiva">Reparación / Fuga</option>
+              <option value="visita_tecnica">Visita Factibilidad</option>
+              <option value="recarga_gas">Carga Gas</option>
+            </select>
+          </div>
+
+          {/* Filtro por Técnico */}
+          <div className="flex items-center gap-1 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-lg px-2 py-1 text-xs transition-colors">
+            <select
+              value={filterTech}
+              onChange={(e) => setFilterTech(e.target.value)}
+              className="bg-transparent text-slate-700 font-medium focus:outline-none cursor-pointer text-xs"
+            >
+              <option value="all">Técnicos: Todos</option>
+              {technicians.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} {t.sec_certified ? '(SEC)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Separador vertical sutil */}
+          <div className="hidden sm:block h-4 w-px bg-slate-200 mx-0.5" />
+
+          {/* Botón Rápido Hoy */}
           <button
-            onClick={onOpenNewOrder}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#00d2ff] to-[#2563eb] hover:from-[#38bdf8] hover:to-[#1d4ed8] text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all cursor-pointer active:scale-95"
+            type="button"
+            onClick={handleSelectToday}
+            className={`px-2 py-1 rounded-lg font-bold transition-all flex items-center gap-1 cursor-pointer text-xs ${
+              dateRangeMode === 'today'
+                ? 'bg-cyan-600 text-white shadow-2xs'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
           >
-            <Plus className="w-4 h-4 stroke-[3]" />
-            <span>Nueva Orden de Servicio</span>
+            <span>Hoy</span>
+            <span className={`px-1 py-0.2 rounded-full text-[10px] font-mono ${
+              dateRangeMode === 'today' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+            }`}>
+              {todayClosuresCount}
+            </span>
+          </button>
+
+          {/* Botón Rápido Ayer */}
+          <button
+            type="button"
+            onClick={handleSelectYesterday}
+            className={`px-2 py-1 rounded-lg font-bold transition-all flex items-center gap-1 cursor-pointer text-xs ${
+              dateRangeMode === 'yesterday'
+                ? 'bg-cyan-600 text-white shadow-2xs'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            <span>Ayer</span>
+            <span className={`px-1 py-0.2 rounded-full text-[10px] font-mono ${
+              dateRangeMode === 'yesterday' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+            }`}>
+              {yesterdayClosuresCount}
+            </span>
+          </button>
+
+          {/* Navegación Día por Día con Flechas y Date Picker */}
+          <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg p-0.5">
+            <button
+              type="button"
+              onClick={handlePrevDay}
+              title="Día anterior"
+              className="p-1 rounded text-slate-600 hover:bg-white hover:text-cyan-700 transition-colors cursor-pointer"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setSelectedDate(e.target.value);
+                  setDateRangeMode('specific_day');
+                }
+              }}
+              className="bg-transparent text-slate-800 font-bold text-xs focus:outline-none cursor-pointer px-1 w-[112px]"
+            />
+            <button
+              type="button"
+              onClick={handleNextDay}
+              title="Día siguiente"
+              className="p-1 rounded text-slate-600 hover:bg-white hover:text-cyan-700 transition-colors cursor-pointer"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Desplegable Días con Cierres Registrados */}
+          <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs">
+            <select
+              value={dateRangeMode === 'specific_day' || dateRangeMode === 'today' || dateRangeMode === 'yesterday' ? selectedDate : ''}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setSelectedDate(e.target.value);
+                  if (e.target.value === todayStr) {
+                    setDateRangeMode('today');
+                  } else if (e.target.value === yesterdayStr) {
+                    setDateRangeMode('yesterday');
+                  } else {
+                    setDateRangeMode('specific_day');
+                  }
+                }
+              }}
+              className="bg-transparent text-slate-700 font-medium focus:outline-none cursor-pointer max-w-[170px] text-xs"
+            >
+              <option value="">
+                {dailyClosures.length > 0 ? `Días con cierres (${dailyClosures.length})` : 'Sin cierres'}
+              </option>
+              {dailyClosures.map((item) => {
+                const isTod = item.date === todayStr;
+                const isYest = item.date === yesterdayStr;
+                const prefix = isTod ? 'Hoy' : isYest ? 'Ayer' : item.date;
+                return (
+                  <option key={item.date} value={item.date}>
+                    {prefix} ({item.orders.length})
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          {/* 7 Días / Histórico */}
+          <button
+            type="button"
+            onClick={() => setDateRangeMode('last_7_days')}
+            className={`px-2 py-1 rounded-lg font-semibold transition-all cursor-pointer text-xs ${
+              dateRangeMode === 'last_7_days'
+                ? 'bg-slate-800 text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            7D
+          </button>
+          <button
+            type="button"
+            onClick={() => setDateRangeMode('all')}
+            className={`px-2 py-1 rounded-lg font-semibold transition-all cursor-pointer text-xs ${
+              dateRangeMode === 'all'
+                ? 'bg-slate-800 text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Histórico
           </button>
         </div>
 
-        {/* 2. Barra Especializada de Selección de Días & Auditoría de Cierres */}
-        <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-bold text-slate-600 flex items-center gap-1.5 mr-1">
-              <Calendar className="w-4 h-4 text-cyan-600" />
-              <span>Día de Cierre:</span>
+        {/* Derecha: Checkbox de Alcance y Botón Resumen */}
+        <div className="flex items-center gap-2 shrink-0">
+          <label className="flex items-center gap-1.5 text-slate-600 cursor-pointer select-none text-[11px]">
+            <input
+              type="checkbox"
+              checked={dateFilterScope === 'all_columns'}
+              onChange={(e) => setDateFilterScope(e.target.checked ? 'all_columns' : 'completed_only')}
+              className="rounded text-cyan-600 focus:ring-cyan-500 cursor-pointer w-3.5 h-3.5"
+            />
+            <span className="hidden xl:inline font-medium">
+              {dateFilterScope === 'all_columns' ? 'Todo el tablero' : 'Solo entregados'}
             </span>
+            <span className="xl:hidden font-medium">
+              {dateFilterScope === 'all_columns' ? 'Todo' : 'Entregados'}
+            </span>
+          </label>
 
-            {/* Botón Rápido Hoy */}
-            <button
-              type="button"
-              onClick={handleSelectToday}
-              className={`px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                dateRangeMode === 'today'
-                  ? 'bg-cyan-600 text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              <span>Hoy</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                dateRangeMode === 'today' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-              }`}>
-                {todayClosuresCount}
-              </span>
-            </button>
-
-            {/* Botón Rápido Ayer */}
-            <button
-              type="button"
-              onClick={handleSelectYesterday}
-              className={`px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                dateRangeMode === 'yesterday'
-                  ? 'bg-cyan-600 text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              <span>Ayer</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                dateRangeMode === 'yesterday' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-              }`}>
-                {yesterdayClosuresCount}
-              </span>
-            </button>
-
-            {/* Navegación Día por Día con Flechas y Date Picker */}
-            <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl p-0.5">
-              <button
-                type="button"
-                onClick={handlePrevDay}
-                title="Día anterior"
-                className="p-1.5 rounded-lg text-slate-600 hover:bg-white hover:text-cyan-700 transition-colors cursor-pointer"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-
-              <div className="relative flex items-center px-2">
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      setSelectedDate(e.target.value);
-                      setDateRangeMode('specific_day');
-                    }
-                  }}
-                  className="bg-transparent text-slate-800 font-bold text-xs focus:outline-none cursor-pointer"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={handleNextDay}
-                title="Día siguiente"
-                className="p-1.5 rounded-lg text-slate-600 hover:bg-white hover:text-cyan-700 transition-colors cursor-pointer"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Desplegable Inteligente: Días con Cierres Registrados */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
-              <select
-                value={dateRangeMode === 'specific_day' || dateRangeMode === 'today' || dateRangeMode === 'yesterday' ? selectedDate : ''}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    setSelectedDate(e.target.value);
-                    if (e.target.value === todayStr) {
-                      setDateRangeMode('today');
-                    } else if (e.target.value === yesterdayStr) {
-                      setDateRangeMode('yesterday');
-                    } else {
-                      setDateRangeMode('specific_day');
-                    }
-                  }
-                }}
-                className="bg-transparent text-slate-700 font-medium focus:outline-none cursor-pointer max-w-[200px]"
-              >
-                <option value="">
-                  {dailyClosures.length > 0 ? `Días con cierres (${dailyClosures.length})` : 'Sin cierres aún'}
-                </option>
-                {dailyClosures.map((item) => {
-                  const isTod = item.date === todayStr;
-                  const isYest = item.date === yesterdayStr;
-                  const prefix = isTod ? 'Hoy' : isYest ? 'Ayer' : item.date;
-                  return (
-                    <option key={item.date} value={item.date}>
-                      {prefix} — {item.orders.length} cerrada{item.orders.length > 1 ? 's' : ''} ({formatAirPrice(item.totalRevenue, currencySymbol, countryCode)})
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-
-            {/* Opciones de Alcance Mayor */}
-            <button
-              type="button"
-              onClick={() => setDateRangeMode('last_7_days')}
-              className={`px-2.5 py-1.5 rounded-xl font-semibold transition-all cursor-pointer ${
-                dateRangeMode === 'last_7_days'
-                  ? 'bg-slate-800 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              7 Días
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setDateRangeMode('all')}
-              className={`px-2.5 py-1.5 rounded-xl font-semibold transition-all cursor-pointer ${
-                dateRangeMode === 'all'
-                  ? 'bg-slate-800 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              Histórico
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* Toggle de Ámbito de Filtro */}
-            <label className="flex items-center gap-1.5 text-slate-600 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={dateFilterScope === 'all_columns'}
-                onChange={(e) => setDateFilterScope(e.target.checked ? 'all_columns' : 'completed_only')}
-                className="rounded text-cyan-600 focus:ring-cyan-500 cursor-pointer"
-              />
-              <span className="text-[11px] font-medium">
-                {dateFilterScope === 'all_columns' ? 'Filtrando todo el tablero' : 'Solo columna entregados'}
-              </span>
-            </label>
-
-            {/* Botón Resumen de Cierres Diarios */}
-            <button
-              type="button"
-              onClick={() => setIsSummaryModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
-              title="Abrir resumen y auditoría de productividad diaria de cierres"
-            >
-              <BarChart2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Resumen de Cierres ({dailyClosures.length} días)</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setIsSummaryModalOpen(true)}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold transition-all cursor-pointer text-xs shadow-2xs active:scale-95"
+            title="Abrir resumen y auditoría de productividad diaria de cierres"
+          >
+            <BarChart2 className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Resumen ({dailyClosures.length}d)</span>
+          </button>
         </div>
       </div>
 
-      {/* 3. Grid de Columnas Kanban */}
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 overflow-x-auto min-h-[600px] pb-4">
+      {/* 2. Grid de Columnas Kanban */}
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3 overflow-x-auto min-h-[600px] pb-3">
         {COLUMNS.map((col) => {
           const isCompletedCol = col.id === 'completado';
           const rawColOrders = filteredOrders.filter((ord) => ord.status === col.id);
@@ -479,10 +465,10 @@ export const KanbanBoardAir: React.FC<KanbanBoardAirProps> = ({
           return (
             <div
               key={col.id}
-              className={`flex flex-col rounded-2xl border ${col.color} p-3.5 shadow-xs`}
+              className={`flex flex-col rounded-xl border ${col.color} p-2.5 sm:p-3 shadow-xs`}
             >
               {/* Encabezado de Columna */}
-              <div className="flex flex-col gap-1 pb-3 mb-3 border-b border-slate-200">
+              <div className="flex flex-col gap-1 pb-2 mb-2 border-b border-slate-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <ColIcon className="w-4 h-4 text-cyan-700" />
