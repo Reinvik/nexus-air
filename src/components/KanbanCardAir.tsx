@@ -196,9 +196,16 @@ export const KanbanCardAir: React.FC<KanbanCardAirProps> = ({
 
         {order.status === 'completado' && (
           <div className="flex items-center justify-between p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-xs">
-            <div className="flex items-center gap-1 text-emerald-800 font-bold">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Servicio Finalizado</span>
+            <div className="flex flex-col text-emerald-800">
+              <div className="flex items-center gap-1 font-bold">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Servicio Finalizado</span>
+              </div>
+              <span className="text-[10px] text-emerald-700 font-medium">
+                {order.completed_at 
+                  ? `Cerrado: ${order.completed_at.replace('T', ' ').slice(0, 16)}` 
+                  : `Cerrado: ${order.scheduled_date || 'Hoy'}`}
+              </span>
             </div>
             {onOpenReceipt && (
               <button

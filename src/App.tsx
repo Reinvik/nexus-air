@@ -392,6 +392,7 @@ export default function App() {
           <KanbanBoardAir
             orders={orders}
             technicians={technicians}
+            settings={settings}
             onOpenNewOrder={() => setIsAddOrderModalOpen(true)}
             onEditOrder={handleOpenEdit}
             onOpenInspection={handleOpenInspection}
