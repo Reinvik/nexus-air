@@ -51,9 +51,9 @@ async function waitForImages(container: HTMLElement): Promise<void> {
 async function renderElementToPdf(container: HTMLElement, filename: string): Promise<void> {
   await waitForImages(container);
 
-  // Escala 1.5 con fondo blanco puro y renderizado nítido sin desfases de scroll ni cortes superiores
+  // Escala 2 con fondo blanco puro y renderizado nítido sin desfases de scroll ni cortes superiores
   const canvas = await html2canvas(container, {
-    scale: 1.5,
+    scale: 2,
     useCORS: true,
     allowTaint: true,
     backgroundColor: '#ffffff',
@@ -68,12 +68,12 @@ async function renderElementToPdf(container: HTMLElement, filename: string): Pro
       clonedEl.style.top = '0px';
       clonedEl.style.left = '0px';
       clonedEl.style.margin = '0 auto';
-      clonedEl.style.paddingTop = '16px';
+      clonedEl.style.paddingTop = '0px';
     }
   });
 
-  // JPEG calidad 0.92 para garantizar peso ultraliviano y fidelidad de texto
-  const imgData = canvas.toDataURL('image/jpeg', 0.92);
+  // JPEG calidad 0.95 para garantizar nitidez impecable de tipografía y vectoriales
+  const imgData = canvas.toDataURL('image/jpeg', 0.95);
 
   const pdf = new jsPDF({
     orientation: 'portrait',
@@ -97,9 +97,9 @@ async function renderElementToPdf(container: HTMLElement, filename: string): Pro
     printWidth = (canvas.width * printHeight) / canvas.height;
   }
 
-  // Centrado horizontal y vertical
+  // Centrado horizontal y alineado en la parte superior (8 mm de margen superior, SIN espacio blanco excesivo)
   const posX = minMarginX + (maxPrintWidth - printWidth) / 2;
-  const posY = Math.max(minMarginY, (pageHeight - printHeight) / 2);
+  const posY = minMarginY;
 
   pdf.addImage(imgData, 'JPEG', posX, posY, printWidth, printHeight);
 
@@ -128,7 +128,7 @@ export async function downloadElementAsCleanPng(container: HTMLElement, filename
       clonedEl.style.top = '0px';
       clonedEl.style.left = '0px';
       clonedEl.style.margin = '0 auto';
-      clonedEl.style.paddingTop = '16px';
+      clonedEl.style.paddingTop = '0px';
     }
   });
   const dataUrl = canvas.toDataURL('image/png');
@@ -159,7 +159,7 @@ export async function copyElementAsCleanPng(container: HTMLElement, filenameFall
       clonedEl.style.top = '0px';
       clonedEl.style.left = '0px';
       clonedEl.style.margin = '0 auto';
-      clonedEl.style.paddingTop = '16px';
+      clonedEl.style.paddingTop = '0px';
     }
   });
 
@@ -299,304 +299,346 @@ export function buildReceiptHtml(order: ServiceOrder, settings: AirSettings): st
     ? order.subtotal 
     : (applyTax ? (order.total - calculatedTax) : order.total);
   const calculatedTotal = applyTax ? order.total : calculatedSubtotal;
-
   const customerName = order.customer?.name || (order as any).customer_name || 'Cliente Particular';
-  const customerRut = order.customer?.rut || (order as any).customer_rut || '—';
-  const customerPhone = order.customer?.phone || (order as any).customer_phone || '—';
-  const customerAddress = order.customer?.address || (order as any).customer_address || '';
-  const customerCommune = order.customer?.commune || (order.customer as any)?.city || '';
+  const customerRut = order.customer?.rut || (order as any).customer_rut || 'Sin registrar';
+  const customerPhone = order.customer?.phone || (order as any).customer_phone || '';
+  const customerAddress = [order.customer?.address, order.customer?.commune || (order.customer as any)?.city].filter(Boolean).join(', ') || (order as any).customer_address || 'En terreno / Domicilio';
 
   const serialEvap = order.checklist?.serial_evaporator || order.equipment?.serial_number_evaporator || order.equipment?.serial_number || '—';
   const serialCond = order.checklist?.serial_condenser || order.equipment?.serial_number_condenser || '—';
 
+  const ampInitial = order.checklist?.amp_initial ? `${order.checklist.amp_initial}A` : (order.checklist?.amperage_amps ? `${order.checklist.amperage_amps}A` : '—');
+  const ampFinal = order.checklist?.amp_final ? `${order.checklist.amp_final}A` : (order.checklist?.amperage_amps ? `${order.checklist.amperage_amps}A` : '—');
+  const voltage = order.checklist?.voltage_final ? `${order.checklist.voltage_final}V` : (order.checklist?.voltage_initial ? `${order.checklist.voltage_initial}V` : '220V');
+  const psiLowInitial = order.checklist?.psi_low_initial ? `${order.checklist.psi_low_initial} PSI` : (order.checklist?.suction_pressure_psi ? `${order.checklist.suction_pressure_psi} PSI` : '—');
+  const psiLowFinal = order.checklist?.psi_low_final ? `${order.checklist.psi_low_final} PSI` : (order.checklist?.suction_pressure_psi ? `${order.checklist.suction_pressure_psi} PSI` : '—');
+  const deltaT = order.checklist?.delta_t_celsius ? `${order.checklist.delta_t_celsius}°C` : (order.checklist?.capacitance_mfd ? `${order.checklist.capacitance_mfd} µF` : 'Conforme');
+
+  const statusBadgeLabel = order.payment_status === 'pagado' ? 'PAGADO ✓' : (order.payment_status === 'abono' ? 'ABONO PARCIAL' : 'PENDIENTE');
+  const statusBadgeStyle = order.payment_status === 'pagado' 
+    ? 'background: #dcfce7; color: #166534; border: 1px solid #86efac;'
+    : (order.payment_status === 'abono'
+        ? 'background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd;'
+        : 'background: #fef3c7; color: #92400e; border: 1px solid #fde68a;');
+
   return `
-    <div style="width: 760px; padding: 32px 28px 24px 28px; background: #ffffff; color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; box-sizing: border-box; font-size: 11px; line-height: 1.35;">
+    <div style="width: 760px; padding: 22px 26px 18px 26px; background: #ffffff; color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; box-sizing: border-box; font-size: 11px; line-height: 1.35; border: 1px solid #e2e8f0; border-radius: 16px;">
       
-      <!-- ENCABEZADO OFICIAL -->
-      <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px; border-bottom: 2px solid #0284c7; padding-bottom: 12px;">
+      <!-- ENCABEZADO OFICIAL (ESTILO IMAGEN 2) -->
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px;">
         <tr>
-          <td style="vertical-align: top; width: 56%;">
-            ${settings.logo_url ? `
-              <div style="margin-bottom: 8px;">
-                <img src="${settings.logo_url}" alt="Logo" style="max-height: 48px; max-width: 160px; object-fit: contain;" />
+          <!-- Marca y Datos Empresa -->
+          <td style="vertical-align: top; width: 62%; padding-right: 12px;">
+            <table style="border-collapse: collapse;">
+              <tr>
+                <td style="vertical-align: middle; padding-right: 12px;">
+                  ${settings.logo_url ? `
+                    <img src="${settings.logo_url}" alt="Logo" style="max-height: 44px; max-width: 120px; object-fit: contain; border-radius: 8px;" />
+                  ` : `
+                    <div style="width: 40px; height: 40px; border-radius: 12px; background: #0284c7; display: flex; align-items: center; justify-content: center; color: #ffffff;">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/>
+                        <path d="M9.6 4.6A2 2 0 1 1 11 8H2"/>
+                        <path d="M12.6 19.4A2 2 0 1 0 14 16H2"/>
+                      </svg>
+                    </div>
+                  `}
+                </td>
+                <td style="vertical-align: middle;">
+                  <div style="font-size: 19px; font-weight: 900; color: #0f172a; line-height: 1.1; letter-spacing: -0.4px;">
+                    ${settings.fantasy_name || settings.company_name || 'NEXUS AIR'}
+                  </div>
+                  <div style="font-size: 9.5px; font-weight: 800; color: #0284c7; text-transform: uppercase; letter-spacing: 0.6px; margin-top: 3px;">
+                    ${settings.company_slogan || 'ESPECIALISTAS EN CLIMATIZACIÓN Y REFRIGERACIÓN'}
+                  </div>
+                </td>
+              </tr>
+            </table>
+
+            <div style="margin-top: 8px; font-size: 10.5px; color: #64748b; line-height: 1.45;">
+              <div>
+                ${settings.tax_id_label || 'Cédula Jurídica / DIMEX'}: <strong style="color: #0f172a;">${settings.rut || settings.tax_id || 'Sin registrar'}</strong>${settings.city ? ` • Ciudad: <span style="color: #334155;">${settings.city}</span>` : ''}
               </div>
-            ` : ''}
-            <div style="font-size: 18px; font-weight: 900; color: #0369a1; letter-spacing: -0.5px; text-transform: uppercase;">
-              ${settings.fantasy_name || settings.company_name || 'NEXUS AIR CLIMATIZACIÓN'}
-            </div>
-            <div style="font-size: 10px; color: #475569; font-weight: 600; margin-top: 2px;">
-              ${settings.company_slogan || 'Servicio Técnico HVAC Especializado & Climatización'}
-            </div>
-            <div style="font-size: 10px; color: #64748b; margin-top: 4px;">
-              ${settings.address ? `<span>📍 ${settings.address}</span> • ` : ''}
-              ${settings.phone ? `<span>📞 ${settings.phone}</span> • ` : ''}
-              ${settings.email ? `<span>✉️ ${settings.email}</span>` : ''}
-            </div>
-            <div style="font-size: 9.5px; color: #64748b; margin-top: 2px;">
-              <strong>${settings.tax_id_label || 'RUT/ID'}:</strong> ${settings.rut || '77.892.410-K'} • <strong>País:</strong> ${settings.country || 'Chile'}${settings.city ? ` • <strong>Ciudad:</strong> ${settings.city}` : ''}
-            </div>
-          </td>
-          <td style="vertical-align: top; width: 44%; text-align: right;">
-            <div style="display: inline-block; border: 2px solid #0284c7; border-radius: 8px; padding: 12px 18px; background: #f0f9ff; text-align: center; min-width: 215px;">
-              <div style="font-size: 10px; font-weight: 800; color: #0369a1; text-transform: uppercase;">
-                COMPROBANTE DE SERVICIO TÉCNICO
+              <div>
+                ${[settings.address, settings.commune].filter(Boolean).join(', ') || 'Dirección comercial'}${settings.phone ? ` • Tel: <span style="color: #0f172a; font-weight: 600;">${settings.phone}</span>` : ''}
               </div>
-              <div style="font-family: monospace; font-size: 17px; font-weight: 900; color: #0c4a6e; margin: 4px 0;">
-                ${displayFolio}
-              </div>
-              <div style="font-size: 10px; color: #0284c7; font-weight: 800; margin-bottom: 4px;">
-                N° Folio: <strong style="font-family: monospace; color: #0c4a6e;">${displayFolio}</strong>
-              </div>
-              ${invoiceDoc ? `
-                <div style="font-size: 10px; color: #475569; font-weight: 700; margin-bottom: 4px;">
-                  Factura / Doc: <strong style="color: #0f172a; font-family: monospace;">${invoiceDoc}</strong>
+              ${settings.website ? `
+                <div style="color: #0284c7; font-family: monospace; font-size: 10px; margin-top: 2px;">
+                  ${settings.website}
                 </div>
               ` : ''}
-              <div style="font-size: 10px; color: #334155; margin-top: 3px; font-weight: 700;">
-                <span>Fecha:</span> <strong style="color: #0f172a;">${dateFormatted}</strong>
+            </div>
+          </td>
+
+          <!-- Rectángulo Comprobante (Estilo Moderno Imagen 2) -->
+          <td style="vertical-align: top; width: 38%; text-align: right;">
+            <div style="display: inline-block; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 12px 16px; text-align: right; min-width: 200px; box-sizing: border-box;">
+              <div style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.6px;">
+                COMPROBANTE DE SERVICIO
               </div>
-              <div style="font-size: 10px; color: #334155; margin-top: 2px; font-weight: 700;">
-                <span>Hora:</span> <strong style="color: #0f172a;">${timeFormatted}</strong>
+              <div style="font-family: monospace; font-size: 16px; font-weight: 900; color: #0369a1; margin: 3px 0 2px 0;">
+                ${displayFolio}
               </div>
-              <div style="margin-top: 6px; display: inline-block; padding: 4px 10px; border-radius: 999px; background: #dcfce7; color: #166534; font-size: 9.5px; font-weight: 800; text-transform: uppercase;">
-                ${order.payment_status === 'pagado' ? 'PAGADO ✓' : (order.payment_status === 'abono' ? 'ABONO PARCIAL' : 'PENDIENTE DE PAGO')}
+              <div style="font-size: 10.5px; color: #0284c7; font-weight: 700; margin-bottom: 2px;">
+                N° Folio: <span style="font-family: monospace; color: #0f172a; font-weight: 800;">${displayFolio}</span>
+              </div>
+              ${invoiceDoc ? `
+                <div style="font-size: 10px; color: #475569; font-weight: 600; margin-bottom: 2px;">
+                  Doc / Factura: <span style="font-family: monospace; color: #0f172a; font-weight: 700;">${invoiceDoc}</span>
+                </div>
+              ` : ''}
+              <div style="font-size: 10.5px; color: #334155; margin-top: 2px; font-weight: 500;">
+                Fecha: <strong style="color: #0f172a;">${dateFormatted}</strong>
+              </div>
+              <div style="font-size: 10.5px; color: #334155; margin-top: 1px; font-weight: 500;">
+                Hora: <strong style="color: #0f172a;">${timeFormatted}</strong>
+              </div>
+              <div style="margin-top: 6px;">
+                <span style="display: inline-block; padding: 2.5px 12px; border-radius: 9999px; font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; ${statusBadgeStyle}">
+                  ${statusBadgeLabel}
+                </span>
               </div>
             </div>
           </td>
         </tr>
       </table>
 
-      <!-- DATOS CLIENTE Y EQUIPO -->
-      <table style="width: 100%; border-collapse: collapse; margin-bottom: 14px;">
+      <!-- Línea Divisoria Sutil -->
+      <div style="height: 1px; background: #e2e8f0; margin-bottom: 12px;"></div>
+
+      <!-- DATOS CLIENTE Y EQUIPO (2 TARJETAS REDONDEADAS IMAGEN 2) -->
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px;">
         <tr>
           <!-- Cliente -->
-          <td style="width: 50%; vertical-align: top; padding-right: 8px;">
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; border-radius: 6px;">
-              <tr style="background: #f1f5f9;">
-                <th colspan="2" style="text-align: left; padding: 5px 8px; font-size: 10px; font-weight: 800; color: #1e293b; text-transform: uppercase; border-bottom: 1px solid #cbd5e1;">
-                  👤 Información del Cliente
-                </th>
-              </tr>
-              <tr>
-                <td style="padding: 4px 8px; color: #64748b; width: 35%; border-bottom: 1px solid #f1f5f9;">Nombre:</td>
-                <td style="padding: 4px 8px; font-weight: 700; color: #0f172a; border-bottom: 1px solid #f1f5f9;">${customerName}</td>
-              </tr>
-              <tr>
-                <td style="padding: 4px 8px; color: #64748b; border-bottom: 1px solid #f1f5f9;">${settings.tax_id_label || 'Identificación'}:</td>
-                <td style="padding: 4px 8px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9;">${customerRut}</td>
-              </tr>
-              <tr>
-                <td style="padding: 4px 8px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Teléfono:</td>
-                <td style="padding: 4px 8px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9;">${customerPhone}</td>
-              </tr>
-              <tr>
-                <td style="padding: 4px 8px; color: #64748b;">Dirección:</td>
-                <td style="padding: 4px 8px; font-weight: 600; color: #0f172a;">${customerAddress} ${customerCommune ? `(${customerCommune})` : ''}</td>
-              </tr>
-            </table>
+          <td style="width: 50%; vertical-align: top; padding-right: 6px;">
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 12px 14px; box-sizing: border-box; min-height: 110px;">
+              <div style="font-size: 9.5px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.6px;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px; display: inline-block;">
+                  <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                </svg>
+                <span style="vertical-align: middle;">DATOS DEL CLIENTE</span>
+              </div>
+              <div style="font-size: 13.5px; font-weight: 800; color: #0f172a; margin-top: 4px; line-height: 1.2;">
+                ${customerName}
+              </div>
+              <div style="font-size: 10.5px; color: #475569; margin-top: 3px;">
+                ${settings.tax_id_label || 'Cédula Jurídica / DIMEX'}: <span style="color: #0f172a; font-weight: 600;">${customerRut}</span>
+              </div>
+              <div style="font-size: 10.5px; color: #475569; margin-top: 2px;">
+                Dirección: <span style="color: #0f172a;">${customerAddress}</span>
+              </div>
+              ${customerPhone && customerPhone !== '—' ? `
+                <div style="font-size: 10.5px; color: #475569; margin-top: 2px;">
+                  Tel: <span style="color: #0f172a; font-weight: 600;">${customerPhone}</span>
+                </div>
+              ` : ''}
+            </div>
           </td>
 
           <!-- Equipo & Técnico -->
-          <td style="width: 50%; vertical-align: top; padding-left: 8px;">
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; border-radius: 6px;">
-              <tr style="background: #f1f5f9;">
-                <th colspan="2" style="text-align: left; padding: 5px 8px; font-size: 10px; font-weight: 800; color: #1e293b; text-transform: uppercase; border-bottom: 1px solid #cbd5e1;">
-                  ❄️ Equipo y Técnico Responsable
-                </th>
-              </tr>
-              <tr>
-                <td style="padding: 4px 8px; color: #64748b; width: 35%; border-bottom: 1px solid #f1f5f9;">Equipo:</td>
-                <td style="padding: 4px 8px; font-weight: 700; color: #0f172a; border-bottom: 1px solid #f1f5f9;">
-                  ${order.equipment?.brand || 'Equipo Climatizador'} ${order.equipment?.btu ? `${order.equipment.btu.toLocaleString()} BTU` : ''}
-                </td>
-              </tr>
-              <tr>
-                <td style="padding: 4px 8px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Ubicación:</td>
-                <td style="padding: 4px 8px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9;">${order.equipment?.location_in_property || 'Área Principal'}</td>
-              </tr>
-              <tr>
-                <td style="padding: 4px 8px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Serial Evap / Cond:</td>
-                <td style="padding: 4px 8px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9; font-family: monospace; font-size: 10px;">
-                  Evap: <strong style="color: #0369a1;">${serialEvap}</strong> • Cond: <strong style="color: #0369a1;">${serialCond}</strong>
-                </td>
-              </tr>
-              <tr>
-                <td style="padding: 4px 8px; color: #64748b;">Técnico HVAC:</td>
-                <td style="padding: 4px 8px; font-weight: 700; color: #0369a1;">
-                  ${order.assigned_technician?.name || 'Técnico Autorizado'} ${order.assigned_technician?.sec_certified ? '(SEC ✓)' : ''}
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-      </table>
-
-      <!-- DETALLE DEL SERVICIO Y DIAGNÓSTICO -->
-      <table style="width: 100%; border-collapse: collapse; margin-bottom: 14px; border: 1px solid #cbd5e1;">
-        <tr style="background: #f8fafc;">
-          <th style="text-align: left; padding: 6px 10px; font-size: 10px; font-weight: 800; color: #0f172a; border-bottom: 1px solid #cbd5e1;">
-            📋 REPORTE TÉCNICO Y PROCEDIMIENTO REALIZADO
-          </th>
-        </tr>
-        <tr>
-          <td style="padding: 8px 10px; background: #ffffff;">
-            <div style="margin-bottom: 6px;">
-              <strong style="color: #0369a1; text-transform: uppercase; font-size: 10px;">Tipo de Servicio:</strong> 
-              <span style="font-weight: 700; color: #0f172a;">${order.service_type.replace('_', ' ').toUpperCase()}</span> — 
-              <span style="color: #334155;">${order.description || 'Intervención de climatización programada.'}</span>
+          <td style="width: 50%; vertical-align: top; padding-left: 6px;">
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 12px 14px; box-sizing: border-box; min-height: 110px;">
+              <div style="font-size: 9.5px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.6px;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px; display: inline-block;">
+                  <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                </svg>
+                <span style="vertical-align: middle;">EQUIPO INTERVENIDO</span>
+              </div>
+              <div style="font-size: 13.5px; font-weight: 800; color: #0f172a; margin-top: 4px; line-height: 1.2;">
+                ${order.equipment?.brand || 'Equipo Climatizador'} ${order.equipment?.btu ? `(${order.equipment.btu.toLocaleString()} BTU)` : ''}
+              </div>
+              <div style="font-size: 10.5px; color: #475569; margin-top: 3px;">
+                📍 Ubicación: <strong style="color: #0f172a;">${order.equipment?.location_in_property || 'Área Principal'}</strong>
+              </div>
+              ${(serialEvap !== '—' || serialCond !== '—') ? `
+                <div style="font-size: 10px; font-family: monospace; font-weight: 700; color: #0369a1; margin-top: 2px;">
+                  ${serialEvap !== '—' ? `<span style="background: #e0f2fe; padding: 1px 5px; border-radius: 4px; border: 1px solid #bae6fd;">Evap: ${serialEvap}</span> ` : ''}
+                  ${serialCond !== '—' ? `<span style="background: #e0f2fe; padding: 1px 5px; border-radius: 4px; border: 1px solid #bae6fd;">Cond: ${serialCond}</span>` : ''}
+                </div>
+              ` : ''}
+              <div style="font-size: 10.5px; color: #475569; margin-top: 2px;">
+                ${order.equipment?.refrigerant ? `Gas: <span style="font-weight: 600; color: #0f172a;">${order.equipment.refrigerant}</span> • ` : ''}Tecnología: <span style="font-weight: 600; color: #0f172a;">${(order.equipment?.technology || 'INVERTER').toUpperCase()}</span>
+              </div>
             </div>
-            ${order.diagnosis ? `
-              <div style="margin-bottom: 4px; padding: 4px 8px; background: #fffbeb; border-left: 3px solid #f59e0b; font-size: 10px;">
-                <strong>Diagnóstico Inicial:</strong> ${order.diagnosis}
-              </div>
-            ` : ''}
-            ${order.resolution ? `
-              <div style="padding: 4px 8px; background: #f0fdf4; border-left: 3px solid #22c55e; font-size: 10px;">
-                <strong>Resolución / Puesta en Marcha:</strong> ${order.resolution}
-              </div>
-            ` : ''}
           </td>
         </tr>
       </table>
 
-      <!-- TABLA DE MEDICIONES TÉCNICAS (PROTOCOLO VENEFRIO NK-040) -->
-      <table style="width: 100%; border-collapse: collapse; margin-bottom: 14px; border: 1px solid #cbd5e1;">
-        <tr style="background: #f1f5f9;">
-          <th colspan="3" style="text-align: left; padding: 6px 10px; font-size: 10px; font-weight: bold; color: #0f172a; text-transform: uppercase; border-bottom: 1px solid #cbd5e1;">
-            ⚡ Mediciones Técnicas en Operación (Protocolo de Calidad HVAC)
-            ${order.checklist?.work_start_time || order.checklist?.work_end_time ? `
-              <span style="float: right; font-weight: normal; font-size: 9.5px; color: #475569;">
-                Horario: ${order.checklist.work_start_time || '—'} a ${order.checklist.work_end_time || '—'}
-              </span>
-            ` : ''}
-          </th>
-        </tr>
-        <tr style="background: #f8fafc; font-size: 9.5px; color: #475569; border-bottom: 1px solid #cbd5e1;">
-          <th style="padding: 5px 8px; text-align: left; width: 42%;">Parámetro de Medición</th>
-          <th style="padding: 5px 8px; text-align: center; width: 29%;">Medición Inicial (Arranque)</th>
-          <th style="padding: 5px 8px; text-align: center; width: 29%;">Medición Final (Puesta a Punto)</th>
-        </tr>
-        <tr style="border-bottom: 1px solid #f1f5f9; font-size: 10px;">
-          <td style="padding: 4px 8px; color: #334155; font-weight: 600;">Consumo Eléctrico (Amperaje / Amp):</td>
-          <td style="padding: 4px 8px; text-align: center; font-family: monospace; font-weight: bold; color: #0f172a;">${order.checklist?.amp_initial ? `${order.checklist.amp_initial} A` : (order.checklist?.amperage_amps ? `${order.checklist.amperage_amps} A` : '—')}</td>
-          <td style="padding: 4px 8px; text-align: center; font-family: monospace; font-weight: bold; color: #0369a1;">${order.checklist?.amp_final ? `${order.checklist.amp_final} A` : (order.checklist?.amperage_amps ? `${order.checklist.amperage_amps} A` : '—')}</td>
-        </tr>
-        <tr style="border-bottom: 1px solid #f1f5f9; font-size: 10px;">
-          <td style="padding: 4px 8px; color: #334155; font-weight: 600;">Voltaje de Red (V):</td>
-          <td style="padding: 4px 8px; text-align: center; font-family: monospace; font-weight: bold; color: #0f172a;">${order.checklist?.voltage_initial ? `${order.checklist.voltage_initial} V` : '220 V'}</td>
-          <td style="padding: 4px 8px; text-align: center; font-family: monospace; font-weight: bold; color: #0369a1;">${order.checklist?.voltage_final ? `${order.checklist.voltage_final} V` : '220 V'}</td>
-        </tr>
-        <tr style="border-bottom: 1px solid #f1f5f9; font-size: 10px;">
-          <td style="padding: 4px 8px; color: #334155; font-weight: 600;">Presión Baja / Succión (PSI):</td>
-          <td style="padding: 4px 8px; text-align: center; font-family: monospace; font-weight: bold; color: #0f172a;">${order.checklist?.psi_low_initial ? `${order.checklist.psi_low_initial} PSI` : (order.checklist?.suction_pressure_psi ? `${order.checklist.suction_pressure_psi} PSI` : '—')}</td>
-          <td style="padding: 4px 8px; text-align: center; font-family: monospace; font-weight: bold; color: #0369a1;">${order.checklist?.psi_low_final ? `${order.checklist.psi_low_final} PSI` : (order.checklist?.suction_pressure_psi ? `${order.checklist.suction_pressure_psi} PSI` : '—')}</td>
-        </tr>
-        <tr style="border-bottom: 1px solid #f1f5f9; font-size: 10px;">
-          <td style="padding: 4px 8px; color: #334155; font-weight: 600;">Presión Alta / Descarga (PSI):</td>
-          <td style="padding: 4px 8px; text-align: center; font-family: monospace; font-weight: bold; color: #0f172a;">${order.checklist?.psi_high_initial ? `${order.checklist.psi_high_initial} PSI` : (order.checklist?.discharge_pressure_psi ? `${order.checklist.discharge_pressure_psi} PSI` : '—')}</td>
-          <td style="padding: 4px 8px; text-align: center; font-family: monospace; font-weight: bold; color: #0369a1;">${order.checklist?.psi_high_final ? `${order.checklist.psi_high_final} PSI` : (order.checklist?.discharge_pressure_psi ? `${order.checklist.discharge_pressure_psi} PSI` : '—')}</td>
-        </tr>
-        <tr style="font-size: 10px;">
-          <td style="padding: 4px 8px; color: #334155; font-weight: 600;">Capacitancia / Salto Térmico:</td>
-          <td style="padding: 4px 8px; text-align: center; font-family: monospace; color: #475569;">${order.checklist?.capacitance_mfd ? `${order.checklist.capacitance_mfd} µF` : 'Conforme'}</td>
-          <td style="padding: 4px 8px; text-align: center; font-family: monospace; font-weight: bold; color: #166534;">${order.checklist?.delta_t_celsius ? `ΔT: ${order.checklist.delta_t_celsius}°C (Óptimo)` : (order.checklist?.capacitance_mfd ? `${order.checklist.capacitance_mfd} µF` : 'Conforme')}</td>
-        </tr>
-      </table>
-
-      <!-- TABLA DE CONCEPTOS Y VALORES -->
-      <table style="width: 100%; border-collapse: collapse; margin-bottom: 14px; border: 1px solid #cbd5e1;">
-        <thead>
-          <tr style="background: #0f172a; color: #ffffff;">
-            <th style="padding: 6px 8px; text-align: left; font-size: 9.5px; text-transform: uppercase;">Concepto / Ítem</th>
-            <th style="padding: 6px 8px; text-align: center; font-size: 9.5px; text-transform: uppercase; width: 12%;">Tipo</th>
-            <th style="padding: 6px 8px; text-align: center; font-size: 9.5px; text-transform: uppercase; width: 12%;">Cant.</th>
-            <th style="padding: 6px 8px; text-align: right; font-size: 9.5px; text-transform: uppercase; width: 18%;">P. Unitario</th>
-            <th style="padding: 6px 8px; text-align: right; font-size: 9.5px; text-transform: uppercase; width: 20%;">Total</th>
+      <!-- INFORME DE TRABAJO & MEDICIONES HVAC (IMAGEN 2) -->
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 12px 14px; margin-bottom: 12px; box-sizing: border-box;">
+        <table style="width: 100%; border-collapse: collapse; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 8px;">
+          <tr>
+            <td style="font-size: 10.5px; font-weight: 800; color: #1e293b; text-transform: uppercase; letter-spacing: 0.4px;">
+              INFORME DE TRABAJO & DIAGNÓSTICO TÉCNICO
+            </td>
+            <td style="text-align: right; font-size: 9.5px; font-weight: 800; color: #0284c7; text-transform: uppercase;">
+              SERVICIO: ${order.service_type.replace('_', ' ').toUpperCase()}
+            </td>
           </tr>
-        </thead>
-        <tbody>
-          ${order.items && order.items.length > 0 ? order.items.map((item, idx) => `
-            <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; border-bottom: 1px solid #e2e8f0;">
-              <td style="padding: 6px 8px; font-weight: 600; color: #1e293b;">${item.description}</td>
-              <td style="padding: 6px 8px; text-align: center; color: #64748b; text-transform: capitalize;">${item.type}</td>
-              <td style="padding: 6px 8px; text-align: center; font-weight: 700;">${item.quantity}</td>
-              <td style="padding: 6px 8px; text-align: right; font-family: monospace;">${formatAirPrice(item.unit_price, currencySymbol, countryCode)}</td>
-              <td style="padding: 6px 8px; text-align: right; font-family: monospace; font-weight: 700;">${formatAirPrice(item.total, currencySymbol, countryCode)}</td>
-            </tr>
-          `).join('') : `
-            <tr style="background: #ffffff; border-bottom: 1px solid #e2e8f0;">
-              <td style="padding: 6px 8px; font-weight: 600; color: #1e293b;">Servicio Técnico HVAC: ${order.service_type.replace('_', ' ').toUpperCase()}</td>
-              <td style="padding: 6px 8px; text-align: center; color: #64748b;">Servicio</td>
-              <td style="padding: 6px 8px; text-align: center; font-weight: 700;">1</td>
-              <td style="padding: 6px 8px; text-align: right; font-family: monospace;">${formatAirPrice(calculatedSubtotal, currencySymbol, countryCode)}</td>
-              <td style="padding: 6px 8px; text-align: right; font-family: monospace; font-weight: 700;">${formatAirPrice(calculatedSubtotal, currencySymbol, countryCode)}</td>
-            </tr>
-          `}
-        </tbody>
-      </table>
+        </table>
 
-      <!-- TOTALES Y CONDICIONES -->
-      <table style="width: 100%; border-collapse: collapse; margin-bottom: 18px;">
+        ${order.diagnosis ? `
+          <div style="font-size: 10.5px; margin-bottom: 4px;">
+            <strong style="color: #334155;">Diagnóstico Inicial:</strong> <span style="color: #475569;">${order.diagnosis}</span>
+          </div>
+        ` : ''}
+        ${order.resolution ? `
+          <div style="font-size: 10.5px; margin-bottom: 6px;">
+            <strong style="color: #334155;">Resolución / Labores:</strong> <span style="color: #475569;">${order.resolution}</span>
+          </div>
+        ` : ''}
+
+        <!-- Protocol Measurements (4 Píldoras en 1 fila) -->
+        <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #e2e8f0;">
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 6px;">
+            <tr>
+              <td style="font-size: 9.5px; font-weight: 800; color: #334155; text-transform: uppercase; letter-spacing: 0.4px;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; display: inline-block;">
+                  <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>
+                </svg>
+                <span style="vertical-align: middle; margin-left: 3px;">MEDICIONES ELÉCTRICAS Y PRESIÓN (PROTOCOLO CALIDAD HVAC)</span>
+              </td>
+              ${order.checklist?.work_start_time || order.checklist?.work_end_time ? `
+                <td style="text-align: right; font-size: 9px; font-family: monospace; color: #64748b;">
+                  Horario: ${order.checklist.work_start_time || '—'} a ${order.checklist.work_end_time || '—'}
+                </td>
+              ` : ''}
+            </tr>
+          </table>
+
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="width: 25%; padding-right: 4px;">
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 7px 9px;">
+                  <div style="font-size: 9px; color: #64748b; font-weight: 600;">Consumo (Amp)</div>
+                  <div style="font-family: monospace; font-size: 10px; font-weight: 800; color: #0369a1; margin-top: 2px;">
+                    Ini: ${ampInitial} | Fin: ${ampFinal}
+                  </div>
+                </div>
+              </td>
+              <td style="width: 25%; padding-right: 4px; padding-left: 4px;">
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 7px 9px;">
+                  <div style="font-size: 9px; color: #64748b; font-weight: 600;">Voltaje (V)</div>
+                  <div style="font-family: monospace; font-size: 10.5px; font-weight: 800; color: #0f172a; margin-top: 2px;">
+                    ${voltage}
+                  </div>
+                </div>
+              </td>
+              <td style="width: 25%; padding-right: 4px; padding-left: 4px;">
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 7px 9px;">
+                  <div style="font-size: 9px; color: #64748b; font-weight: 600;">Presión Baja (PSI)</div>
+                  <div style="font-family: monospace; font-size: 10px; font-weight: 800; color: #0369a1; margin-top: 2px;">
+                    Ini: ${psiLowInitial} | Fin: ${psiLowFinal}
+                  </div>
+                </div>
+              </td>
+              <td style="width: 25%; padding-left: 4px;">
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 7px 9px;">
+                  <div style="font-size: 9px; color: #64748b; font-weight: 600;">Salto Térmico (ΔT)</div>
+                  <div style="font-family: monospace; font-size: 10px; font-weight: 800; color: #166534; margin-top: 2px;">
+                    ${deltaT}
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- TABLA DE CONCEPTOS Y VALORES (CARD ELEGANTE IMAGEN 2) -->
+      <div style="border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; margin-bottom: 12px; background: #ffffff;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 10.5px;">
+          <thead>
+            <tr style="background: #f1f5f9; color: #475569; font-size: 9.5px; font-weight: 800; text-transform: uppercase;">
+              <th style="padding: 7px 12px;">Descripción del Concepto / Insumo</th>
+              <th style="padding: 7px 10px; text-align: center; width: 60px;">Cant.</th>
+              <th style="padding: 7px 12px; text-align: right; width: 110px;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${order.items && order.items.length > 0 ? order.items.map((item, idx) => `
+              <tr style="border-top: 1px solid #f1f5f9; background: ${idx % 2 === 0 ? '#ffffff' : '#fafafa'};">
+                <td style="padding: 7px 12px; font-weight: 600; color: #1e293b;">${item.description}</td>
+                <td style="padding: 7px 10px; text-align: center; font-family: monospace;">${item.quantity}</td>
+                <td style="padding: 7px 12px; text-align: right; font-family: monospace; font-weight: 700; color: #0f172a;">${formatAirPrice(item.total, currencySymbol, countryCode)}</td>
+              </tr>
+            `).join('') : `
+              <tr style="border-top: 1px solid #f1f5f9; background: #ffffff;">
+                <td style="padding: 7px 12px; font-weight: 600; color: #1e293b;">Servicio de ${order.service_type.replace('_', ' ')} (Mano de obra y materiales)</td>
+                <td style="padding: 7px 10px; text-align: center; font-family: monospace;">1</td>
+                <td style="padding: 7px 12px; text-align: right; font-family: monospace; font-weight: 700; color: #0f172a;">${formatAirPrice(calculatedTotal, currencySymbol, countryCode)}</td>
+              </tr>
+            `}
+          </tbody>
+        </table>
+
+        <!-- Totals Footer Box -->
+        <div style="background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 10px 14px; text-align: right;">
+          <table style="border-collapse: collapse; margin-left: auto; width: 250px; font-size: 10.5px;">
+            <tr>
+              <td style="padding: 2px 0; color: #64748b; text-align: left;">Subtotal Neto:</td>
+              <td style="padding: 2px 0; text-align: right; font-family: monospace; font-weight: 700; color: #0f172a;">
+                ${formatAirPrice(calculatedSubtotal, currencySymbol, countryCode)}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 2px 0; color: #64748b; text-align: left;">${settings.tax_name || 'IVA'} (${applyTax ? `${taxPercent}%` : '0%'}):</td>
+              <td style="padding: 2px 0; text-align: right; font-family: monospace; font-weight: 700; color: #0f172a;">
+                ${applyTax ? formatAirPrice(calculatedTax, currencySymbol, countryCode) : 'Exento (0%)'}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0 2px 0; border-top: 1px solid #cbd5e1; font-size: 11px; font-weight: 900; color: #0f172a; text-transform: uppercase; text-align: left;">
+                TOTAL COMPROBANTE:
+              </td>
+              <td style="padding: 6px 0 2px 0; border-top: 1px solid #cbd5e1; text-align: right; font-family: monospace; font-size: 13.5px; font-weight: 900; color: #0369a1;">
+                ${formatAirPrice(calculatedTotal, currencySymbol, countryCode)}
+              </td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- TÉRMINOS Y TÉCNICO RESPONSABLE -->
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px;">
         <tr>
-          <!-- Condiciones de Garantía -->
-          <td style="width: 58%; vertical-align: top; padding-right: 12px;">
-            <div style="padding: 8px 12px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px;">
-              <div style="font-weight: 800; font-size: 10px; color: #0284c7; margin-bottom: 4px; text-transform: uppercase;">
+          <td style="width: 58%; vertical-align: top; padding-right: 8px;">
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 10px; font-size: 9px; color: #64748b; line-height: 1.4;">
+              <div style="font-weight: 800; color: #0284c7; text-transform: uppercase; margin-bottom: 2px;">
                 🛡️ Términos de Garantía & Mantención
               </div>
-              <ul style="margin: 0; padding-left: 14px; font-size: 9.5px; color: #475569; line-height: 1.4;">
-                <li>Garantía de mano de obra y repuestos: <strong>${settings.warranty_months || 6} meses</strong> bajo uso normal.</li>
-                <li>Ciclo de mantención preventiva recomendado: <strong>${settings.maintenance_interval_months || 6} meses (180 días)</strong> para preservar vida útil del compresor.</li>
-                <li>Atención técnica certificada según estándares de climatización.</li>
-              </ul>
+              <div>• Garantía de servicio: <strong>${settings.warranty_months || 6} meses</strong> bajo uso normal.</div>
+              <div>• Ciclo recomendado: <strong>${settings.maintenance_interval_months || 6} meses (180 días)</strong> para preservar compresor.</div>
             </div>
           </td>
-
-          <!-- Resumen Numérico -->
-          <td style="width: 42%; vertical-align: top;">
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1;">
-              <tr>
-                <td style="padding: 5px 8px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Subtotal Neto:</td>
-                <td style="padding: 5px 8px; text-align: right; font-family: monospace; font-weight: 600; border-bottom: 1px solid #f1f5f9;">
-                  ${formatAirPrice(calculatedSubtotal, currencySymbol, countryCode)}
-                </td>
-              </tr>
-              <tr>
-                <td style="padding: 5px 8px; color: #64748b; border-bottom: 1px solid #cbd5e1;">${settings.tax_name || 'IVA'} (${applyTax ? `${taxPercent}%` : '0%'}):</td>
-                <td style="padding: 5px 8px; text-align: right; font-family: monospace; font-weight: 600; border-bottom: 1px solid #cbd5e1;">
-                  ${applyTax ? formatAirPrice(calculatedTax, currencySymbol, countryCode) : 'Exento (0%)'}
-                </td>
-              </tr>
-              <tr style="background: #f0fdf4;">
-                <td style="padding: 6px 8px; font-size: 11px; font-weight: 900; color: #166534;">TOTAL FINAL:</td>
-                <td style="padding: 6px 8px; text-align: right; font-family: monospace; font-size: 13px; font-weight: 900; color: #166534;">
-                  ${formatAirPrice(calculatedTotal, currencySymbol, countryCode)}
-                </td>
-              </tr>
-            </table>
+          <td style="width: 42%; vertical-align: middle;">
+            <div style="text-align: right; font-size: 9.5px; color: #64748b; line-height: 1.35;">
+              <div>Técnico HVAC: <strong style="color: #0f172a;">${order.assigned_technician?.name || 'Técnico Especialista'}</strong></div>
+              ${order.assigned_technician?.sec_certified ? '<div style="color: #0284c7; font-weight: 700;">Instalador Certificado SEC ✓</div>' : ''}
+            </div>
           </td>
         </tr>
       </table>
 
-      <!-- FIRMAS DE CONFORMIDAD (NK-040) -->
-      <table style="width: 100%; border-collapse: collapse; margin-top: 14px; margin-bottom: 8px;">
+      <!-- FIRMAS DE CONFORMIDAD -->
+      <table style="width: 100%; border-collapse: collapse; margin-top: 14px; margin-bottom: 6px;">
         <tr>
-          <td style="width: 48%; text-align: center; vertical-align: bottom; padding: 0 10px;">
-            <div style="border-bottom: 1.5px dashed #64748b; height: 36px; margin-bottom: 6px;"></div>
-            <div style="font-size: 10px; font-weight: 700; color: #0f172a;">${order.checklist?.technician_signature_name || order.assigned_technician?.name || 'Técnico Especialista HVAC'}</div>
-            <div style="font-size: 9px; color: #64748b;">Firma Técnico Responsable ${order.assigned_technician?.sec_certified ? '(SEC ✓)' : ''}</div>
+          <td style="width: 45%; text-align: center; vertical-align: bottom;">
+            <div style="border-bottom: 1.5px dashed #94a3b8; height: 26px; margin-bottom: 4px;"></div>
+            <div style="font-size: 9.5px; font-weight: 700; color: #0f172a;">${order.checklist?.technician_signature_name || order.assigned_technician?.name || 'Firma Técnico Especialista'}</div>
+            <div style="font-size: 8.5px; color: #64748b;">Técnico Responsable HVAC</div>
           </td>
-          <td style="width: 4%;"></td>
-          <td style="width: 48%; text-align: center; vertical-align: bottom; padding: 0 10px;">
-            <div style="border-bottom: 1.5px dashed #64748b; height: 36px; margin-bottom: 6px;"></div>
-            <div style="font-size: 10px; font-weight: 700; color: #0f172a;">${order.checklist?.customer_signature_name || customerName}</div>
-            <div style="font-size: 9px; color: #64748b;">Firma Recepción Conforme • Doc: ${order.checklist?.customer_id_document || customerRut}</div>
+          <td style="width: 10%;"></td>
+          <td style="width: 45%; text-align: center; vertical-align: bottom;">
+            <div style="border-bottom: 1.5px dashed #94a3b8; height: 26px; margin-bottom: 4px;"></div>
+            <div style="font-size: 9.5px; font-weight: 700; color: #0f172a;">${order.checklist?.customer_signature_name || customerName}</div>
+            <div style="font-size: 8.5px; color: #64748b;">Firma Recepción Conforme</div>
           </td>
         </tr>
       </table>
 
       <!-- PIE DE PÁGINA -->
-      <div style="text-align: center; font-size: 9px; color: #94a3b8; margin-top: 14px; border-top: 1px solid #e2e8f0; padding-top: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+      <div style="text-align: center; font-size: 8.5px; color: #94a3b8; margin-top: 12px; border-top: 1px solid #f1f5f9; padding-top: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
         ${settings.fantasy_name || settings.company_name || 'NEXUS AIR'} • SISTEMA DE GESTIÓN CLIMATIZACIÓN MULTI-TENANT • CONTROL OFICIAL HVAC
       </div>
 
