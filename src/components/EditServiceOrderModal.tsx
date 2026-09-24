@@ -1,8 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { ServiceOrder, Technician, OrderStatus, ServiceType, AirSettings, Customer, AirEquipment } from '../types';
-import { X, Save, Trash2, Calendar, Clock, Wrench, DollarSign, CheckCircle, Navigation, Radio, MapPin, Users, Percent, Check, FileText, User, UserPlus } from 'lucide-react';
+import { 
+  X, 
+  Save, 
+  Trash2, 
+  Calendar, 
+  Clock, 
+  Wrench, 
+  DollarSign, 
+  CheckCircle, 
+  Navigation, 
+  MapPin, 
+  Users, 
+  Check, 
+  FileText, 
+  User, 
+  UserPlus, 
+  Phone, 
+  Thermometer, 
+  Gauge, 
+  Camera, 
+  Eye, 
+  Layers, 
+  ShieldCheck,
+  CreditCard,
+  Hash,
+  Sparkles,
+  Info
+} from 'lucide-react';
 import { calculateLiveRouteETA, getCustomerCoordinates, RouteETA } from '../lib/routingService';
 import { QuickCreateCustomerModal } from './QuickCreateCustomerModal';
+import { WhatsAppIcon, getWhatsAppUrl } from './KanbanCardAir';
 import { toast } from 'react-hot-toast';
 
 interface EditServiceOrderModalProps {
@@ -16,6 +44,7 @@ interface EditServiceOrderModalProps {
   onUpdateOrder: (id: string, updates: Partial<ServiceOrder>) => void;
   onDeleteOrder: (id: string) => void;
   onOpenReceipt?: (order: ServiceOrder) => void;
+  onOpenInspection?: (order: ServiceOrder) => void;
   onAddCustomer?: (customer: Omit<Customer, 'id' | 'created_at'>) => Promise<Customer | void> | void;
   onAddEquipment?: (equipment: Omit<AirEquipment, 'id' | 'next_maintenance_date'>) => Promise<AirEquipment | void> | void;
 }
@@ -31,6 +60,7 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
   onUpdateOrder,
   onDeleteOrder,
   onOpenReceipt,
+  onOpenInspection,
   onAddCustomer,
   onAddEquipment,
 }) => {
@@ -48,7 +78,17 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
     };
   }, [isOpen, onClose]);
 
+  // Tab View Mode
+  const [activeTab, setActiveTab] = useState<'general' | 'crew' | 'billing' | 'tech_report' | 'all'>('general');
+
+  // Core Order State
+  const [serviceType, setServiceType] = useState<ServiceType>(order?.service_type || 'mantencion_preventiva');
   const [status, setStatus] = useState<OrderStatus>(order?.status || 'ingresado');
+  const [customerId, setCustomerId] = useState(order?.customer_id || '');
+  const [equipmentId, setEquipmentId] = useState(order?.equipment_id || '');
+  const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
+
+  // Technician & Crew
   const [technicianId, setTechnicianId] = useState(order?.assigned_technician_id || '');
   const [assistantId, setAssistantId] = useState(order?.assigned_assistant_id || '');
   const [techPayoutType, setTechPayoutType] = useState<'fixed' | 'percentage'>(order?.technician_payout_type || 'fixed');
@@ -56,17 +96,23 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
   const [assistantPayoutType, setAssistantPayoutType] = useState<'fixed' | 'percentage'>(order?.assistant_payout_type || 'fixed');
   const [assistantPayoutValue, setAssistantPayoutValue] = useState<number>(order?.assistant_payout_value ?? 10000);
 
-  const [customerId, setCustomerId] = useState(order?.customer_id || '');
-  const [equipmentId, setEquipmentId] = useState(order?.equipment_id || '');
-  const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
-
+  // Scheduling
   const [scheduledDate, setScheduledDate] = useState(order?.scheduled_date || '');
   const [scheduledSlot, setScheduledSlot] = useState(order?.scheduled_time_slot || '');
+
+  // Technical Text Notes
   const [description, setDescription] = useState(order?.description || '');
   const [diagnosis, setDiagnosis] = useState(order?.diagnosis || '');
   const [resolution, setResolution] = useState(order?.resolution || '');
-  const [paymentStatus, setPaymentStatus] = useState(order?.payment_status || 'pendiente');
+
+  // Billing & Payment
   const [total, setTotal] = useState(order?.total || 0);
+  const [applyTax, setApplyTax] = useState<boolean>(order?.apply_tax ?? true);
+  const [paymentStatus, setPaymentStatus] = useState<'pendiente' | 'pagado' | 'abono'>(order?.payment_status || 'pendiente');
+  const [paymentMethod, setPaymentMethod] = useState<'transferencia' | 'efectivo' | 'tarjeta' | 'webpay'>(order?.payment_method || 'transferencia');
+  const [paymentReference, setPaymentReference] = useState(order?.payment_reference || '');
+  const [paidAmount, setPaidAmount] = useState<number>(order?.paid_amount ?? (order?.payment_status === 'pagado' ? order?.total || 0 : 0));
+  const [paymentNotes, setPaymentNotes] = useState(order?.payment_notes || '');
 
   // GPS Live Tracking State
   const [isTrackingGps, setIsTrackingGps] = useState(order?.status === 'en_ruta' && !!order?.technician_location?.is_active);
@@ -78,6 +124,7 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
 
   useEffect(() => {
     if (order) {
+      setServiceType(order.service_type || 'mantencion_preventiva');
       setCustomerId(order.customer_id || '');
       setEquipmentId(order.equipment_id || '');
       setStatus(order.status);
@@ -87,19 +134,24 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
       setTechPayoutValue(order.technician_payout_value ?? 20000);
       setAssistantPayoutType(order.assistant_payout_type || 'fixed');
       setAssistantPayoutValue(order.assistant_payout_value ?? 10000);
-      setScheduledDate(order.scheduled_date);
-      setScheduledSlot(order.scheduled_time_slot);
-      setDescription(order.description);
+      setScheduledDate(order.scheduled_date || '');
+      setScheduledSlot(order.scheduled_time_slot || '');
+      setDescription(order.description || '');
       setDiagnosis(order.diagnosis || '');
       setResolution(order.resolution || '');
-      setPaymentStatus(order.payment_status);
-      setTotal(order.total);
+      setTotal(order.total || 0);
+      setApplyTax(order.apply_tax ?? true);
+      setPaymentStatus(order.payment_status || 'pendiente');
+      setPaymentMethod(order.payment_method || 'transferencia');
+      setPaymentReference(order.payment_reference || '');
+      setPaidAmount(order.paid_amount ?? (order.payment_status === 'pagado' ? order.total || 0 : 0));
+      setPaymentNotes(order.payment_notes || '');
       setIsTrackingGps(order.status === 'en_ruta' && !!order.technician_location?.is_active);
       setLastCoords(order.technician_location ? { lat: order.technician_location.lat, lng: order.technician_location.lng } : null);
     }
   }, [order?.id]);
 
-  // Cálculo Dinámico de Ruta OSRM hacia el Cliente
+  // Dynamic Route calculation
   useEffect(() => {
     if (!lastCoords || !order) return;
     const dest = getCustomerCoordinates(
@@ -120,6 +172,16 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
 
   if (!isOpen || !order) return null;
 
+  // Selected customer & equipment
+  const selectedCustomer = customers?.find(c => c.id === customerId) || order.customer;
+  const availableEquipments = equipments?.filter(e => e.customer_id === customerId) || [];
+  const selectedEquipment = availableEquipments.find(e => e.id === equipmentId) || (order.equipment_id === equipmentId ? order.equipment : undefined);
+
+  // Financial calculations
+  const taxRate = settings?.tax_rate !== undefined ? Number(settings.tax_rate) : 0.19;
+  const subtotal = applyTax ? Math.round(total / (1 + taxRate)) : total;
+  const tax = applyTax ? (total - subtotal) : 0;
+
   const calculatedTechPayout = techPayoutType === 'percentage' 
     ? Math.round((total * techPayoutValue) / 100) 
     : techPayoutValue;
@@ -128,6 +190,11 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
         ? Math.round((total * assistantPayoutValue) / 100) 
         : assistantPayoutValue)
     : 0;
+
+  // Direct WhatsApp & Phone
+  const customerPhone = selectedCustomer?.phone || order.customer?.phone || order.customer_phone;
+  const customerName = selectedCustomer?.name || order.customer?.name || order.customer_name || 'Cliente';
+  const whatsappUrl = getWhatsAppUrl(customerPhone, customerName, order.ticket_number);
 
   const handleStartTrip = () => {
     setStatus('en_ruta');
@@ -200,13 +267,11 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const taxRate = settings?.tax_rate !== undefined ? Number(settings.tax_rate) : 0.19;
-    const subtotal = Math.round(total / (1 + taxRate));
-    const tax = total - subtotal;
 
     onUpdateOrder(order.id, {
       customer_id: customerId,
       equipment_id: equipmentId || undefined,
+      service_type: serviceType,
       status,
       assigned_technician_id: technicianId,
       assigned_assistant_id: assistantId || undefined,
@@ -219,7 +284,12 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
       description,
       diagnosis,
       resolution,
+      apply_tax: applyTax,
       payment_status: paymentStatus,
+      payment_method: paymentMethod,
+      payment_reference: paymentReference,
+      paid_amount: paidAmount,
+      payment_notes: paymentNotes,
       subtotal,
       tax,
       total,
@@ -248,76 +318,191 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-5xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] my-auto text-slate-900 cursor-default"
       >
-        {/* Header */}
-        <div className="px-6 py-3.5 bg-slate-50/95 border-b border-slate-200 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-cyan-50 border border-cyan-200 text-cyan-600 flex items-center justify-center font-bold">
+        {/* Header Principal con Acciones Rápidas */}
+        <div className="px-5 py-3 bg-slate-50/95 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-cyan-50 border border-cyan-200 text-cyan-600 flex items-center justify-center font-bold shrink-0">
               <Wrench className="w-4 h-4" />
             </div>
-            <div>
-              <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-                Editar Orden Técnica
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200 font-mono font-bold">
-                  {order.ticket_number}
-                </span>
-              </h3>
-              <p className="text-xs text-slate-500">
-                {order.customer?.name} • {order.customer?.commune} • {order.customer?.phone}
-                {order.equipment && (
-                  <span className="ml-2 font-medium text-cyan-700">
-                    ({order.equipment.brand} {order.equipment.btu} BTU - {order.equipment.location_in_property})
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
+                  Editar Orden de Servicio
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200 font-mono font-bold">
+                    {order.ticket_number}
                   </span>
-                )}
+                </h3>
+              </div>
+              <p className="text-xs text-slate-500 truncate">
+                {customerName} • {selectedCustomer?.commune || 'Sin comuna'} • {selectedCustomer?.address || 'Sin dirección'}
               </p>
             </div>
           </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Botón WhatsApp Directo en Cabecera */}
+            {whatsappUrl && (
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={`Hablar por WhatsApp con ${customerName} (${customerPhone})`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs transition-transform active:scale-95 shadow-xs cursor-pointer"
+              >
+                <WhatsAppIcon className="w-3.5 h-3.5" />
+                <span>WhatsApp</span>
+              </a>
+            )}
+
+            {/* Botón Llamar Directo */}
+            {customerPhone && (
+              <a
+                href={`tel:${customerPhone.replace(/\s+/g, '')}`}
+                title={`Llamar a ${customerPhone}`}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors cursor-pointer border border-slate-200"
+              >
+                <Phone className="w-3.5 h-3.5 text-slate-500" />
+                <span className="hidden sm:inline">Llamar</span>
+              </a>
+            )}
+
+            {/* Recibo Rápido */}
+            {onOpenReceipt && (
+              <button
+                type="button"
+                onClick={() => onOpenReceipt(order)}
+                title="Ver comprobante oficial"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-300 transition-colors cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="hidden sm:inline">Recibo</span>
+              </button>
+            )}
+
+            {/* Cerrar */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer ml-1"
+              title="Cerrar modal (Esc)"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Barra de Navegación por Pestañas */}
+        <div className="px-5 py-2 bg-slate-100/70 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs shrink-0">
+          <div className="flex items-center gap-1 overflow-x-auto py-0.5">
+            <button
+              type="button"
+              onClick={() => setActiveTab('general')}
+              className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                activeTab === 'general'
+                  ? 'bg-white text-cyan-800 shadow-2xs border border-slate-200'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-cyan-600" />
+              <span>1. General & Climatización</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('crew')}
+              className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                activeTab === 'crew'
+                  ? 'bg-white text-cyan-800 shadow-2xs border border-slate-200'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5 text-blue-600" />
+              <span>2. Cuadrilla & GPS</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('billing')}
+              className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                activeTab === 'billing'
+                  ? 'bg-white text-cyan-800 shadow-2xs border border-slate-200'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
+              <span>3. Facturación & Cobro</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('tech_report')}
+              className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                activeTab === 'tech_report'
+                  ? 'bg-white text-cyan-800 shadow-2xs border border-slate-200'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
+              <span>4. Diagnóstico & Ficha HVAC</span>
+            </button>
+          </div>
+
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-            title="Cerrar modal (Esc)"
+            onClick={() => setActiveTab(activeTab === 'all' ? 'general' : 'all')}
+            className={`px-2.5 py-1.5 rounded-lg font-semibold text-[11px] flex items-center gap-1 transition-colors cursor-pointer border ${
+              activeTab === 'all'
+                ? 'bg-slate-800 text-white border-slate-900'
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+            }`}
           >
-            <X className="w-5 h-5" />
+            <Layers className="w-3.5 h-3.5" />
+            <span>{activeTab === 'all' ? 'Ver por Pestañas' : 'Ver Todo'}</span>
           </button>
         </div>
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4 text-xs">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-              {/* COLUMNA IZQUIERDA: Estados, Agendamiento, Cuadrilla y GPS */}
-              <div className="lg:col-span-6 space-y-4">
-                {/* Cliente & Equipo Asignado */}
-                {customers && customers.length > 0 && (
+          <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4 text-xs">
+            {/* PESTAÑA 1: General & Climatización */}
+            {(activeTab === 'general' || activeTab === 'all') && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pb-1 border-b border-slate-200">
+                  <Sparkles className="w-4 h-4 text-cyan-600" />
+                  <h4 className="font-bold text-sm text-slate-800">Datos Generales, Cliente & Equipo HVAC</h4>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Tarjeta de Cliente */}
                   <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="font-semibold text-slate-700 flex items-center gap-1.5">
-                          <User className="w-3.5 h-3.5 text-cyan-600" />
-                          Cliente Asociado
-                        </label>
-                        {onAddCustomer && (
-                          <button
-                            type="button"
-                            onClick={() => setIsAddCustomerModalOpen(true)}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-700 hover:text-cyan-800 font-bold text-[11px] transition-colors cursor-pointer border border-cyan-300/40 shadow-2xs"
-                            title="Crear un nuevo cliente y asociarlo a esta orden"
-                          >
-                            <UserPlus className="w-3.5 h-3.5" />
-                            <span>+ Nuevo Cliente</span>
-                          </button>
-                        )}
-                      </div>
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                        <User className="w-3.5 h-3.5 text-cyan-600" />
+                        Cliente Asociado
+                      </label>
+                      {onAddCustomer && (
+                        <button
+                          type="button"
+                          onClick={() => setIsAddCustomerModalOpen(true)}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-cyan-50 hover:bg-cyan-100 text-cyan-800 font-bold text-[11px] transition-colors cursor-pointer border border-cyan-200 shadow-2xs"
+                        >
+                          <UserPlus className="w-3.5 h-3.5 text-cyan-600" />
+                          <span>+ Nuevo Cliente</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {customers && customers.length > 0 ? (
                       <select
                         value={customerId}
                         onChange={(e) => {
                           setCustomerId(e.target.value);
                           setEquipmentId('');
                         }}
-                        className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 font-medium focus:border-cyan-500 focus:outline-none transition-colors"
+                        className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 font-medium focus:border-cyan-500 focus:outline-none transition-colors"
                       >
                         {customers.map(c => (
                           <option key={c.id} value={c.id}>
@@ -325,40 +510,131 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                           </option>
                         ))}
                       </select>
-                    </div>
+                    ) : (
+                      <p className="text-slate-500 text-xs italic">Cargando lista de clientes...</p>
+                    )}
 
-                    {equipments && (
-                      <div className="space-y-1.5 pt-2 border-t border-slate-200/70">
-                        <label className="font-semibold text-slate-700 flex items-center gap-1.5">
-                          <Wrench className="w-3.5 h-3.5 text-blue-600" />
-                          Equipo Asignado
-                        </label>
-                        <select
-                          value={equipmentId}
-                          onChange={(e) => setEquipmentId(e.target.value)}
-                          className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:border-cyan-500 focus:outline-none transition-colors"
-                        >
-                          <option value="">Sin equipo registrado (Asignación abierta)</option>
-                          {equipments.filter(e => e.customer_id === customerId).map(eq => (
-                            <option key={eq.id} value={eq.id}>
-                              {eq.brand} {eq.btu} BTU - {eq.location_in_property} ({eq.type})
-                            </option>
-                          ))}
-                        </select>
+                    {/* Ficha Resumen del Cliente */}
+                    {selectedCustomer && (
+                      <div className="p-2.5 rounded-lg bg-white border border-slate-200 space-y-1 text-[11px]">
+                        <div className="flex items-center justify-between font-bold text-slate-800">
+                          <span>{selectedCustomer.name}</span>
+                          <span className="text-slate-500 font-mono text-[10px]">{selectedCustomer.rut || 'Sin RUT'}</span>
+                        </div>
+                        <div className="text-slate-600">
+                          📍 {selectedCustomer.address}, {selectedCustomer.commune}
+                        </div>
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                          <span className="text-slate-500">📞 {selectedCustomer.phone || 'Sin fono'}</span>
+                          {whatsappUrl && (
+                            <a
+                              href={whatsappUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-emerald-600 font-bold hover:underline inline-flex items-center gap-1"
+                            >
+                              <WhatsAppIcon className="w-3 h-3" />
+                              <span>Abrir WhatsApp</span>
+                            </a>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
-                )}
 
-                {/* Status & Payment Status */}
-                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <label className="font-semibold text-slate-700">Estado de la Orden</label>
+                  {/* Tarjeta de Equipo HVAC */}
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                        <Wrench className="w-3.5 h-3.5 text-blue-600" />
+                        Equipo de Aire Acondicionado
+                      </label>
+                      <span className="text-[10px] text-slate-500 font-semibold">
+                        {availableEquipments.length} equipo(s) del cliente
+                      </span>
+                    </div>
+
+                    <select
+                      value={equipmentId}
+                      onChange={(e) => setEquipmentId(e.target.value)}
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:border-cyan-500 focus:outline-none transition-colors"
+                    >
+                      <option value="">Sin equipo registrado (Asignación libre)</option>
+                      {availableEquipments.map(eq => (
+                        <option key={eq.id} value={eq.id}>
+                          {eq.brand} {eq.btu.toLocaleString()} BTU - {eq.location_in_property} ({eq.technology?.toUpperCase()})
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* Especificaciones Completas del Equipo */}
+                    {selectedEquipment ? (
+                      <div className="p-2.5 rounded-lg bg-white border border-slate-200 space-y-1.5 text-[11px]">
+                        <div className="flex items-center justify-between font-bold text-cyan-900">
+                          <span className="text-xs">❄️ {selectedEquipment.brand} {selectedEquipment.btu.toLocaleString()} BTU</span>
+                          <span className="uppercase text-[9.5px] px-1.5 py-0.2 rounded bg-cyan-100 text-cyan-800 font-mono font-bold">
+                            {selectedEquipment.technology || 'Inverter'}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-slate-600 pt-1 border-t border-slate-100">
+                          <div>
+                            <span className="text-slate-400">Tipo:</span> <strong className="text-slate-700">{selectedEquipment.type}</strong>
+                          </div>
+                          <div>
+                            <span className="text-slate-400">Refrigerante:</span> <strong className="text-slate-700">{selectedEquipment.refrigerant || 'R410A'}</strong>
+                          </div>
+                          <div>
+                            <span className="text-slate-400">Ubicación:</span> <strong className="text-slate-700">{selectedEquipment.location_in_property}</strong>
+                          </div>
+                          <div>
+                            <span className="text-slate-400">Modelo:</span> <strong className="text-slate-700">{selectedEquipment.model || 'N/A'}</strong>
+                          </div>
+                        </div>
+                        {(selectedEquipment.serial_number_evaporator || selectedEquipment.serial_number_condenser) && (
+                          <div className="pt-1 border-t border-slate-100 font-mono text-[10px] text-slate-600 space-y-0.5">
+                            {selectedEquipment.serial_number_evaporator && (
+                              <div>Serial Evaporador (Int): <strong className="text-slate-800">{selectedEquipment.serial_number_evaporator}</strong></div>
+                            )}
+                            {selectedEquipment.serial_number_condenser && (
+                              <div>Serial Condensador (Ext): <strong className="text-slate-800">{selectedEquipment.serial_number_condenser}</strong></div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="p-2.5 rounded-lg bg-white/70 border border-dashed border-slate-200 text-slate-500 text-center text-[11px]">
+                        Asignación abierta. Los datos del equipo pueden registrarse en terreno o en la Ficha HVAC.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Tipo de Servicio, Estado de la Orden y Agendamiento */}
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="space-y-1">
+                      <label className="font-semibold text-slate-700 text-xs">Tipo de Servicio</label>
+                      <select
+                        value={serviceType}
+                        onChange={(e) => setServiceType(e.target.value as ServiceType)}
+                        className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 font-semibold focus:border-cyan-500 focus:outline-none"
+                      >
+                        <option value="mantencion_preventiva">Mantención Preventiva (6M)</option>
+                        <option value="instalacion">Instalación Nueva</option>
+                        <option value="mantencion_correctiva">Reparación / Fuga</option>
+                        <option value="reparacion">Reparación General</option>
+                        <option value="visita_tecnica">Visita Técnica / Diagnóstico</option>
+                        <option value="recarga_gas">Recarga Gas Refrigerante</option>
+                        <option value="pruebas_qa">Pruebas QA & Medición</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="font-semibold text-slate-700 text-xs">Estado de la Orden</label>
                       <select
                         value={status}
                         onChange={(e) => setStatus(e.target.value as OrderStatus)}
-                        className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 font-medium focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-colors"
+                        className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 font-semibold focus:border-cyan-500 focus:outline-none"
                       >
                         <option value="ingresado">Ingresado / Solicitud</option>
                         <option value="en_ruta">En Ruta (Despachado)</option>
@@ -369,24 +645,8 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                       </select>
                     </div>
 
-                    <div className="space-y-1.5">
-                      <label className="font-semibold text-slate-700">Estado de Pago</label>
-                      <select
-                        value={paymentStatus}
-                        onChange={(e) => setPaymentStatus(e.target.value as any)}
-                        className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 font-medium focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-colors"
-                      >
-                        <option value="pendiente">Pendiente de Pago</option>
-                        <option value="abono">Abono Inicial Recibido</option>
-                        <option value="pagado">Pagado Total</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Fecha y Bloque Horario */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200/70">
-                    <div className="space-y-1.5">
-                      <label className="font-semibold text-slate-700 flex items-center gap-1">
+                    <div className="space-y-1">
+                      <label className="font-semibold text-slate-700 text-xs flex items-center gap-1">
                         <Calendar className="w-3.5 h-3.5 text-cyan-600" />
                         Fecha Programada
                       </label>
@@ -394,12 +654,12 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                         type="date"
                         value={scheduledDate}
                         onChange={(e) => setScheduledDate(e.target.value)}
-                        className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:border-cyan-500 focus:outline-none transition-colors"
+                        className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:border-cyan-500 focus:outline-none"
                       />
                     </div>
 
-                    <div className="space-y-1.5">
-                      <label className="font-semibold text-slate-700 flex items-center gap-1">
+                    <div className="space-y-1">
+                      <label className="font-semibold text-slate-700 text-xs flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5 text-cyan-600" />
                         Bloque Horario
                       </label>
@@ -407,11 +667,21 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                         type="text"
                         value={scheduledSlot}
                         onChange={(e) => setScheduledSlot(e.target.value)}
-                        placeholder="Ej: 09:00 - 11:00"
-                        className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:border-cyan-500 focus:outline-none transition-colors"
+                        placeholder="Ej: 09:30 - 11:30"
+                        className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:border-cyan-500 focus:outline-none"
                       />
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* PESTAÑA 2: Cuadrilla & GPS */}
+            {(activeTab === 'crew' || activeTab === 'all') && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pb-1 border-b border-slate-200">
+                  <Users className="w-4 h-4 text-blue-600" />
+                  <h4 className="font-bold text-sm text-slate-800">Cuadrilla de Terreno & Seguimiento GPS</h4>
                 </div>
 
                 {/* Equipo de Terreno & Pago por Mano de Obra */}
@@ -419,10 +689,10 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
                       <Users className="w-3.5 h-3.5 text-cyan-600" />
-                      Equipo de Terreno & Pago por Mano de Obra
+                      Asignación de Personal Técnico & Liquidación
                     </span>
                     <span className="text-[10px] text-slate-500 font-semibold">
-                      Control de comisiones
+                      Cálculo de comisiones de servicio
                     </span>
                   </div>
 
@@ -480,7 +750,7 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center pt-2 border-t border-slate-200/80">
                     <div className="sm:col-span-1">
                       <label className="text-[11px] font-semibold text-slate-700 block mb-1">
-                        Ayudante (Opcional)
+                        Ayudante Técnico (Opcional)
                       </label>
                       <select
                         value={assistantId}
@@ -593,7 +863,7 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                     {lastCoords && (
                       <div className="w-full pt-2 border-t border-blue-900/60 flex flex-wrap items-center justify-between gap-1 text-[11px]">
                         <span className="text-slate-300">
-                          Ruta hacia <strong className="text-white">{order.customer?.commune || order.customer?.address || 'Destino'}</strong>:
+                          Ruta hacia <strong className="text-white">{selectedCustomer?.commune || selectedCustomer?.address || 'Destino'}</strong>:
                         </span>
                         <div className="flex items-center gap-2">
                           {routeEta ? (
@@ -614,92 +884,268 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                   </div>
                 </div>
               </div>
+            )}
 
-              {/* COLUMNA DERECHA: Facturación, Descripción, Diagnóstico y Resolución */}
-              <div className="lg:col-span-6 space-y-4">
-                {/* Facturación y Total Card */}
-                <div className="p-4 rounded-xl bg-gradient-to-br from-slate-50 to-blue-50/40 border border-slate-200/90 shadow-xs space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
-                      <DollarSign className="w-4 h-4 text-emerald-600" />
-                      Total Facturado de la Orden
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-white border border-slate-200 font-bold text-slate-600 uppercase">
-                      {settings?.country || 'Chile'} • {settings?.currency_code || 'CLP'}
-                    </span>
-                  </div>
+            {/* PESTAÑA 3: Cobro, Pagos & Facturación */}
+            {(activeTab === 'billing' || activeTab === 'all') && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pb-1 border-b border-slate-200">
+                  <DollarSign className="w-4 h-4 text-emerald-600" />
+                  <h4 className="font-bold text-sm text-slate-800">Facturación, Cobro & Pagos</h4>
+                </div>
 
-                  <div className="flex items-center gap-3">
-                    <div className="relative flex-1">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
-                        {settings?.currency_symbol || '$'}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Total y Desglose de Impuestos */}
+                  <div className="p-4 rounded-xl bg-gradient-to-br from-slate-50 to-blue-50/40 border border-slate-200/90 shadow-xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                        <DollarSign className="w-4 h-4 text-emerald-600" />
+                        Total Facturado de la Orden
                       </span>
-                      <input
-                        type="number"
-                        value={total}
-                        onChange={(e) => setTotal(parseInt(e.target.value) || 0)}
-                        className="w-full pl-8 pr-3 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 font-mono font-black text-lg focus:border-cyan-500 focus:outline-none transition-colors"
-                      />
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-white border border-slate-200 font-bold text-slate-600 uppercase">
+                        {settings?.country || 'Chile'} • {settings?.currency_code || 'CLP'}
+                      </span>
                     </div>
 
-                    {onOpenReceipt && (
-                      <button
-                        type="button"
-                        onClick={() => onOpenReceipt(order)}
-                        className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs transition-all cursor-pointer shrink-0 shadow-xs"
-                      >
-                        <FileText className="w-4 h-4 text-emerald-600" />
-                        <span>Comprobante</span>
-                      </button>
-                    )}
+                    <div className="flex items-center gap-3">
+                      <div className="relative flex-1">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
+                          {settings?.currency_symbol || '$'}
+                        </span>
+                        <input
+                          type="number"
+                          value={total}
+                          onChange={(e) => setTotal(parseInt(e.target.value) || 0)}
+                          className="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-900 font-mono font-black text-lg focus:border-cyan-500 focus:outline-none transition-colors"
+                        />
+                      </div>
+
+                      {onOpenReceipt && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenReceipt(order)}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs transition-all cursor-pointer shrink-0 shadow-xs"
+                        >
+                          <FileText className="w-4 h-4 text-emerald-600" />
+                          <span>Comprobante</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Toggle Aplica IVA y Desglose */}
+                    <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <label className="font-semibold text-slate-700 flex items-center gap-1.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={applyTax}
+                            onChange={(e) => setApplyTax(e.target.checked)}
+                            className="rounded text-cyan-600 focus:ring-cyan-500"
+                          />
+                          <span>Aplica IVA ({Math.round(taxRate * 100)}%)</span>
+                        </label>
+                        <span className="text-[10px] text-slate-400 font-semibold">
+                          {applyTax ? 'Factura con IVA' : 'Boleta Exenta'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100 font-mono text-[11px] text-slate-600">
+                        <div>Subtotal Neto: <strong>{settings?.currency_symbol || '$'} {subtotal.toLocaleString()}</strong></div>
+                        <div>IVA ({Math.round(taxRate * 100)}%): <strong>{settings?.currency_symbol || '$'} {tax.toLocaleString()}</strong></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Estado de Pago, Método y Referencia */}
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                    <span className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                      <CreditCard className="w-4 h-4 text-cyan-600" />
+                      Detalle del Cobro & Pago
+                    </span>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div className="space-y-1">
+                        <label className="font-semibold text-slate-700 text-[11px]">Estado de Pago</label>
+                        <select
+                          value={paymentStatus}
+                          onChange={(e) => setPaymentStatus(e.target.value as any)}
+                          className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 font-medium focus:border-cyan-500 focus:outline-none"
+                        >
+                          <option value="pendiente">Pendiente de Pago</option>
+                          <option value="abono">Abono Inicial</option>
+                          <option value="pagado">Pagado Total</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-semibold text-slate-700 text-[11px]">Método de Pago</label>
+                        <select
+                          value={paymentMethod}
+                          onChange={(e) => setPaymentMethod(e.target.value as any)}
+                          className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 font-medium focus:border-cyan-500 focus:outline-none"
+                        >
+                          <option value="transferencia">Transferencia Bancaria</option>
+                          <option value="efectivo">Efectivo en Terreno</option>
+                          <option value="tarjeta">Tarjeta Débito / Crédito</option>
+                          <option value="webpay">Webpay / Enlace Online</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-semibold text-slate-700 text-[11px] flex items-center gap-1">
+                          <Hash className="w-3 h-3 text-slate-400" />
+                          N° Comprobante / Referencia
+                        </label>
+                        <input
+                          type="text"
+                          value={paymentReference}
+                          onChange={(e) => setPaymentReference(e.target.value)}
+                          placeholder="Ej: Transf. 984128"
+                          className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono text-xs focus:border-cyan-500 focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-semibold text-slate-700 text-[11px]">Monto Pagado / Abonado</label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            value={paidAmount}
+                            onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)}
+                            className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono text-xs font-bold focus:border-cyan-500 focus:outline-none"
+                          />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-mono font-bold">
+                            {settings?.currency_symbol || '$'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1 pt-1">
+                      <label className="font-semibold text-slate-700 text-[11px]">Notas de Cobro / Observaciones de Pago</label>
+                      <input
+                        type="text"
+                        value={paymentNotes}
+                        onChange={(e) => setPaymentNotes(e.target.value)}
+                        placeholder="Ej: Pagado 50% al iniciar y saldo al recibir el comprobante..."
+                        className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs focus:border-cyan-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* PESTAÑA 4: Diagnóstico & Ficha HVAC */}
+            {(activeTab === 'tech_report' || activeTab === 'all') && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-1 border-b border-slate-200">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-purple-600" />
+                    <h4 className="font-bold text-sm text-slate-800">Informe Técnico, Diagnóstico & Mediciones HVAC</h4>
+                  </div>
+                  {onOpenInspection && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenInspection(order)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-2xs transition-all cursor-pointer"
+                    >
+                      <Gauge className="w-3.5 h-3.5" />
+                      <span>Abrir Ficha de Inspección Completa</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Resumen de Mediciones Técnicas */}
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                  <span className="font-bold text-slate-800 text-xs flex items-center gap-1">
+                    <Thermometer className="w-3.5 h-3.5 text-cyan-600" />
+                    Mediciones de Control Térmico y Eléctrico (Checklist QA)
+                  </span>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1">
+                    <div className="p-2 rounded-lg bg-white border border-slate-200 text-center">
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Delta T (°C)</span>
+                      <strong className="text-cyan-800 text-xs font-mono">
+                        {order.checklist?.delta_t_celsius ? `${order.checklist.delta_t_celsius}°C` : 'S/Medir'}
+                      </strong>
+                    </div>
+
+                    <div className="p-2 rounded-lg bg-white border border-slate-200 text-center">
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Baja PSI</span>
+                      <strong className="text-slate-800 text-xs font-mono">
+                        {order.checklist?.suction_pressure_psi || order.checklist?.psi_low_final ? `${order.checklist.suction_pressure_psi || order.checklist.psi_low_final} PSI` : 'S/Medir'}
+                      </strong>
+                    </div>
+
+                    <div className="p-2 rounded-lg bg-white border border-slate-200 text-center">
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Alta PSI</span>
+                      <strong className="text-slate-800 text-xs font-mono">
+                        {order.checklist?.discharge_pressure_psi || order.checklist?.psi_high_final ? `${order.checklist.discharge_pressure_psi || order.checklist.psi_high_final} PSI` : 'S/Medir'}
+                      </strong>
+                    </div>
+
+                    <div className="p-2 rounded-lg bg-white border border-slate-200 text-center">
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Amperaje</span>
+                      <strong className="text-slate-800 text-xs font-mono">
+                        {order.checklist?.amperage_amps || order.checklist?.amp_final ? `${order.checklist.amperage_amps || order.checklist.amp_final} A` : 'S/Medir'}
+                      </strong>
+                    </div>
+
+                    <div className="p-2 rounded-lg bg-white border border-slate-200 text-center">
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Voltaje</span>
+                      <strong className="text-slate-800 text-xs font-mono">
+                        {order.checklist?.voltage_final || order.checklist?.voltage_initial ? `${order.checklist.voltage_final || order.checklist.voltage_initial} V` : 'S/Medir'}
+                      </strong>
+                    </div>
                   </div>
                 </div>
 
-                {/* Descripción General */}
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-700">Descripción del Trabajo / Solicitud</label>
-                  <textarea
-                    rows={2}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Descripción del requerimiento inicial del cliente..."
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-colors"
-                  />
-                </div>
+                {/* Textareas de Descripción, Diagnóstico y Resolución */}
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-700 text-xs">Descripción Inicial / Solicitud del Cliente</label>
+                    <textarea
+                      rows={2}
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Descripción del requerimiento inicial del cliente..."
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-colors text-xs"
+                    />
+                  </div>
 
-                {/* Diagnóstico Técnico */}
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-700">Diagnóstico Técnico en Terreno</label>
-                  <textarea
-                    rows={3}
-                    value={diagnosis}
-                    onChange={(e) => setDiagnosis(e.target.value)}
-                    placeholder="Estado inicial del equipo al llegar al sitio, anomalías detectadas, presiones o ruidos..."
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-colors"
-                  />
-                </div>
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-700 text-xs">Diagnóstico Técnico en Terreno</label>
+                    <textarea
+                      rows={2}
+                      value={diagnosis}
+                      onChange={(e) => setDiagnosis(e.target.value)}
+                      placeholder="Estado inicial del equipo al llegar al sitio, anomalías detectadas, ruidos, presiones..."
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-colors text-xs"
+                    />
+                  </div>
 
-                {/* Trabajo Realizado / Resolución */}
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-700">Trabajo Realizado / Resolución Técnica</label>
-                  <textarea
-                    rows={3}
-                    value={resolution}
-                    onChange={(e) => setResolution(e.target.value)}
-                    placeholder="Detalle de mantención, piezas cambiadas, recarga de refrigerante, pruebas térmicas..."
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-colors"
-                  />
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-700 text-xs">Trabajo Realizado / Resolución Técnica</label>
+                    <textarea
+                      rows={2}
+                      value={resolution}
+                      onChange={(e) => setResolution(e.target.value)}
+                      placeholder="Detalle de mantención ejecutada, piezas cambiadas, recarga de refrigerante, pruebas térmicas..."
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-colors text-xs"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Footer Actions */}
-          <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
+          <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
             <button
               type="button"
               onClick={handleDelete}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 transition-colors cursor-pointer text-xs font-semibold"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>Eliminar Orden</span>
@@ -712,17 +1158,17 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                   e.stopPropagation();
                   onClose();
                 }}
-                className="px-4 py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+                className="px-4 py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer text-xs font-semibold"
                 title="Cancelar y cerrar modal (Esc)"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold shadow-lg shadow-cyan-500/20 transition-all cursor-pointer"
+                className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold shadow-md shadow-cyan-500/20 transition-all cursor-pointer text-xs"
               >
                 <Save className="w-4 h-4" />
-                Guardar Cambios
+                <span>Guardar Cambios</span>
               </button>
             </div>
           </div>
@@ -749,3 +1195,4 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
     </div>
   );
 };
+

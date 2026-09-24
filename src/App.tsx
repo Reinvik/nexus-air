@@ -552,6 +552,11 @@ export default function App() {
             setIsEditOrderModalOpen(false);
             setReceiptOrder(ord);
           }}
+          onOpenInspection={(ord) => {
+            setIsEditOrderModalOpen(false);
+            setSelectedOrder(ord);
+            setIsInspectionModalOpen(true);
+          }}
           onUpdateOrder={updateOrder}
           onDeleteOrder={deleteOrder}
           onAddCustomer={addCustomer}

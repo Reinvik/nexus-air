@@ -919,6 +919,8 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
 
     try {
       const dbUpdates: any = { updated_at: new Date().toISOString() };
+      if (updates.customer_id !== undefined) dbUpdates.customer_id = updates.customer_id;
+      if (updates.equipment_id !== undefined) dbUpdates.equipment_id = updates.equipment_id || null;
       if (updates.status !== undefined) dbUpdates.status = updates.status;
       if (updates.assigned_technician_id !== undefined) dbUpdates.assigned_technician_id = updates.assigned_technician_id || null;
       if (updates.assigned_assistant_id !== undefined) dbUpdates.assigned_assistant_id = updates.assigned_assistant_id || null;

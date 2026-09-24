@@ -544,7 +544,7 @@ export const KanbanBoardAir: React.FC<KanbanBoardAirProps> = ({
               </div>
 
               {/* Contenedor de Tarjetas */}
-              <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+              <div className="flex-1 space-y-2 overflow-y-auto pr-1">
                 {colOrders.length === 0 ? (
                   <div className="h-40 flex flex-col items-center justify-center text-center p-3 text-slate-400 text-xs border border-dashed border-slate-300 rounded-xl space-y-2">
                     {isCompletedCol ? (
