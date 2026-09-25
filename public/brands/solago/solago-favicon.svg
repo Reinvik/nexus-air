@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none">
+  <!-- Fondo degradado oscuro corporativo -->
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0a1628"/>
+      <stop offset="100%" stop-color="#050811"/>
+    </linearGradient>
+    <linearGradient id="nGrad" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00d2ff"/>
+      <stop offset="100%" stop-color="#0080c8"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Fondo oscuro con bordes redondeados -->
+  <rect width="48" height="48" rx="13" fill="url(#bgGrad)"/>
+  <!-- Borde neón sutil -->
+  <rect x="0.75" y="0.75" width="46.5" height="46.5" rx="12.25" stroke="#00d2ff" stroke-opacity="0.35" stroke-width="1.5"/>
+
+  <!-- Letra "N" estilizada como logotipo premium -->
+  <g filter="url(#glow)">
+    <path d="M13 34V14L22 28V14M22 14L35 34V14" 
+          stroke="url(#nGrad)" 
+          stroke-width="3.2" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"
+          fill="none"/>
+  </g>
+
+  <!-- Punto de acento cian abajo derecha -->
+  <circle cx="38" cy="36" r="2.5" fill="#00d2ff" opacity="0.8"/>
+</svg>

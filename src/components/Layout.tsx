@@ -27,6 +27,7 @@ import {
   Globe,
   Search
 } from 'lucide-react';
+import { useBrand } from '../lib/brandConfig';
 
 interface LayoutProps {
   activeTab: ViewTab;
@@ -62,6 +63,7 @@ export const Layout: React.FC<LayoutProps> = ({
   children,
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { isSolago, brand, switchBrand } = useBrand();
 
   const mainNav: { id: ViewTab; label: string; icon: React.ElementType; badge?: number; badgeColor?: string }[] = [
     { id: 'dashboard', label: 'Tablero Órdenes', icon: Kanban, badge: activeOrdersCount },
@@ -95,7 +97,7 @@ export const Layout: React.FC<LayoutProps> = ({
         />
       )}
 
-      {/* Smartlean / Nexus Dark Sidebar */}
+      {/* Smartlean / Nexus / Solago Dark Sidebar */}
       <aside className={`w-[270px] bg-[#050811] border-r border-white/[0.04] flex flex-col justify-between shrink-0 shadow-2xl z-50 fixed inset-y-0 left-0 transition-transform duration-300 ease-in-out md:static md:translate-x-0 ${
         isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
@@ -112,6 +114,17 @@ export const Layout: React.FC<LayoutProps> = ({
                       className="max-h-9 max-w-[70px] object-contain rounded"
                     />
                   </div>
+                ) : isSolago ? (
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#0a1628] to-[#050811] border border-amber-500/40 flex items-center justify-center p-1 shadow-[0_0_15px_rgba(255,161,0,0.25)] transition-transform hover:scale-105 shrink-0">
+                    <img
+                      src="/brands/solago/solago-emblem.png"
+                      alt="SoLago"
+                      className="w-full h-full object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
                 ) : (
                   <div className="w-9 h-9 rounded-xl bg-[rgba(0,210,255,0.1)] border border-[rgba(0,210,255,0.3)] flex items-center justify-center text-[#00d2ff] shadow-[0_0_15px_rgba(0,210,255,0.25)] transition-transform hover:scale-105 shrink-0">
                     <Wind className="w-5 h-5" />
@@ -119,10 +132,18 @@ export const Layout: React.FC<LayoutProps> = ({
                 )}
                 <div className="flex flex-col truncate min-w-0">
                   <div className="text-[17px] font-black tracking-[-0.04em] text-white leading-none truncate">
-                    {settings?.fantasy_name || <>NEXUS<span className="text-[#00d2ff]">AIR</span></>}
+                    {settings?.fantasy_name ? (
+                      settings.fantasy_name
+                    ) : isSolago ? (
+                      <>
+                        <span className="text-[#ffa100]">So</span><span className="text-[#2563eb]">Lago</span><span className="text-[#00d2ff] ml-1">AIR</span>
+                      </>
+                    ) : (
+                      <>NEXUS<span className="text-[#00d2ff]">AIR</span></>
+                    )}
                   </div>
-                  <span className="text-[8.5px] font-extrabold text-[#00d2ff] tracking-[0.12em] uppercase mt-1 truncate">
-                    {settings?.company_slogan || 'BY SMARTLEAN'}
+                  <span className={`text-[8.5px] font-extrabold ${isSolago ? 'text-[#ffa100]' : 'text-[#00d2ff]'} tracking-[0.12em] uppercase mt-1 truncate`}>
+                    {settings?.company_slogan || (isSolago ? 'BY SMARTLEAN • HVAC OS' : 'BY SMARTLEAN')}
                   </span>
                 </div>
               </div>
@@ -137,13 +158,17 @@ export const Layout: React.FC<LayoutProps> = ({
               </button>
             </div>
 
-            {/* Quick Action Button - Smartlean Gradient */}
+            {/* Quick Action Button - Smartlean / SoLago Gradient */}
             <button
               onClick={() => {
                 onOpenNewOrder();
                 setIsMobileMenuOpen(false);
               }}
-              className="w-full mt-4 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-gradient-to-r from-[#00d2ff] to-[#2563eb] hover:from-[#38bdf8] hover:to-[#1d4ed8] text-white font-bold text-xs shadow-[0_6px_20px_rgba(37,99,235,0.35)] transition-all cursor-pointer"
+              className={`w-full mt-4 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl ${
+                isSolago
+                  ? 'bg-gradient-to-r from-[#ffa100] via-[#00d2ff] to-[#2563eb] hover:opacity-95 shadow-[0_6px_20px_rgba(255,161,0,0.3)]'
+                  : 'bg-gradient-to-r from-[#00d2ff] to-[#2563eb] hover:from-[#38bdf8] hover:to-[#1d4ed8] shadow-[0_6px_20px_rgba(37,99,235,0.35)]'
+              } text-white font-bold text-xs transition-all cursor-pointer`}
             >
               <Plus className="w-4 h-4 stroke-[3]" />
               <span>NUEVA ORDEN TÉCNICA</span>
@@ -277,9 +302,9 @@ export const Layout: React.FC<LayoutProps> = ({
               <div className="text-[10px] text-slate-500 truncate">
                 {currentUserProfile?.email || settings.email || 'contacto@nexusair.cl'}
               </div>
-              <div className="text-[10px] font-bold text-[#00d2ff]">
+              <div className={`text-[10px] font-bold ${isSolago ? 'text-[#ffa100]' : 'text-[#00d2ff]'}`}>
                 {isNexusOwner
-                  ? '👑 Nexus Owner HVAC'
+                  ? (isSolago ? '👑 SoLago Owner HVAC' : '👑 Nexus Owner HVAC')
                   : currentUserProfile?.role === 'admin'
                   ? 'Administrador HVAC'
                   : 'Técnico Certificado SEC'}
@@ -287,9 +312,48 @@ export const Layout: React.FC<LayoutProps> = ({
             </div>
           </div>
 
+          {/* Selector Rápido de Marca: Nexus Air vs SoLago Air */}
+          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-[10px] font-bold text-slate-400">
+            <span className="flex items-center gap-1.5">
+              <Globe className={`w-3.5 h-3.5 ${isSolago ? 'text-[#ffa100]' : 'text-cyan-400'}`} />
+              <span className="text-slate-300">Modo Marca:</span>
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => switchBrand('nexus')}
+                className={`px-2 py-0.5 rounded-lg transition-all cursor-pointer text-[10px] ${
+                  !isSolago 
+                    ? 'bg-cyan-500/20 text-[#00d2ff] font-extrabold border border-cyan-500/40 shadow-xs' 
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Visualizar como Nexus Air"
+              >
+                Nexus
+              </button>
+              <span className="text-slate-600">|</span>
+              <button
+                type="button"
+                onClick={() => switchBrand('solago')}
+                className={`px-2 py-0.5 rounded-lg transition-all cursor-pointer text-[10px] ${
+                  isSolago 
+                    ? 'bg-amber-500/20 text-[#ffa100] font-extrabold border border-amber-500/40 shadow-xs' 
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Visualizar como SoLago Air"
+              >
+                SoLago
+              </button>
+            </div>
+          </div>
+
           <button
             onClick={() => setActiveTab('settings')}
-            className="w-full py-2 px-2 bg-[rgba(6,182,212,0.03)] hover:bg-[rgba(6,182,212,0.12)] border border-[rgba(6,182,212,0.2)] hover:border-[rgba(6,182,212,0.45)] text-[#00d2ff] hover:text-white rounded-xl text-[10.5px] font-bold flex items-center justify-center gap-2 whitespace-nowrap tracking-[0.03em] transition-all cursor-pointer"
+            className={`w-full py-2 px-2 ${
+              isSolago 
+                ? 'bg-[rgba(255,161,0,0.04)] hover:bg-[rgba(255,161,0,0.12)] border-[rgba(255,161,0,0.25)] hover:border-[rgba(255,161,0,0.45)] text-[#ffa100]' 
+                : 'bg-[rgba(6,182,212,0.03)] hover:bg-[rgba(6,182,212,0.12)] border-[rgba(6,182,212,0.2)] hover:border-[rgba(6,182,212,0.45)] text-[#00d2ff]'
+            } border hover:text-white rounded-xl text-[10.5px] font-bold flex items-center justify-center gap-2 whitespace-nowrap tracking-[0.03em] transition-all cursor-pointer`}
           >
             <ShieldCheck className="w-3.5 h-3.5" />
             <span>AJUSTES & PERFIL DE EMPRESA</span>
@@ -338,7 +402,7 @@ export const Layout: React.FC<LayoutProps> = ({
                 {[...mainNav, ...manageNav].find(i => i.id === activeTab)?.label || 'Panel de Climatización'}
               </h1>
               <p className="text-[10px] text-slate-500 truncate max-w-[130px] sm:max-w-none">
-                {settings.company_name} • Mantenimiento ({settings.maintenance_interval_months || 6}M)
+                {settings?.company_name || (isSolago ? 'SoLago Air' : 'Nexus Air')} • Mantenimiento ({settings?.maintenance_interval_months || 6}M)
               </p>
             </div>
           </div>
@@ -383,7 +447,11 @@ export const Layout: React.FC<LayoutProps> = ({
             {/* Botón "+ Nueva Orden" en la Cabecera */}
             <button
               onClick={onOpenNewOrder}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#00d2ff] to-[#2563eb] hover:from-[#38bdf8] hover:to-[#1d4ed8] text-white font-bold text-xs shadow-sm shadow-blue-500/25 transition-all cursor-pointer active:scale-95 shrink-0"
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-xl ${
+                isSolago
+                  ? 'bg-gradient-to-r from-[#ffa100] via-[#00d2ff] to-[#2563eb] shadow-amber-500/25'
+                  : 'bg-gradient-to-r from-[#00d2ff] to-[#2563eb] hover:from-[#38bdf8] hover:to-[#1d4ed8] shadow-blue-500/25'
+              } text-white font-bold text-xs shadow-sm transition-all cursor-pointer active:scale-95 shrink-0`}
               title="Crear nueva orden técnica"
             >
               <Plus className="w-3.5 h-3.5 stroke-[3]" />

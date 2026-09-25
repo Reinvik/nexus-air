@@ -17,6 +17,7 @@ import { InspeccionHVACModal } from './components/InspeccionHVACModal';
 import { PublicBookingModal, BookingPrefill } from './components/PublicBookingModal';
 import { ReceiptModalAir } from './components/ReceiptModalAir';
 import { LandingNexusAir } from './components/LandingNexusAir';
+import { LandingSolagoAir } from './components/LandingSolagoAir';
 import { LandingTenantAir } from './components/LandingTenantAir';
 import { LandingEditorAir } from './components/LandingEditorAir';
 import { LoginAir } from './components/LoginAir';
@@ -25,6 +26,7 @@ import { NexusOwnerAir } from './components/NexusOwnerAir';
 import { ViewTab, ServiceOrder, AirSettings, Customer, AirEquipment, ServiceType } from './types';
 import { Toaster, toast } from 'react-hot-toast';
 import { ShieldAlert } from 'lucide-react';
+import { useBrand } from './lib/brandConfig';
 
 type MainView = 'landing' | 'tenant_landing' | 'login' | 'customer' | 'dashboard';
 
@@ -85,6 +87,21 @@ export default function App() {
   });
 
   const [tenantSettings, setTenantSettings] = useState<AirSettings | null>(null);
+  const { isSolago, brand } = useBrand();
+
+  const effectiveSettings = useMemo(() => {
+    const base = tenantSettings || settings;
+    if (isSolago && (!base.fantasy_name || base.fantasy_name === 'Nexus Air' || base.fantasy_name === 'Mi Empresa Climatizadora')) {
+      return {
+        ...base,
+        fantasy_name: 'SoLago Air',
+        company_name: base.company_name === 'Nexus Air Climatización SpA' || base.company_name === 'Mi Empresa Climatizadora' ? 'SoLago Air' : base.company_name,
+        company_slogan: base.company_slogan || 'Software Online para Locales y Climatización Inteligente',
+        logo_url: base.logo_url || '/brands/solago/solago-emblem.png',
+      };
+    }
+    return base;
+  }, [tenantSettings, settings, isSolago]);
 
   useEffect(() => {
     if (tenantSlug) {
@@ -276,24 +293,33 @@ export default function App() {
     );
   }
 
-  // 2. Vista Landing Institucional SaaS Nexus Air
+  // 2. Vista Landing Institucional SaaS (Nexus Air o SoLago Air según marca activa)
   if (view === 'landing') {
     return (
       <>
         <Toaster position="top-right" />
-        <LandingNexusAir
-          settings={settings}
-          onOpenBooking={() => handleOpenBooking()}
-          onOpenPortal={() => setView('customer')}
-          onAdminAccess={() => setView('login')}
-        />
+        {isSolago ? (
+          <LandingSolagoAir
+            settings={effectiveSettings}
+            onOpenBooking={() => handleOpenBooking()}
+            onOpenPortal={() => setView('customer')}
+            onAdminAccess={() => setView('login')}
+          />
+        ) : (
+          <LandingNexusAir
+            settings={effectiveSettings}
+            onOpenBooking={() => handleOpenBooking()}
+            onOpenPortal={() => setView('customer')}
+            onAdminAccess={() => setView('login')}
+          />
+        )}
         <PublicBookingModal
           isOpen={isBookingModalOpen}
           onClose={() => {
             setIsBookingModalOpen(false);
             setBookingPrefill(null);
           }}
-          settings={settings}
+          settings={effectiveSettings}
           customers={customers}
           prefill={bookingPrefill}
           onConfirmBooking={handleConfirmPublicBooking}
@@ -374,13 +400,13 @@ export default function App() {
         setActiveTab={setActiveTab}
         onOpenNewOrder={() => setIsAddOrderModalOpen(true)}
         onOpenLanding={() => {
-          const slug = tenantSlug || settings.company_slug || 'nexus-air';
+          const slug = tenantSlug || settings.company_slug || (isSolago ? 'solago-air' : 'nexus-air');
           window.open(`/?t=${slug}`, '_blank');
         }}
         onOpenPortal={() => setView('customer')}
         overdueRecaptacionCount={overdueCount}
         activeOrdersCount={activeOrdersCount}
-        settings={settings}
+        settings={effectiveSettings}
         currentUserProfile={currentProfile}
         isNexusOwner={isNexusOwner}
         searchTerm={dashboardSearchTerm}
@@ -395,7 +421,7 @@ export default function App() {
           <KanbanBoardAir
             orders={orders}
             technicians={technicians}
-            settings={settings}
+            settings={effectiveSettings}
             searchTerm={dashboardSearchTerm}
             setSearchTerm={setDashboardSearchTerm}
             onOpenNewOrder={() => setIsAddOrderModalOpen(true)}
