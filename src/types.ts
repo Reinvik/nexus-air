@@ -87,7 +87,8 @@ export interface Technician {
 
 export interface TechnicianPayout {
   id: string;
-  payout_number: string; // ej: "LIQ-2026-001"
+  company_id?: string;
+  payout_number?: string; // ej: "LIQ-2026-001"
   technician_id: string;
   technician_name: string;
   technician_role: 'tecnico' | 'ayudante';
@@ -99,6 +100,7 @@ export interface TechnicianPayout {
   notes?: string;
   order_ids: string[];
   created_at: string;
+  updated_at?: string;
 }
 
 export interface HVACInspectionChecklist {

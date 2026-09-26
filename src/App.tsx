@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useAirStore } from './hooks/useAirStore';
 import { Layout } from './components/Layout';
