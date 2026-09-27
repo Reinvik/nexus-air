@@ -1,5 +1,15 @@
-import { Customer, AirEquipment, Technician, ServiceOrder, AirPart, AirSettings } from '../types';
-import { subMonths, addDays, format } from 'date-fns';
+import { 
+  Customer, 
+  AirEquipment, 
+  Technician, 
+  ServiceOrder, 
+  AirPart, 
+  AirSettings,
+  FixedCosts,
+  Expense,
+  FinanceSettings
+} from '../types';
+import { subMonths, subDays, addDays, format } from 'date-fns';
 
 const today = new Date();
 
@@ -489,5 +499,125 @@ export const INITIAL_SERVICE_ORDERS: ServiceOrder[] = [
     payment_method: 'tarjeta',
     created_at: format(subMonths(today, 1), 'yyyy-MM-dd'),
     completed_at: format(subMonths(today, 1), 'yyyy-MM-dd HH:mm'),
+  },
+];
+
+export const INITIAL_FIXED_COSTS: FixedCosts = {
+  rent: 450000,
+  salaries: 650000,
+  services: 85000,
+  software: 35000,
+  marketing: 120000,
+  transport: 150000,
+  other: 50000,
+};
+
+export const INITIAL_FINANCE_SETTINGS: FinanceSettings = {
+  target_monthly_profit: 1500000,
+  manual_margin_pct: null,
+  exchange_rate: 940,
+  use_dual_currency: false,
+  uf_value: 38200,
+  is_currency_swapped: false,
+};
+
+export const INITIAL_EXPENSES: Expense[] = [
+  {
+    id: 'exp-1',
+    date: format(today, 'yyyy-MM-dd'),
+    category: 'combustible',
+    description: 'Carga de combustible Diésel furgón técnico asignado a ruta Oriente',
+    amount: 45000,
+    amount_usd: 48,
+    payment_method: 'tarjeta',
+    status: 'pagado',
+    supplier: 'Copec Las Condes',
+    invoice_number: 'BOL-98124',
+    is_fixed: false,
+    created_at: format(today, 'yyyy-MM-dd 08:30'),
+  },
+  {
+    id: 'exp-2',
+    date: format(subDays(today, 2), 'yyyy-MM-dd'),
+    category: 'repuestos_insumos',
+    description: '2 Cilindros Gas Refrigerante R410A Virgen (11.3 kg c/u)',
+    amount: 140000,
+    amount_usd: 149,
+    payment_method: 'transferencia',
+    status: 'pagado',
+    supplier: 'Distribuidora Anwo / Totaline',
+    invoice_number: 'FAC-44210',
+    is_fixed: false,
+    created_at: format(subDays(today, 2), 'yyyy-MM-dd 11:15'),
+  },
+  {
+    id: 'exp-3',
+    date: format(subDays(today, 5), 'yyyy-MM-dd'),
+    category: 'arriendo',
+    description: 'Arriendo mensual taller operativo y bodega de repuestos climatización',
+    amount: 450000,
+    amount_usd: 478,
+    payment_method: 'transferencia',
+    status: 'pagado',
+    supplier: 'Inmobiliaria El Bosque',
+    invoice_number: 'REC-ARRIENDO-09',
+    is_fixed: true,
+    created_at: format(subDays(today, 5), 'yyyy-MM-dd 09:00'),
+  },
+  {
+    id: 'exp-4',
+    date: format(subDays(today, 7), 'yyyy-MM-dd'),
+    category: 'marketing',
+    description: 'Campaña Google Ads Búsqueda Climatización: "Instalación y Mantenimiento de Aire"',
+    amount: 120000,
+    amount_usd: 128,
+    payment_method: 'tarjeta',
+    status: 'pagado',
+    supplier: 'Google Ads',
+    invoice_number: 'INV-GGL-8821',
+    is_fixed: true,
+    created_at: format(subDays(today, 7), 'yyyy-MM-dd 14:00'),
+  },
+  {
+    id: 'exp-5',
+    date: format(subDays(today, 10), 'yyyy-MM-dd'),
+    category: 'repuestos_insumos',
+    description: '3 Rollos tubería de cobre 1/4 y 3/8 con aislante Armaflex + soportes murales',
+    amount: 98000,
+    amount_usd: 104,
+    payment_method: 'transferencia',
+    status: 'pagado',
+    supplier: 'Frigoking Climatización',
+    invoice_number: 'FAC-3211',
+    is_fixed: false,
+    created_at: format(subDays(today, 10), 'yyyy-MM-dd 16:45'),
+  },
+  {
+    id: 'exp-6',
+    date: format(subDays(today, 12), 'yyyy-MM-dd'),
+    category: 'servicios_basicos',
+    description: 'Consumo eléctrico taller trifásico + agua y fibra óptica 600 Mbps',
+    amount: 85000,
+    amount_usd: 90,
+    payment_method: 'transferencia',
+    status: 'pagado',
+    supplier: 'Enel / Entel Empresas',
+    invoice_number: 'BOL-55421',
+    is_fixed: true,
+    created_at: format(subDays(today, 12), 'yyyy-MM-dd 10:20'),
+  },
+  {
+    id: 'exp-7',
+    date: format(subMonths(today, 1), 'yyyy-MM-dd'),
+    category: 'herramientas',
+    description: 'Bomba de vacío 2 etapas 5 CFM + manómetro digital Testo',
+    amount: 220000,
+    amount_usd: 234,
+    payment_method: 'transferencia',
+    status: 'pagado',
+    supplier: 'Refriherramientas Chile',
+    invoice_number: 'FAC-1002',
+    is_fixed: false,
+    created_at: format(subMonths(today, 1), 'yyyy-MM-dd 12:00'),
   },
 ];

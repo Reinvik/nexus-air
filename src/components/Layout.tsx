@@ -25,7 +25,8 @@ import {
   Crown,
   ShieldAlert,
   Globe,
-  Search
+  Search,
+  Scale
 } from 'lucide-react';
 import { useBrand } from '../lib/brandConfig';
 
@@ -82,7 +83,8 @@ export const Layout: React.FC<LayoutProps> = ({
     { id: 'inventory', label: 'Equipos & Stock', icon: Boxes },
     { id: 'customers', label: 'Clientes', icon: Users },
     { id: 'technicians', label: 'Técnicos HVAC', icon: Wrench },
-    { id: 'sales', label: 'Ventas & Finanzas', icon: TrendingUp },
+    { id: 'sales', label: 'Ventas & Cobros', icon: TrendingUp },
+    { id: 'finances', label: 'Finanzas & Equilibrio', icon: Scale },
     { id: 'landingpage', label: 'Mi Landing Page', icon: Globe },
     { id: 'settings', label: 'Configuración', icon: Settings },
   ];

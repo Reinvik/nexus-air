@@ -11,6 +11,7 @@ import { CustomersAir } from './components/CustomersAir';
 import { TechniciansAir } from './components/TechniciansAir';
 import { SalesAir } from './components/SalesAir';
 import { SettingsAir } from './components/SettingsAir';
+import { FinanceModuleAir } from './components/FinanceModuleAir';
 import { AddServiceOrderModal } from './components/AddServiceOrderModal';
 import { EditServiceOrderModal } from './components/EditServiceOrderModal';
 import { InspeccionHVACModal } from './components/InspeccionHVACModal';
@@ -74,7 +75,15 @@ export default function App() {
     fetchPublicCompanyBySlug,
     technicianPayouts,
     addTechnicianPayout,
-    deleteTechnicianPayout
+    deleteTechnicianPayout,
+    fixedCosts,
+    expenses,
+    financeSettings,
+    updateFixedCosts,
+    addExpense,
+    updateExpense,
+    deleteExpense,
+    updateFinanceSettings
   } = useAirStore(effectiveCompanyId);
 
   // Tenant slug detection (ej: ?t=nexus-air)
@@ -504,6 +513,22 @@ export default function App() {
             settings={tenantSettings || settings}
             technicianPayouts={technicianPayouts}
             onUpdateOrder={updateOrder}
+          />
+        )}
+
+        {activeTab === 'finances' && (
+          <FinanceModuleAir
+            orders={orders}
+            settings={tenantSettings || settings}
+            fixedCosts={fixedCosts}
+            expenses={expenses}
+            financeSettings={financeSettings}
+            technicianPayouts={technicianPayouts}
+            onUpdateFixedCosts={updateFixedCosts}
+            onAddExpense={addExpense}
+            onUpdateExpense={updateExpense}
+            onDeleteExpense={deleteExpense}
+            onUpdateFinanceSettings={updateFinanceSettings}
           />
         )}
 

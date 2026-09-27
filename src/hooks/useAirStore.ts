@@ -10,7 +10,10 @@ import {
   OrderStatus,
   RecaptacionReminder,
   HVACInspectionChecklist,
-  TechnicianPayout
+  TechnicianPayout,
+  FixedCosts,
+  Expense,
+  FinanceSettings
 } from '../types';
 import { 
   INITIAL_SETTINGS, 
@@ -18,7 +21,10 @@ import {
   INITIAL_EQUIPMENTS, 
   INITIAL_TECHNICIANS, 
   INITIAL_PARTS, 
-  INITIAL_SERVICE_ORDERS 
+  INITIAL_SERVICE_ORDERS,
+  INITIAL_FIXED_COSTS,
+  INITIAL_EXPENSES,
+  INITIAL_FINANCE_SETTINGS
 } from '../lib/mockAirData';
 import { addDays, differenceInDays, format, parseISO } from 'date-fns';
 import { toast } from 'react-hot-toast';
@@ -126,6 +132,39 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     };
   });
 
+  const [fixedCosts, setFixedCosts] = useState<FixedCosts>(() => {
+    try {
+      const saved = localStorage.getItem(`nexus_air_fixed_costs_${companyId}`);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Error reading fixed costs from localStorage:', e);
+    }
+    return INITIAL_FIXED_COSTS;
+  });
+
+  const [expenses, setExpenses] = useState<Expense[]>(() => {
+    try {
+      const saved = localStorage.getItem(`nexus_air_expenses_${companyId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.warn('Error reading expenses from localStorage:', e);
+    }
+    return isMockCompany ? INITIAL_EXPENSES : INITIAL_EXPENSES;
+  });
+
+  const [financeSettings, setFinanceSettings] = useState<FinanceSettings>(() => {
+    try {
+      const saved = localStorage.getItem(`nexus_air_finance_settings_${companyId}`);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Error reading finance settings from localStorage:', e);
+    }
+    return INITIAL_FINANCE_SETTINGS;
+  });
+
   const [isLoaded, setIsLoaded] = useState(false);
   const [contactedReminderIds, setContactedReminderIds] = useState<Record<string, string>>(() => {
     try {
@@ -210,6 +249,33 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       console.warn('Error saving technician payouts:', e);
     }
   }, [technicianPayouts, companyId]);
+
+  // Persistir costos fijos
+  useEffect(() => {
+    try {
+      localStorage.setItem(`nexus_air_fixed_costs_${companyId}`, JSON.stringify(fixedCosts));
+    } catch (e) {
+      console.warn('Error saving fixed costs:', e);
+    }
+  }, [fixedCosts, companyId]);
+
+  // Persistir egresos
+  useEffect(() => {
+    try {
+      localStorage.setItem(`nexus_air_expenses_${companyId}`, JSON.stringify(expenses));
+    } catch (e) {
+      console.warn('Error saving expenses:', e);
+    }
+  }, [expenses, companyId]);
+
+  // Persistir configuración de finanzas y equilibrio
+  useEffect(() => {
+    try {
+      localStorage.setItem(`nexus_air_finance_settings_${companyId}`, JSON.stringify(financeSettings));
+    } catch (e) {
+      console.warn('Error saving finance settings:', e);
+    }
+  }, [financeSettings, companyId]);
 
   // Sincronizar estado en memoria inmediatamente al cambiar de empresa (switch o login)
   useEffect(() => {
@@ -323,6 +389,33 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       }
     } catch {
       setTechnicianPayouts([]);
+    }
+
+    // 9. Sincronizar costos fijos
+    try {
+      const savedFC = localStorage.getItem(`nexus_air_fixed_costs_${companyId}`);
+      if (savedFC) setFixedCosts(JSON.parse(savedFC));
+      else setFixedCosts(INITIAL_FIXED_COSTS);
+    } catch {
+      setFixedCosts(INITIAL_FIXED_COSTS);
+    }
+
+    // 10. Sincronizar egresos
+    try {
+      const savedExp = localStorage.getItem(`nexus_air_expenses_${companyId}`);
+      if (savedExp) setExpenses(JSON.parse(savedExp));
+      else setExpenses(INITIAL_EXPENSES);
+    } catch {
+      setExpenses(INITIAL_EXPENSES);
+    }
+
+    // 11. Sincronizar configuración de finanzas
+    try {
+      const savedFS = localStorage.getItem(`nexus_air_finance_settings_${companyId}`);
+      if (savedFS) setFinanceSettings(JSON.parse(savedFS));
+      else setFinanceSettings(INITIAL_FINANCE_SETTINGS);
+    } catch {
+      setFinanceSettings(INITIAL_FINANCE_SETTINGS);
     }
   }, [companyId]);
 
@@ -1739,6 +1832,69 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     }
   }, [companyId, fetchData]);
 
+  // Métodos de Finanzas & Punto de Equilibrio
+  const updateFixedCosts = useCallback((newCosts: Partial<FixedCosts>) => {
+    setFixedCosts(prev => {
+      const updated = { ...prev, ...newCosts };
+      try {
+        localStorage.setItem(`nexus_air_fixed_costs_${companyId}`, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    toast.success('Costos fijos actualizados');
+  }, [companyId]);
+
+  const addExpense = useCallback((data: Omit<Expense, 'id' | 'created_at'>) => {
+    const newId = 'exp-' + crypto.randomUUID().slice(0, 8);
+    const newExp: Expense = {
+      ...data,
+      id: newId,
+      company_id: companyId,
+      created_at: format(new Date(), 'yyyy-MM-dd HH:mm'),
+    };
+    setExpenses(prev => {
+      const updated = [newExp, ...prev];
+      try {
+        localStorage.setItem(`nexus_air_expenses_${companyId}`, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    toast.success('Egreso operativo registrado con éxito');
+    return newExp;
+  }, [companyId]);
+
+  const updateExpense = useCallback((id: string, updates: Partial<Expense>) => {
+    setExpenses(prev => {
+      const updated = prev.map(exp => exp.id === id ? { ...exp, ...updates } : exp);
+      try {
+        localStorage.setItem(`nexus_air_expenses_${companyId}`, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    toast.success('Gasto actualizado');
+  }, [companyId]);
+
+  const deleteExpense = useCallback((id: string) => {
+    setExpenses(prev => {
+      const updated = prev.filter(exp => exp.id !== id);
+      try {
+        localStorage.setItem(`nexus_air_expenses_${companyId}`, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    toast.success('Gasto eliminado');
+  }, [companyId]);
+
+  const updateFinanceSettings = useCallback((newSettings: Partial<FinanceSettings>) => {
+    setFinanceSettings(prev => {
+      const updated = { ...prev, ...newSettings };
+      try {
+        localStorage.setItem(`nexus_air_finance_settings_${companyId}`, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  }, [companyId]);
+
   // Helper para consultar landing pública de empresa por slug
   const fetchPublicCompanyBySlug = useCallback(async (slug: string) => {
     try {
@@ -1767,6 +1923,14 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     technicianPayouts,
     reminders,
     settings,
+    fixedCosts,
+    expenses,
+    financeSettings,
+    updateFixedCosts,
+    addExpense,
+    updateExpense,
+    deleteExpense,
+    updateFinanceSettings,
     addOrder,
     updateOrder,
     updateOrderStatus,

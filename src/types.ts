@@ -404,6 +404,54 @@ export interface LandingPageConfig {
   social_tiktok_url?: string;
 }
 
+export interface FixedCosts {
+  rent: number;          // Arriendo taller / bodegas / oficina
+  salaries: number;      // Nómina y sueldos fijos administrativos y base
+  services: number;      // Servicios luz, agua, internet, telefonía
+  software: number;      // Software, ERP, hosting, CRM
+  marketing: number;     // Publicidad Google Ads, Meta Ads
+  transport: number;     // Combustible, seguro y mantención vehicular
+  other: number;         // Otros gastos fijos estructurales
+}
+
+export type ExpenseCategory = 
+  | 'combustible' 
+  | 'repuestos_insumos' 
+  | 'herramientas' 
+  | 'arriendo' 
+  | 'nomina_viaticos' 
+  | 'servicios_basicos' 
+  | 'marketing' 
+  | 'impuestos_tasas' 
+  | 'otro';
+
+export interface Expense {
+  id: string;
+  company_id?: string;
+  date: string; // YYYY-MM-DD
+  category: ExpenseCategory;
+  description: string;
+  amount: number;
+  amount_usd?: number;
+  currency?: string;
+  payment_method: string;
+  status: 'pagado' | 'pendiente';
+  supplier?: string;
+  invoice_number?: string;
+  is_fixed?: boolean;
+  notes?: string;
+  created_at: string;
+}
+
+export interface FinanceSettings {
+  target_monthly_profit: number;
+  manual_margin_pct?: number | null;
+  exchange_rate: number;
+  use_dual_currency: boolean;
+  uf_value?: number;
+  is_currency_swapped?: boolean;
+}
+
 export type ViewTab = 
   | 'dashboard' 
   | 'recaptacion' 
@@ -413,6 +461,7 @@ export type ViewTab =
   | 'customers' 
   | 'technicians' 
   | 'sales' 
+  | 'finances'
   | 'settings'
   | 'landingpage'
   | 'nexus_owner';
