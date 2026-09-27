@@ -986,7 +986,7 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="text-slate-700 font-medium">Última Mantención</label>
+                  <label className="text-slate-700 font-medium">Último Mantenimiento</label>
                   <input
                     type="date"
                     value={eqLastDate}
@@ -1195,7 +1195,7 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="text-slate-700 font-semibold block mb-1">Última Mantención</label>
+                  <label className="text-slate-700 font-semibold block mb-1">Último Mantenimiento</label>
                   <input
                     type="date"
                     value={bulkLastDate}

@@ -453,7 +453,7 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
           {activeTab === 'recovery' && (
             <div className="text-xs font-bold text-rose-800 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200 flex items-center gap-1.5">
               <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
-              <span>Clientes sin mantención hace más de {settings.inactive_recovery_months || 9} meses (Mensaje con 15% Descuento)</span>
+              <span>Clientes sin mantenimiento hace más de {settings.inactive_recovery_months || 9} meses (Mensaje con 15% Descuento)</span>
             </div>
           )}
         </div>

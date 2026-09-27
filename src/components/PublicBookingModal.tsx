@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ServiceType, AirSettings, ServiceOrder, Customer, AirEquipment } from '../types';
+import { ServiceType, AirSettings, ServiceOrder, Customer, AirEquipment, formatServiceType } from '../types';
 import { X, Calendar, Clock, MapPin, Phone, User, CheckCircle2, Wind, Sparkles, ShieldCheck, Search } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 
@@ -65,7 +65,7 @@ export const PublicBookingModal: React.FC<PublicBookingModalProps> = ({
       }
       if (prefill.equipment) {
         const eq = prefill.equipment;
-        const eqText = `Mantención de equipo ${eq.brand} ${eq.btu.toLocaleString()} BTU (${eq.technology.toUpperCase()})${eq.location_in_property ? ` ubicado en ${eq.location_in_property}` : ''}${eq.serial_number ? ` • Serial: ${eq.serial_number}` : ''}`;
+        const eqText = `Mantenimiento de equipo ${eq.brand} ${eq.btu.toLocaleString()} BTU (${eq.technology.toUpperCase()})${eq.location_in_property ? ` ubicado en ${eq.location_in_property}` : ''}${eq.serial_number ? ` • Serial: ${eq.serial_number}` : ''}`;
         setNotes(prev => prev ? `${prev}\n${eqText}` : eqText);
       } else if (prefill.notes) {
         setNotes(prefill.notes);
@@ -203,7 +203,7 @@ export const PublicBookingModal: React.FC<PublicBookingModalProps> = ({
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Servicio:</span>
-                <span className="text-slate-900 font-medium capitalize">{confirmedOrder.service_type.replace('_', ' ')}</span>
+                <span className="text-slate-900 font-medium capitalize">{formatServiceType(confirmedOrder.service_type)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Fecha y Horario:</span>
@@ -311,7 +311,7 @@ export const PublicBookingModal: React.FC<PublicBookingModalProps> = ({
                   onChange={(e) => setServiceType(e.target.value as any)}
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-colors"
                 >
-                  <option value="mantencion_preventiva">Mantención Preventiva (Semestral)</option>
+                  <option value="mantencion_preventiva">Mantenimiento Preventivo (Semestral)</option>
                   <option value="instalacion">Instalación de Equipo Nuevo</option>
                   <option value="mantencion_correctiva">Reparación / Falla / Fuga</option>
                   <option value="visita_tecnica">Visita Técnica y Diagnóstico</option>

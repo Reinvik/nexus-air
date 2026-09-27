@@ -168,21 +168,21 @@ export function ProformaModalAir({
     ];
   });
 
-  // Ítems de Mantención Multiequipo Corporativa (NK-035)
+  // Ítems de Mantenimiento Multiequipo Corporativo (NK-035)
   const [maintenanceItems, setMaintenanceItems] = useState<ProformaItem[]>(() => {
     if (isChile) {
       return [
-        { id: 'm-1', concept: 'MANTENCIÓN PREVENTIVA SPLIT 9.000 - 12.000 BTU (DESARME E HIDROLAVADO)', quantity: 8, unitPrice: 35000, total: 280000, type: 'instalacion' },
-        { id: 'm-2', concept: 'MANTENCIÓN PREVENTIVA SPLIT 18.000 - 24.000 BTU (DESARME Y PRESIÓN)', quantity: 4, unitPrice: 45000, total: 180000, type: 'instalacion' },
-        { id: 'm-3', concept: 'MANTENCIÓN CASSETTE / PISO-CIELO 36.000 - 60.000 BTU', quantity: 2, unitPrice: 75000, total: 150000, type: 'instalacion' },
+        { id: 'm-1', concept: 'MANTENIMIENTO PREVENTIVO SPLIT 9.000 - 12.000 BTU (DESARME E HIDROLAVADO)', quantity: 8, unitPrice: 35000, total: 280000, type: 'instalacion' },
+        { id: 'm-2', concept: 'MANTENIMIENTO PREVENTIVO SPLIT 18.000 - 24.000 BTU (DESARME Y PRESIÓN)', quantity: 4, unitPrice: 45000, total: 180000, type: 'instalacion' },
+        { id: 'm-3', concept: 'MANTENIMIENTO CASSETTE / PISO-CIELO 36.000 - 60.000 BTU', quantity: 2, unitPrice: 75000, total: 150000, type: 'instalacion' },
         { id: 'm-4', concept: 'SANITIZACIÓN Y DESINFECCIÓN CON BACTERICIDA CERTIFICADO', quantity: 1, unitPrice: 45000, total: 45000, type: 'material' },
         { id: 'm-5', concept: 'REVISIÓN ELÉCTRICA DE TABLEROS Y CONSUMO AMPERIMÉTRICO', quantity: 1, unitPrice: 50000, total: 50000, type: 'instalacion' },
       ];
     }
     return [
-      { id: 'm-1', concept: 'MANTENCIÓN PREVENTIVA SPLIT 9.000 - 12.000 BTU (DESARME E HIDROLAVADO)', quantity: 8, unitPrice: 22000, total: 176000, type: 'instalacion' },
-      { id: 'm-2', concept: 'MANTENCIÓN PREVENTIVA SPLIT 18.000 - 24.000 BTU (DESARME Y PRESIÓN)', quantity: 4, unitPrice: 32000, total: 128000, type: 'instalacion' },
-      { id: 'm-3', concept: 'MANTENCIÓN CASSETTE / PISO-CIELO 36.000 - 60.000 BTU', quantity: 2, unitPrice: 55000, total: 110000, type: 'instalacion' },
+      { id: 'm-1', concept: 'MANTENIMIENTO PREVENTIVO SPLIT 9.000 - 12.000 BTU (DESARME E HIDROLAVADO)', quantity: 8, unitPrice: 22000, total: 176000, type: 'instalacion' },
+      { id: 'm-2', concept: 'MANTENIMIENTO PREVENTIVO SPLIT 18.000 - 24.000 BTU (DESARME Y PRESIÓN)', quantity: 4, unitPrice: 32000, total: 128000, type: 'instalacion' },
+      { id: 'm-3', concept: 'MANTENIMIENTO CASSETTE / PISO-CIELO 36.000 - 60.000 BTU', quantity: 2, unitPrice: 55000, total: 110000, type: 'instalacion' },
       { id: 'm-4', concept: 'SANITIZACIÓN Y DESINFECCIÓN CON BACTERICIDA CERTIFICADO', quantity: 1, unitPrice: 25000, total: 25000, type: 'material' },
       { id: 'm-5', concept: 'REVISIÓN ELÉCTRICA DE TABLEROS Y CONSUMO AMPERIMÉTRICO', quantity: 1, unitPrice: 30000, total: 30000, type: 'instalacion' },
     ];
@@ -321,7 +321,7 @@ export function ProformaModalAir({
   const handleAddMaintenanceItem = (presetConcept?: string, defaultPrice?: number) => {
     const newItem: ProformaItem = {
       id: `m-${Date.now()}`,
-      concept: presetConcept || 'NUEVA PARTIDA DE MANTENCIÓN PREVENTIVA',
+      concept: presetConcept || 'NUEVA PARTIDA DE MANTENIMIENTO PREVENTIVO',
       quantity: 1,
       unitPrice: defaultPrice || (isChile ? 35000 : 22000),
       total: defaultPrice || (isChile ? 35000 : 22000),
@@ -385,7 +385,7 @@ export function ProformaModalAir({
       clientEmail,
       serviceCategory,
       serviceTitle: isMultiMaintenance
-        ? 'PRESUPUESTO MANTENCIÓN MULTIEQUIPO CORPORATIVA'
+        ? 'PRESUPUESTO MANTENIMIENTO MULTIEQUIPO CORPORATIVO'
         : isRepair
         ? 'PRESUPUESTO REPARACIÓN Y DIAGNÓSTICO'
         : 'COTIZACIÓN / PROFORMA OFICIAL',
@@ -458,7 +458,7 @@ export function ProformaModalAir({
       }
       const activeItems = isMultiMaintenance ? maintenanceItems : isRepair ? repairItems : installationItems;
       const title = isMultiMaintenance 
-        ? 'PRESUPUESTO MANTENCIÓN MULTIEQUIPO' 
+        ? 'PRESUPUESTO MANTENIMIENTO MULTIEQUIPO' 
         : isRepair 
         ? 'PRESUPUESTO REPARACIÓN Y DIAGNÓSTICO' 
         : 'PROFORMA OFICIAL DE CLIMATIZACIÓN';
@@ -530,7 +530,7 @@ export function ProformaModalAir({
   const handleSendWhatsApp = () => {
     const activeItems = isMultiMaintenance ? maintenanceItems : isRepair ? repairItems : installationItems;
     const title = isMultiMaintenance 
-      ? 'PRESUPUESTO MANTENCIÓN MULTIEQUIPO' 
+      ? 'PRESUPUESTO MANTENIMIENTO MULTIEQUIPO' 
       : isRepair 
       ? 'PRESUPUESTO REPARACIÓN Y DIAGNÓSTICO' 
       : 'PROFORMA OFICIAL DE CLIMATIZACIÓN';
@@ -571,7 +571,7 @@ export function ProformaModalAir({
         customer_phone: clientPhone,
         customer_email: clientEmail,
         description: isMultiMaintenance
-          ? `Mantención preventiva multiequipo según Proforma ${proformaFolio}`
+          ? `Mantenimiento preventivo multiequipo según Proforma ${proformaFolio}`
           : isRepair
           ? `Reparación y diagnóstico especializado según Proforma ${proformaFolio}`
           : `Instalación dimensionada con Proforma ${proformaFolio}: ${currentEquipment?.name || 'Equipo'} para área de ${areaM2} m².`,
@@ -759,7 +759,7 @@ export function ProformaModalAir({
               }`}
             >
               <Building2 className="w-3.5 h-3.5" />
-              <span>🏢 Mantención Multiequipo Corporativa</span>
+              <span>🏢 Mantenimiento Multiequipo Corporativo</span>
             </button>
             <button
               type="button"
@@ -796,7 +796,7 @@ export function ProformaModalAir({
             {/* Proforma Box */}
             <div className="sm:text-right border border-slate-300 rounded-xl overflow-hidden shrink-0 shadow-xs">
               <div className="bg-slate-800 text-white px-6 py-1.5 font-black text-center text-sm tracking-widest uppercase">
-                {isMultiMaintenance ? 'MANTENCIÓN MULTIEQUIPO' : isRepair ? 'REPARACIÓN & DIAGNÓSTICO' : 'PROFORMA'}
+                {isMultiMaintenance ? 'MANTENIMIENTO MULTIEQUIPO' : isRepair ? 'REPARACIÓN & DIAGNÓSTICO' : 'PROFORMA'}
               </div>
               <div className="p-2.5 bg-slate-50 text-xs font-mono space-y-1">
                 <div className="flex justify-between gap-4 items-center">
@@ -1080,11 +1080,11 @@ export function ProformaModalAir({
               </>
             )}
 
-            {/* CASO 2: MANTENCIÓN MULTIEQUIPO CORPORATIVA (NK-035) */}
+            {/* CASO 2: MANTENIMIENTO MULTIEQUIPO CORPORATIVO (NK-035) */}
             {isMultiMaintenance && (
               <div className="border border-slate-300 rounded-xl overflow-hidden shadow-xs">
                 <div className="bg-blue-100 text-blue-900 font-bold px-4 py-2.5 text-xs uppercase tracking-wider flex flex-wrap items-center justify-between gap-2">
-                  <span>🏢 Partidas de Mantención Multiequipo Corporativa</span>
+                  <span>🏢 Partidas de Mantenimiento Multiequipo Corporativo</span>
                   <button
                     type="button"
                     onClick={() => handleAddMaintenanceItem()}
@@ -1100,21 +1100,21 @@ export function ProformaModalAir({
                   <span className="text-[11px] font-bold text-slate-500 mr-1">Rápidos:</span>
                   <button
                     type="button"
-                    onClick={() => handleAddMaintenanceItem('MANTENCIÓN PREVENTIVA SPLIT 9.000 - 12.000 BTU (DESARME E HIDROLAVADO)', isChile ? 35000 : 22000)}
+                    onClick={() => handleAddMaintenanceItem('MANTENIMIENTO PREVENTIVO SPLIT 9.000 - 12.000 BTU (DESARME E HIDROLAVADO)', isChile ? 35000 : 22000)}
                     className="px-2 py-0.5 rounded text-[10px] font-bold bg-white text-slate-700 border border-slate-200 hover:border-cyan-500 hover:text-cyan-700 transition-colors cursor-pointer"
                   >
                     + Split 9k-12k
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleAddMaintenanceItem('MANTENCIÓN PREVENTIVA SPLIT 18.000 - 24.000 BTU (DESARME Y PRESIÓN)', isChile ? 45000 : 32000)}
+                    onClick={() => handleAddMaintenanceItem('MANTENIMIENTO PREVENTIVO SPLIT 18.000 - 24.000 BTU (DESARME Y PRESIÓN)', isChile ? 45000 : 32000)}
                     className="px-2 py-0.5 rounded text-[10px] font-bold bg-white text-slate-700 border border-slate-200 hover:border-cyan-500 hover:text-cyan-700 transition-colors cursor-pointer"
                   >
                     + Split 18k-24k
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleAddMaintenanceItem('MANTENCIÓN CASSETTE / PISO-CIELO 36.000 - 60.000 BTU', isChile ? 75000 : 55000)}
+                    onClick={() => handleAddMaintenanceItem('MANTENIMIENTO CASSETTE / PISO-CIELO 36.000 - 60.000 BTU', isChile ? 75000 : 55000)}
                     className="px-2 py-0.5 rounded text-[10px] font-bold bg-white text-slate-700 border border-slate-200 hover:border-cyan-500 hover:text-cyan-700 transition-colors cursor-pointer"
                   >
                     + Cassette / Piso-Cielo
@@ -1193,7 +1193,7 @@ export function ProformaModalAir({
                       </tr>
                     ))}
                     <tr className="bg-slate-50/90 font-bold border-t border-slate-200">
-                      <td colSpan={3} className="p-2.5 text-right uppercase text-slate-700">Subtotal Mantención Multiequipo:</td>
+                      <td colSpan={3} className="p-2.5 text-right uppercase text-slate-700">Subtotal Mantenimiento Multiequipo:</td>
                       <td className="p-2.5 text-right font-mono text-slate-900">{formatAirPrice(subtotalInstalacion, currencySymbol, countryCode)}</td>
                       <td className="print:hidden"></td>
                     </tr>

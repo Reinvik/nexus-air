@@ -558,7 +558,7 @@ export const LandingEditorAir: React.FC<LandingEditorAirProps> = ({
                       rows={3}
                       value={draftConfig.hero_subtitle || ''}
                       onChange={(e) => updateField('hero_subtitle', e.target.value)}
-                      placeholder="Ej: Instalación certificada SEC, mantención preventiva profunda y servicio técnico de urgencia."
+                      placeholder="Ej: Instalación certificada SEC, mantenimiento preventivo profundo y servicio técnico de urgencia."
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-900 focus:outline-none focus:border-cyan-500"
                     />
                   </div>
@@ -755,7 +755,7 @@ export const LandingEditorAir: React.FC<LandingEditorAirProps> = ({
                               type="text"
                               value={svc.title}
                               onChange={(e) => handleServiceChange(index, 'title', e.target.value)}
-                              placeholder="Ej: Mantención Preventiva Profunda"
+                              placeholder="Ej: Mantenimiento Preventivo Profundo"
                               className="w-full px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200"
                             />
                           </div>
@@ -1082,7 +1082,7 @@ export const LandingEditorAir: React.FC<LandingEditorAirProps> = ({
                   settings={settings}
                   previewConfig={draftConfig}
                   onOpenBooking={(svcTitle) => {
-                    toast.success(`Vista Previa: Agendamiento para "${svcTitle || 'Mantención'}"`);
+                    toast.success(`Vista Previa: Agendamiento para "${svcTitle || 'Mantenimiento'}"`);
                   }}
                   onOpenPortal={() => {
                     toast('Vista Previa: Apertura del Portal de Clientes', { icon: '🔍' });

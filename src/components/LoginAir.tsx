@@ -194,7 +194,7 @@ export const LoginAir: React.FC<LoginAirProps> = ({
                 <div>
                   <h4 className="text-xs font-bold text-white">Recaptación Semestral 180D Automatizada</h4>
                   <p className="text-[11px] text-slate-400 leading-normal">
-                    Disparo de recordatorios preventivos para asegurar la mantención periódica de cada equipo.
+                    Disparo de recordatorios preventivos para asegurar el mantenimiento periódico de cada equipo.
                   </p>
                 </div>
               </div>

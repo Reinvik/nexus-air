@@ -155,7 +155,7 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
       const orderTotal = order.total || 0;
       const sType = order.service_type || 'mantencion_preventiva';
       const prettyServiceName = 
-        sType === 'mantencion_preventiva' ? 'Mantención Preventiva' :
+        sType === 'mantencion_preventiva' || sType === 'mantenimiento_preventivo' ? 'Mantenimiento Preventivo' :
         sType === 'instalacion' ? 'Instalación de Equipo' :
         sType === 'reparacion' ? 'Reparación / Corrección' :
         sType === 'recaptacion' ? 'Recaptación 6M' :
@@ -179,7 +179,7 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
             const pType = tech.commission_instalacion_type || 'fixed';
             const val = tech.commission_instalacion_value ?? 35000;
             comm = pType === 'percentage' ? Math.round((orderTotal * val) / 100) : val;
-          } else if (sType === 'mantencion_preventiva' || sType === 'recaptacion') {
+          } else if (sType === 'mantencion_preventiva' || sType === 'mantenimiento_preventivo' || sType === 'recaptacion') {
             const pType = tech.commission_mantencion_type || 'fixed';
             const val = tech.commission_mantencion_value ?? 20000;
             comm = pType === 'percentage' ? Math.round((orderTotal * val) / 100) : val;
@@ -216,7 +216,7 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
             const pType = asst.commission_instalacion_type || 'fixed';
             const val = asst.commission_instalacion_value ?? 25000;
             comm = pType === 'percentage' ? Math.round((orderTotal * val) / 100) : val;
-          } else if (sType === 'mantencion_preventiva' || sType === 'recaptacion') {
+          } else if (sType === 'mantencion_preventiva' || sType === 'mantenimiento_preventivo' || sType === 'recaptacion') {
             const pType = asst.commission_mantencion_type || 'fixed';
             const val = asst.commission_mantencion_value ?? 10000;
             comm = pType === 'percentage' ? Math.round((orderTotal * val) / 100) : val;
@@ -626,7 +626,7 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                 </span>
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                   <div className="bg-white p-1.5 rounded-lg border border-slate-200">
-                    <span className="text-slate-500 block">Mantención:</span>
+                    <span className="text-slate-500 block">Mantenimiento:</span>
                     <strong className="text-slate-900 font-mono">
                       {t.commission_mantencion_type === 'percentage'
                         ? `${mantVal}%`
@@ -872,14 +872,14 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                     Tarifas Pactadas por Tipo de Trabajo
                   </label>
                   <p className="text-[10px] text-slate-500">
-                    Define montos fijos o % independientes para mantenciones e instalaciones
+                    Define montos fijos o % independientes para mantenimientos e instalaciones
                   </p>
                 </div>
 
-                {/* Mantención */}
+                {/* Mantenimiento */}
                 <div className="bg-white p-2.5 rounded-lg border border-slate-200 space-y-1">
                   <div className="flex justify-between items-center text-[11px] font-bold text-slate-800">
-                    <span>🔧 Mantenciones Preventivas</span>
+                    <span>🔧 Mantenimientos Preventivos</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <select
@@ -1081,13 +1081,13 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                     Tarifas Pactadas por Tipo de Trabajo
                   </label>
                   <p className="text-[10px] text-slate-500">
-                    Ajusta montos fijos o % independientes para mantenciones e instalaciones
+                    Ajusta montos fijos o % independientes para mantenimientos e instalaciones
                   </p>
                 </div>
 
-                {/* Mantención */}
+                {/* Mantenimiento */}
                 <div className="bg-white p-2.5 rounded-lg border border-slate-200 space-y-1">
-                  <span className="text-[11px] font-bold text-slate-800 block">🔧 Mantenciones Preventivas</span>
+                  <span className="text-[11px] font-bold text-slate-800 block">🔧 Mantenimientos Preventivos</span>
                   <div className="grid grid-cols-2 gap-2">
                     <select
                       value={editCommMantType}

@@ -77,7 +77,7 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
     if (serviceType === 'instalacion') {
       setTechPayoutType(tech.commission_instalacion_type || 'fixed');
       setTechPayoutValue(tech.commission_instalacion_value ?? 35000);
-    } else if (serviceType === 'mantencion_preventiva') {
+    } else if (serviceType === 'mantencion_preventiva' || (serviceType as any) === 'mantenimiento_preventivo') {
       setTechPayoutType(tech.commission_mantencion_type || 'fixed');
       setTechPayoutValue(tech.commission_mantencion_value ?? 20000);
     } else {
@@ -97,7 +97,7 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
     if (serviceType === 'instalacion') {
       setAssistantPayoutType(asst.commission_instalacion_type || 'fixed');
       setAssistantPayoutValue(asst.commission_instalacion_value ?? 25000);
-    } else if (serviceType === 'mantencion_preventiva') {
+    } else if (serviceType === 'mantencion_preventiva' || (serviceType as any) === 'mantenimiento_preventivo') {
       setAssistantPayoutType(asst.commission_mantencion_type || 'fixed');
       setAssistantPayoutValue(asst.commission_mantencion_value ?? 10000);
     } else {
@@ -301,7 +301,7 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                       }}
                       className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:border-cyan-500 focus:outline-none transition-colors font-medium"
                     >
-                      <option value="mantencion_preventiva">Mantención Preventiva (6 Meses)</option>
+                      <option value="mantencion_preventiva">Mantenimiento Preventivo (6 Meses)</option>
                       <option value="instalacion">Instalación Nueva de Equipo</option>
                       <option value="mantencion_correctiva">Reparación / Falla / Fuga</option>
                       <option value="visita_tecnica">Visita Técnica de Diagnóstico</option>
@@ -350,7 +350,7 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                     rows={2}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Ej: Mantención preventiva semestral, limpieza profunda de turbina, no enfría suficiente..."
+                    placeholder="Ej: Mantenimiento preventivo semestral, limpieza profunda de turbina, no enfría suficiente..."
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:outline-none transition-colors"
                   />
                 </div>

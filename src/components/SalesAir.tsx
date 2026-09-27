@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ServiceOrder, AirSettings, TechnicianPayout } from '../types';
+import { ServiceOrder, AirSettings, TechnicianPayout, formatServiceType } from '../types';
 import { formatAirPrice } from '../lib/countries';
 import { 
   TrendingUp, 
@@ -339,7 +339,7 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings, technician
       }
 
       const sType = o.service_type || '';
-      if (sType.includes('mantencion') || sType === 'recaptacion') {
+      if (sType.includes('mantencion') || sType.includes('mantenimiento') || sType === 'recaptacion') {
         mantencionesTotal += orderTotal;
       } else if (sType.includes('instalacion')) {
         instalacionesTotal += orderTotal;
@@ -428,7 +428,7 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings, technician
         }
 
         const sType = o.service_type || '';
-        if (sType.includes('mantencion') || sType === 'recaptacion') {
+        if (sType.includes('mantencion') || sType.includes('mantenimiento') || sType === 'recaptacion') {
           grp.serviceBreakdown.mantencion++;
         } else if (sType.includes('instalacion')) {
           grp.serviceBreakdown.instalacion++;
@@ -567,7 +567,7 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings, technician
               )}
             </div>
             <p className="text-xs text-slate-500">
-              Rendimiento por venta de equipos, mantenciones e ingresos recurrentes
+              Rendimiento por venta de equipos, mantenimientos e ingresos recurrentes
             </p>
           </div>
         </div>
@@ -806,7 +806,7 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings, technician
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="p-3.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs flex items-center justify-between">
           <div>
-            <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider block">Mantenciones 6M</span>
+            <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider block">Mantenimientos 6M</span>
             <strong className="text-slate-900 font-mono font-bold text-sm">
               {formatAirPrice(stats.mantencionesTotal, currencySymbol, countryCode)}
             </strong>
@@ -909,7 +909,7 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings, technician
                           <span className="text-emerald-700 font-medium">{wk.completedCount} completadas</span>
                           <span>•</span>
                           <span>
-                            {wk.serviceBreakdown.mantencion} mantenciones, {wk.serviceBreakdown.instalacion} inst.
+                            {wk.serviceBreakdown.mantencion} mantenimientos, {wk.serviceBreakdown.instalacion} inst.
                           </span>
                         </div>
                       </div>
@@ -1118,7 +1118,7 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings, technician
                           <div className="text-[10px] text-slate-400">{o.customer?.commune}</div>
                         </td>
                         <td className="py-3 px-4 capitalize text-slate-700 font-medium">
-                          {o.service_type.replace('_', ' ')}
+                          {formatServiceType(o.service_type)}
                         </td>
                         <td className="py-3 px-4 font-mono text-slate-500">{o.scheduled_date}</td>
                         <td className="py-3 px-4">

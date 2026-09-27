@@ -511,7 +511,7 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div>
-              <label className="text-slate-700 font-semibold block mb-1">Intervalo Mantención Preventiva</label>
+              <label className="text-slate-700 font-semibold block mb-1">Intervalo Mantenimiento Preventivo</label>
               <div className="flex items-center gap-1.5">
                 <input
                   type="number"
@@ -560,7 +560,7 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
 
             <div>
               <label className="text-slate-700 font-semibold block mb-1">
-                Precio Mantención ({formData.currency_symbol || '$'} {formData.currency_code})
+                Precio Mantenimiento ({formData.currency_symbol || '$'} {formData.currency_code})
               </label>
               <input
                 type="number"

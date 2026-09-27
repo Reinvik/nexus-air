@@ -69,7 +69,7 @@ export const LandingNexusAir: React.FC<LandingNexusAirProps> = ({
           <div className="hidden md:flex items-center gap-7 text-xs font-semibold text-slate-300">
             <a href="#servicios" className="hover:text-[#00d2ff] transition-colors">Servicios</a>
             <a href="#calculadora" className="hover:text-[#00d2ff] transition-colors">Calculadora BTU</a>
-            <a href="#recaptacion" className="hover:text-[#00d2ff] transition-colors">Mantención Semestral</a>
+            <a href="#recaptacion" className="hover:text-[#00d2ff] transition-colors">Mantenimiento Semestral</a>
             <button
               onClick={onOpenPortal}
               className="text-slate-300 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -121,7 +121,7 @@ export const LandingNexusAir: React.FC<LandingNexusAirProps> = ({
 
           <p className="text-base sm:text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed font-normal">
             Ingeniería en venta, instalación y desinfección química de aires acondicionados Inverter A++. 
-            Aseguramos aire puro sin ácaros ni bacterias y mantenciones programadas cada 180 días.
+            Aseguramos aire puro sin ácaros ni bacterias y mantenimientos programados cada 180 días.
           </p>
 
           {/* Action CTAs */}
@@ -131,7 +131,7 @@ export const LandingNexusAir: React.FC<LandingNexusAirProps> = ({
               className="btn-nexus-gradient px-8 py-4 text-sm font-black w-full sm:w-auto"
             >
               <Calendar className="w-5 h-5 stroke-[2.5]" />
-              <span>AGENDAR VISITA O MANTENCIÓN ONLINE</span>
+              <span>AGENDAR VISITA O MANTENIMIENTO ONLINE</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 
@@ -274,7 +274,7 @@ export const LandingNexusAir: React.FC<LandingNexusAirProps> = ({
             <div className="w-12 h-12 rounded-2xl bg-[rgba(0,210,255,0.1)] text-[#00d2ff] flex items-center justify-center border border-[rgba(0,210,255,0.25)]">
               <Clock className="w-6 h-6" />
             </div>
-            <h3 className="font-bold text-lg text-white">Mantención Semestral (6 Meses)</h3>
+            <h3 className="font-bold text-lg text-white">Mantenimiento Semestral (6 Meses)</h3>
             <p className="text-xs text-slate-400 leading-relaxed">
               Desinfección con bactericidas especializados, lavado a presión de turbina y serpentín interior, control de salto térmico (\(\Delta T\)) y presiones de gas refrigerante.
             </p>
@@ -320,7 +320,7 @@ export const LandingNexusAir: React.FC<LandingNexusAirProps> = ({
               <span>CICLO SEMESTRAL RECOMENDADO</span>
             </div>
             <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-              ¿Por qué es fundamental la mantención cada 6 meses?
+              ¿Por qué es fundamental el mantenimiento cada 6 meses?
             </h2>
             <div className="space-y-3 text-xs text-slate-300 leading-relaxed">
               <p>
@@ -337,7 +337,7 @@ export const LandingNexusAir: React.FC<LandingNexusAirProps> = ({
               onClick={onOpenBooking}
               className="btn-nexus-gradient px-6 py-3 text-xs"
             >
-              Programar mi Mantención Semestral
+              Programar mi Mantenimiento Semestral
             </button>
           </div>
 

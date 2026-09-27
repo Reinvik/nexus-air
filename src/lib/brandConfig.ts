@@ -57,7 +57,7 @@ export const BRANDS: Record<BrandId, BrandTheme> = {
     logoUrl: '/favicon.svg',
     faviconUrl: '/favicon.svg',
     pageTitle: 'Nexus Air • Sistema de Climatización & HVAC OS',
-    metaDescription: 'Plataforma oficial para gestión de órdenes técnicas, cálculo térmico de BTU y mantención preventiva semestral.',
+    metaDescription: 'Plataforma oficial para gestión de órdenes técnicas, cálculo térmico de BTU y mantenimiento preventivo semestral.',
     colors: {
       primary: '#00d2ff',
       secondary: '#2563eb',

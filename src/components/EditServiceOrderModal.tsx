@@ -619,7 +619,7 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                         onChange={(e) => setServiceType(e.target.value as ServiceType)}
                         className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 font-semibold focus:border-cyan-500 focus:outline-none"
                       >
-                        <option value="mantencion_preventiva">Mantención Preventiva (6M)</option>
+                        <option value="mantencion_preventiva">Mantenimiento Preventivo (6M)</option>
                         <option value="instalacion">Instalación Nueva</option>
                         <option value="mantencion_correctiva">Reparación / Fuga</option>
                         <option value="reparacion">Reparación General</option>
@@ -1131,7 +1131,7 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                       rows={2}
                       value={resolution}
                       onChange={(e) => setResolution(e.target.value)}
-                      placeholder="Detalle de mantención ejecutada, piezas cambiadas, recarga de refrigerante, pruebas térmicas..."
+                      placeholder="Detalle de mantenimiento ejecutado, piezas cambiadas, recarga de refrigerante, pruebas térmicas..."
                       className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-colors text-xs"
                     />
                   </div>

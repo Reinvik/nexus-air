@@ -1019,7 +1019,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     let techPayoutVal = orderData.technician_payout_value;
     if (tech && (techPayoutVal === undefined || techPayoutVal === 0)) {
       const sType = orderData.service_type || 'mantencion_preventiva';
-      if (sType.startsWith('mantencion')) {
+      if (sType.startsWith('mantencion') || sType.startsWith('mantenimiento')) {
         techPayoutType = tech.commission_mantencion_type || tech.default_commission_type || 'fixed';
         techPayoutVal = tech.commission_mantencion_value ?? tech.default_commission_value ?? 20000;
       } else if (sType.startsWith('instalacion')) {
@@ -1147,13 +1147,13 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       equipment_id: reminder.equipment_id,
       service_type: 'mantencion_preventiva',
       status: 'ingresado',
-      description: `Mantención preventiva periódica recaptada (${settings.maintenance_interval_months || 6} meses). Equipo ${reminder.equipment_brand} ${reminder.equipment_btu} BTU en ${reminder.equipment_location}.`,
+      description: `Mantenimiento preventivo periódico recaptado (${settings.maintenance_interval_months || 6} meses). Equipo ${reminder.equipment_brand} ${reminder.equipment_btu} BTU en ${reminder.equipment_location}.`,
       scheduled_date: format(addDays(new Date(), 2), 'yyyy-MM-dd'),
       scheduled_time_slot: '10:00 - 12:00',
       items: [
         {
           id: `it-${Date.now()}`,
-          description: `Mantención Preventiva ${reminder.equipment_brand} ${reminder.equipment_btu} BTU`,
+          description: `Mantenimiento Preventivo ${reminder.equipment_brand} ${reminder.equipment_btu} BTU`,
           quantity: 1,
           unit_price: basePrice,
           total: basePrice,

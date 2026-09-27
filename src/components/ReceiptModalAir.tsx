@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ServiceOrder, AirSettings } from '../types';
+import { ServiceOrder, AirSettings, formatServiceType } from '../types';
 import { formatAirPrice, getTaxPercentage } from '../lib/countries';
 import { toast } from 'react-hot-toast';
 import { 
@@ -181,7 +181,7 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
       `*Cliente:* ${clientName}\n` +
       `*Dirección:* ${order.customer?.address || ''}, ${order.customer?.commune || ''}\n\n` +
       `🔧 *Detalle del Servicio:*\n` +
-      `• Tipo: ${order.service_type.replace('_', ' ').toUpperCase()}\n` +
+      `• Tipo: ${formatServiceType(order.service_type).toUpperCase()}\n` +
       `• Equipo: ${equipInfo}${serialInfo}\n` +
       `• Técnico Responsable: ${techName}\n\n` +
       (order.resolution ? `*Trabajo Realizado:* ${order.resolution}\n\n` : '') +
@@ -421,7 +421,7 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
                 Informe de Trabajo & Diagnóstico Técnico
               </span>
               <span className="text-[10px] font-bold text-cyan-700 uppercase">
-                Servicio: {order.service_type.replace('_', ' ')}
+                Servicio: {formatServiceType(order.service_type)}
               </span>
             </div>
 
@@ -516,7 +516,7 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
                     ) : (
                       <tr>
                         <td className="p-3 font-medium text-slate-800">
-                          Servicio de {order.service_type.replace('_', ' ')} (Mano de obra y materiales)
+                          Servicio de {formatServiceType(order.service_type)} (Mano de obra y materiales)
                         </td>
                         <td className="p-3 text-center font-mono">1</td>
                         <td className="p-3 text-right font-mono font-bold text-slate-900">

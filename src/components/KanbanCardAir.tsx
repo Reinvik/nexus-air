@@ -64,9 +64,11 @@ export const KanbanCardAir: React.FC<KanbanCardAirProps> = ({
   onOpenReceipt,
 }) => {
   const serviceTypeLabels: Record<string, { label: string; bg: string; text: string; border: string }> = {
-    mantencion_preventiva: { label: 'Mantención (6M)', bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200' },
+    mantencion_preventiva: { label: 'Mantenimiento (6M)', bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200' },
+    mantenimiento_preventivo: { label: 'Mantenimiento (6M)', bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200' },
     instalacion: { label: 'Instalación', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
     mantencion_correctiva: { label: 'Reparación / Fuga', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
+    mantenimiento_correctivo: { label: 'Reparación / Fuga', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
     reparacion: { label: 'Reparación', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
     visita_tecnica: { label: 'Diagnóstico', bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
     recarga_gas: { label: 'Carga Gas', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },

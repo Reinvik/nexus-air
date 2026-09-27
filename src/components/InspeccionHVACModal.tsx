@@ -351,7 +351,7 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-700 flex items-center gap-2">
                   <Wind className="w-4 h-4 text-cyan-600" />
-                  Protocolo de Limpieza y Mantención Preventiva
+                  Protocolo de Limpieza y Mantenimiento Preventivo
                 </h4>
 
                 <div className="space-y-2">
@@ -565,7 +565,7 @@ export const InspeccionHVACModal: React.FC<InspeccionHVACModalProps> = ({
                   rows={2}
                   value={checklist.technician_notes || ''}
                   onChange={(e) => setChecklist(prev => ({ ...prev, technician_notes: e.target.value }))}
-                  placeholder="Ej: Se realizó prueba de calor y frío. Desagüe libre de sarro. Se recomienda próxima mantención preventiva en 6 meses..."
+                  placeholder="Ej: Se realizó prueba de calor y frío. Desagüe libre de sarro. Se recomienda próximo mantenimiento preventivo en 6 meses..."
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none leading-relaxed transition-colors"
                 />
               </div>

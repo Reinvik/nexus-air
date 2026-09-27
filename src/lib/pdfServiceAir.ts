@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
-import { ServiceOrder, AirSettings } from '../types';
+import { ServiceOrder, AirSettings, formatServiceType } from '../types';
 import { formatAirPrice, getTaxPercentage } from './countries';
 
 export interface ProformaPdfData {
@@ -11,7 +11,7 @@ export interface ProformaPdfData {
   clientPhone?: string;
   clientEmail?: string;
   clientAddress?: string;
-  serviceCategory?: 'instalacion' | 'mantencion_multiequipo' | 'reparacion';
+  serviceCategory?: 'instalacion' | 'mantenimiento_multiequipo' | 'mantencion_multiequipo' | 'reparacion';
   serviceTitle?: string;
   areaM2?: number;
   recommendedBtu?: number;
@@ -494,7 +494,7 @@ export function buildReceiptHtml(order: ServiceOrder, settings: AirSettings): st
               INFORME DE TRABAJO & DIAGNÓSTICO TÉCNICO
             </td>
             <td style="text-align: right; font-size: 9.5px; font-weight: 800; color: #0284c7; text-transform: uppercase;">
-              SERVICIO: ${order.service_type.replace('_', ' ').toUpperCase()}
+              SERVICIO: ${formatServiceType(order.service_type).toUpperCase()}
             </td>
           </tr>
         </table>
@@ -586,7 +586,7 @@ export function buildReceiptHtml(order: ServiceOrder, settings: AirSettings): st
               </tr>
             `).join('') : `
               <tr style="border-top: 1px solid #f1f5f9; background: #ffffff;">
-                <td style="padding: 7px 12px; font-weight: 600; color: #1e293b;">Servicio de ${order.service_type.replace('_', ' ')} (Mano de obra y materiales)</td>
+                <td style="padding: 7px 12px; font-weight: 600; color: #1e293b;">Servicio de ${formatServiceType(order.service_type)} (Mano de obra y materiales)</td>
                 <td style="padding: 7px 10px; text-align: center; font-family: monospace;">1</td>
                 <td style="padding: 7px 12px; text-align: right; font-family: monospace; font-weight: 700; color: #0f172a;">${formatAirPrice(calculatedTotal, currencySymbol, countryCode)}</td>
               </tr>
@@ -632,7 +632,7 @@ export function buildReceiptHtml(order: ServiceOrder, settings: AirSettings): st
           <td style="width: 58%; vertical-align: top; padding-right: 8px;">
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 10px; font-size: 9px; color: #64748b; line-height: 1.4;">
               <div style="font-weight: 800; color: #0284c7; text-transform: uppercase; margin-bottom: 2px;">
-                🛡️ Términos de Garantía & Mantención
+                🛡️ Términos de Garantía & Mantenimiento
               </div>
               <div>• Garantía de servicio: <strong>${settings.warranty_months || 6} meses</strong> bajo uso normal.</div>
               <div>• Ciclo recomendado: <strong>${settings.maintenance_interval_months || 6} meses (180 días)</strong> para preservar compresor.</div>
@@ -682,12 +682,12 @@ export function buildProformaHtml(data: ProformaPdfData, settings: AirSettings):
   const taxPercent = getTaxPercentage(data.taxRate || settings.tax_rate);
   const category = data.serviceCategory || 'instalacion';
 
-  const isMultiMaintenance = category === 'mantencion_multiequipo';
+  const isMultiMaintenance = category === 'mantencion_multiequipo' || (category as string) === 'mantenimiento_multiequipo';
   const isRepair = category === 'reparacion';
 
   const categoryTitle = data.serviceTitle || (
     isMultiMaintenance 
-      ? 'PRESUPUESTO MANTENCIÓN MULTIEQUIPO' 
+      ? 'PRESUPUESTO MANTENIMIENTO MULTIEQUIPO' 
       : isRepair 
         ? 'PRESUPUESTO REPARACIÓN Y DIAGNÓSTICO' 
         : 'COTIZACIÓN / PROFORMA'
@@ -799,13 +799,13 @@ export function buildProformaHtml(data: ProformaPdfData, settings: AirSettings):
             <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; border-radius: 6px;">
               <tr style="background: #f1f5f9;">
                 <th colspan="2" style="text-align: left; padding: 5px 8px; font-size: 10px; font-weight: 800; color: #1e293b; text-transform: uppercase; border-bottom: 1px solid #cbd5e1;">
-                  ${isMultiMaintenance ? '🏢 Alcance Mantención Multiequipo' : isRepair ? '🔧 Diagnóstico y Alcance Técnico' : '📐 Estudio Térmico Estimado'}
+                  ${isMultiMaintenance ? '🏢 Alcance Mantenimiento Multiequipo' : isRepair ? '🔧 Diagnóstico y Alcance Técnico' : '📐 Estudio Térmico Estimado'}
                 </th>
               </tr>
               ${isMultiMaintenance ? `
                 <tr>
                   <td style="padding: 4px 8px; color: #64748b; width: 45%; border-bottom: 1px solid #f1f5f9;">Tipo de Servicio:</td>
-                  <td style="padding: 4px 8px; font-weight: 700; color: #0891b2; border-bottom: 1px solid #f1f5f9;">Mantención Preventiva Corporativa</td>
+                  <td style="padding: 4px 8px; font-weight: 700; color: #0891b2; border-bottom: 1px solid #f1f5f9;">Mantenimiento Preventivo Corporativo</td>
                 </tr>
                 <tr>
                   <td style="padding: 4px 8px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Protocolo:</td>

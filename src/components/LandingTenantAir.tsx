@@ -198,7 +198,7 @@ export const LandingTenantAir: React.FC<LandingTenantAirProps> = ({
               }}
             >
               <Calendar className="w-4 h-4" />
-              <span>Agendar Mantención</span>
+              <span>Agendar Mantenimiento</span>
             </button>
           </div>
         </div>
@@ -563,7 +563,7 @@ export const LandingTenantAir: React.FC<LandingTenantAirProps> = ({
             Zonas de Cobertura y Atención Técnica
           </h3>
           <p className="text-xs text-slate-400 max-w-xl mx-auto">
-            Contamos con móviles equipados para atender visitas de instalación, mantención preventiva y emergencias.
+            Contamos con móviles equipados para atender visitas de instalación, mantenimiento preventivo y emergencias.
           </p>
         </div>
 

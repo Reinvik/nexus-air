@@ -3,7 +3,7 @@ import { AirSettings, LandingPageConfig, LandingServiceItem } from '../types';
 export const DEFAULT_HVAC_SERVICES: LandingServiceItem[] = [
   {
     id: 'svc-1',
-    title: 'Mantención Preventiva Profunda',
+    title: 'Mantenimiento Preventivo Profundo',
     desc: 'Limpieza química integral de serpentines evaporador/condensador, sanitización bactericida y control de presiones de gas.',
     price: 45000,
     badge: 'Más Solicitado',
@@ -173,7 +173,7 @@ export function resolveAirLandingConfig(
     // Hero Section
     hero_badge: cfg.hero_badge || 'Técnicos Certificados SEC • Garantía 6 Meses',
     hero_title: cfg.hero_title || `Especialistas en Climatización y Confort Térmico`,
-    hero_subtitle: cfg.hero_subtitle || 'Instalación certificada SEC, mantención preventiva profunda y servicio técnico de urgencia para hogares y empresas.',
+    hero_subtitle: cfg.hero_subtitle || 'Instalación certificada SEC, mantenimiento preventivo profundo y servicio técnico de urgencia para hogares y empresas.',
     hero_cta_text: cfg.hero_cta_text || 'Agendar Visita a Domicilio',
     hero_phone: companyPhone,
     hero_image_url: cfg.hero_image_url || '',

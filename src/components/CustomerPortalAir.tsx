@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Customer, AirEquipment, ServiceOrder, AirSettings } from '../types';
+import { Customer, AirEquipment, ServiceOrder, AirSettings, formatServiceType } from '../types';
 import { 
   Wind, 
   Thermometer, 
@@ -309,7 +309,7 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-md shadow-cyan-500/20 transition-all cursor-pointer"
             >
               <Calendar className="w-4 h-4" />
-              <span>Agendar Mantención</span>
+              <span>Agendar Mantenimiento</span>
             </button>
 
             <button
@@ -335,7 +335,7 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
               </span>
               <h2 className="text-2xl font-black text-slate-900">Consulta tu Historial</h2>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Ingresa tu {settings.tax_id_label || 'RUT'} o teléfono para consultar tus equipos registrados, historial de mantenciones y el seguimiento satelital de tu técnico en terreno.
+                Ingresa tu {settings.tax_id_label || 'RUT'} o teléfono para consultar tus equipos registrados, historial de mantenimientos y el seguimiento satelital de tu técnico en terreno.
               </p>
             </div>
 
@@ -427,7 +427,7 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-md shadow-cyan-500/20 transition-all cursor-pointer"
           >
             <Calendar className="w-4 h-4" />
-            <span>Agendar Nueva Mantención</span>
+            <span>Agendar Nuevo Mantenimiento</span>
           </button>
 
           <button
@@ -635,7 +635,7 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
               <Wind className="w-5 h-5 text-cyan-600" />
               Tus Equipos de Aire Acondicionado ({clientEquipments.length})
             </h3>
-            <span className="text-xs text-slate-500 font-medium">Ciclo de Mantención Preventiva ({settings?.maintenance_interval_months || 6} Meses)</span>
+            <span className="text-xs text-slate-500 font-medium">Ciclo de Mantenimiento Preventivo ({settings?.maintenance_interval_months || 6} Meses)</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -660,11 +660,11 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
                 {/* Maintenance Timeline Bar */}
                 <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
                   <div className="flex justify-between text-xs">
-                    <span className="text-slate-500">Última Mantención:</span>
+                    <span className="text-slate-500">Último Mantenimiento:</span>
                     <span className="text-slate-800 font-mono font-medium">{eq.last_maintenance_date || 'Instalación nueva'}</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-cyan-700 font-semibold">Próxima Mantención ({settings?.maintenance_interval_months || 6} Meses):</span>
+                    <span className="text-cyan-700 font-semibold">Próximo Mantenimiento ({settings?.maintenance_interval_months || 6} Meses):</span>
                     <span className="text-cyan-600 font-mono font-bold">{eq.next_maintenance_date}</span>
                   </div>
 
@@ -682,7 +682,7 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
                     onClick={() => onOpenBooking(matchedCustomer, eq)}
                     className="px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold transition-all cursor-pointer shadow-xs"
                   >
-                    Agendar Mantención
+                    Agendar Mantenimiento
                   </button>
                 </div>
               </div>
@@ -712,7 +712,7 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
                     <div className="flex items-center gap-2">
                       <span className="font-mono font-bold text-cyan-600 text-xs">{ord.ticket_number}</span>
                       <span className="text-sm font-bold text-slate-900 capitalize">
-                        {ord.service_type.replace('_', ' ')}
+                        {formatServiceType(ord.service_type)}
                       </span>
                     </div>
                     <span className="text-xs px-2.5 py-0.5 rounded-full font-bold uppercase bg-slate-100 text-slate-700 border border-slate-200">
@@ -753,7 +753,7 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
                           Evidencia del Trabajo Realizado (Antes y Después)
                         </span>
                         <span className="text-[10px] text-slate-500 font-medium">
-                          Transparencia técnica de mantención
+                          Transparencia técnica de mantenimiento
                         </span>
                       </div>
 
@@ -918,7 +918,7 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
               Filtros limpios aseguran flujo libre de aire y evitan que el compresor Inverter trabaje forzado.
             </div>
             <div className="p-3.5 rounded-2xl bg-white border border-cyan-100 shadow-xs">
-              <strong className="text-slate-900 block mb-1">⏱️ Mantención Semestral 6M</strong>
+              <strong className="text-slate-900 block mb-1">⏱️ Mantenimiento Semestral 6M</strong>
               Garantiza la eliminación de bacterias, previene fugas de refrigerante y alarga la vida útil a más de 12 años.
             </div>
           </div>

@@ -207,7 +207,7 @@ export const LandingSolagoAir: React.FC<LandingSolagoAirProps> = ({
               </div>
               <div>
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block">Cobertura de Garantía</span>
-                <span className="text-sm font-extrabold text-slate-900">Mantención Periódica 180 Días (6M)</span>
+                <span className="text-sm font-extrabold text-slate-900">Mantenimiento Periódico 180 Días (6M)</span>
               </div>
             </div>
           </div>
@@ -234,7 +234,7 @@ export const LandingSolagoAir: React.FC<LandingSolagoAirProps> = ({
               <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center group-hover:scale-105 transition-transform">
                 <Wind className="w-5 h-5" />
               </div>
-              <h3 className="text-base font-bold text-white">Mantención Preventiva (6M)</h3>
+              <h3 className="text-base font-bold text-white">Mantenimiento Preventivo (6M)</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
                 Desarme y lavado químico con bactericida de serpentines evaporador y condensador, limpieza de bandeja y prueba de drenaje.
               </p>
@@ -378,7 +378,7 @@ export const LandingSolagoAir: React.FC<LandingSolagoAirProps> = ({
               VALORACIÓN DE CONGESTIÓN & CONTROL DE TIEMPO
             </span>
             <h2 className="text-2xl sm:text-3xl font-black text-white leading-snug">
-              Se acabó olvidar las mantenciones periódicas y arriesgar la vida útil del compresor
+              Se acabó olvidar los mantenimientos periódicos y arriesgar la vida útil del compresor
             </h2>
             <p className="text-sm text-slate-300 leading-relaxed">
               La acumulación de polvo y sarro eleva el consumo eléctrico hasta en un 35% y reduce la vida útil del condensador. Con el sistema de retención de <strong className="text-white">SoLago Air</strong>, cada orden registra la fecha exacta para enviar el recordatorio preventivo a los 180 días automáticamente.

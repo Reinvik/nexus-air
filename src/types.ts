@@ -12,11 +12,42 @@ export type ServiceType =
   | 'instalacion' 
   | 'mantencion_preventiva' 
   | 'mantencion_correctiva' 
+  | 'mantenimiento_preventivo'
+  | 'mantenimiento_correctivo'
   | 'visita_tecnica' 
   | 'recarga_gas'
   | 'reparacion'
   | 'recaptacion'
   | 'pruebas_qa';
+
+export function formatServiceType(type?: string): string {
+  if (!type) return 'Mantenimiento';
+  switch (type) {
+    case 'mantencion_preventiva':
+    case 'mantenimiento_preventivo':
+      return 'Mantenimiento Preventivo (6M)';
+    case 'mantencion_correctiva':
+    case 'mantenimiento_correctivo':
+      return 'Mantenimiento Correctivo / Fuga';
+    case 'instalacion':
+      return 'Instalación de Equipo';
+    case 'visita_tecnica':
+      return 'Visita Técnica de Diagnóstico';
+    case 'recarga_gas':
+      return 'Recarga de Gas Refrigerante';
+    case 'reparacion':
+      return 'Reparación General';
+    case 'recaptacion':
+      return 'Recaptación de Mantenimiento';
+    case 'pruebas_qa':
+      return 'Pruebas de Calidad / QA';
+    default:
+      return type
+        .replace(/mantencion/gi, 'mantenimiento')
+        .replace(/mantenciones/gi, 'mantenimientos')
+        .replace(/_/g, ' ');
+  }
+}
 
 export type OrderStatus = 
   | 'ingresado' 
@@ -41,7 +72,7 @@ export interface AirEquipment {
   location_in_property: string; // ej: "Dormitorio Principal", "Living Comedor", "Sala Servidores"
   installation_date?: string;
   last_maintenance_date?: string;
-  next_maintenance_date: string; // 6 meses después de la última mantención o instalación
+  next_maintenance_date: string; // 6 meses después del último mantenimiento o instalación
   notes?: string;
 }
 

@@ -30,9 +30,9 @@ export const INITIAL_SETTINGS: AirSettings = {
   pre_expiration_warning_days: 15,
   standard_maintenance_price: 45000,
   standard_installation_price: 130000,
-  whatsapp_template_recaptacion: 'Hola {cliente}, te saludamos de Nexus Air. Tu equipo de aire acondicionado {marca} ({btu} BTU) instalado en {ubicacion} está cumpliendo 6 meses desde su última mantención preventiva. Para asegurar aire puro, evitar malos olores y optimizar el consumo eléctrico para esta temporada, te invitamos a agendar con tu técnico asignado aquí: {link}',
+  whatsapp_template_recaptacion: 'Hola {cliente}, te saludamos de Nexus Air. Tu equipo de aire acondicionado {marca} ({btu} BTU) instalado en {ubicacion} está cumpliendo 6 meses desde su último mantenimiento preventivo. Para asegurar aire puro, evitar malos olores y optimizar el consumo eléctrico para esta temporada, te invitamos a agendar con tu técnico asignado aquí: {link}',
   whatsapp_template_agendamiento: 'Estimado/a {cliente}, tu servicio técnico para {tipo_servicio} ha sido programado para el día {fecha} en el bloque {hora}. El técnico asignado es {tecnico}.',
-  whatsapp_template_terminado: 'Estimado/a {cliente}, el servicio de {tipo_servicio} para tu equipo {marca} ha finalizado con éxito. Tu salto térmico medido fue de {delta_t}°C y presiones en norma. Tu próxima mantención preventiva está programada para dentro de 6 meses ({proxima_fecha}). ¡Gracias por confiar en Nexus Air!',
+  whatsapp_template_terminado: 'Estimado/a {cliente}, el servicio de {tipo_servicio} para tu equipo {marca} ha finalizado con éxito. Tu salto térmico medido fue de {delta_t}°C y presiones en norma. Tu próximo mantenimiento preventivo está programada para dentro de 6 meses ({proxima_fecha}). ¡Gracias por confiar en Nexus Air!',
   whatsapp_template_cobro: 'Hola {cliente}, le saludamos de {empresa}. Le recordamos que mantiene un saldo pendiente de {saldo} por el servicio {servicio} (Folio {ticket}).\n\nDatos de transferencia:\nBanco: {banco}\nTipo de Cuenta: {tipo_cuenta}\nN° de Cuenta: {numero_cuenta}\nTitular / RUT: {rut}\nEmail de confirmación: {email}\n\nAgradecemos remitir su comprobante a este chat para actualizar su estado de pago. ¡Muchas gracias!',
   bank_name: 'Banco de Chile / BAC Credomatic',
   bank_account_type: 'Cuenta Corriente',
@@ -184,7 +184,7 @@ export const INITIAL_CUSTOMERS: Customer[] = [
     commune: 'Las Condes',
     city: 'Santiago',
     customer_type: 'comercial',
-    notes: 'Horario preferente para mantenciones: después de las 18:00 hrs o sábados por la mañana.',
+    notes: 'Horario preferente para mantenimientos: después de las 18:00 hrs o sábados por la mañana.',
     created_at: format(subMonths(today, 9), 'yyyy-MM-dd'),
   },
   {
@@ -210,7 +210,7 @@ export const INITIAL_CUSTOMERS: Customer[] = [
     commune: 'Ñuñoa',
     city: 'Santiago',
     customer_type: 'comercial',
-    notes: 'Salón principal con alta afluencia de comensales. Mantención clave de filtros y evaporador.',
+    notes: 'Salón principal con alta afluencia de comensales. Mantenimiento clave de filtros y evaporador.',
     created_at: format(subMonths(today, 16), 'yyyy-MM-dd'),
   },
 ];
@@ -336,7 +336,7 @@ export const INITIAL_SERVICE_ORDERS: ServiceOrder[] = [
     scheduled_date: format(today, 'yyyy-MM-dd'),
     scheduled_time_slot: '09:30 - 11:30',
     assigned_technician_id: 'tech-1',
-    description: 'Mantención preventiva semestral de 6 meses. Limpieza química de serpentín interior, revisión de salto térmico y presurización.',
+    description: 'Mantenimiento preventivo semestral de 6 meses. Limpieza química de serpentín interior, revisión de salto térmico y presurización.',
     diagnosis: 'Filtros con acumulación de polvo al 70%. Condensador exterior con buen tiro pero requiere desincrustado de aletas.',
     checklist: {
       clean_evaporator_coil: true,
@@ -352,7 +352,7 @@ export const INITIAL_SERVICE_ORDERS: ServiceOrder[] = [
       technician_notes: 'Equipo operando estable. Se aplicó bactericida con aroma menta fresca.',
     },
     items: [
-      { id: 'it-1', description: 'Servicio Mantención Preventiva Split 12k BTU', quantity: 1, unit_price: 45000, total: 45000, type: 'servicio' },
+      { id: 'it-1', description: 'Servicio Mantenimiento Preventivo Split 12k BTU', quantity: 1, unit_price: 45000, total: 45000, type: 'servicio' },
       { id: 'it-2', description: 'Sanitización profunda con bactericida HVAC', quantity: 1, unit_price: 10000, total: 10000, type: 'insumo' },
     ],
     subtotal: 55000,
@@ -431,7 +431,7 @@ export const INITIAL_SERVICE_ORDERS: ServiceOrder[] = [
     scheduled_date: format(today, 'yyyy-MM-dd'),
     scheduled_time_slot: '08:30 - 10:30',
     assigned_technician_id: 'tech-1',
-    description: 'Mantención preventiva semestral en Cowork El Golf. Se realizó limpieza con hidrolavadora a presión controlada y prueba de temperatura.',
+    description: 'Mantenimiento preventivo semestral en Cowork El Golf. Se realizó limpieza con hidrolavadora a presión controlada y prueba de temperatura.',
     diagnosis: 'Excelente estado estructural. Consumo eléctrico dentro de los parámetros de fabricante.',
     checklist: {
       clean_evaporator_coil: true,
@@ -447,7 +447,7 @@ export const INITIAL_SERVICE_ORDERS: ServiceOrder[] = [
       technician_notes: 'Prueba de frío superada: inyección en 10.2°C con retorno en 24.3°C.',
     },
     items: [
-      { id: 'it-7', description: 'Mantención Preventiva Split 18k BTU Inverter R32', quantity: 1, unit_price: 55000, total: 55000, type: 'servicio' },
+      { id: 'it-7', description: 'Mantenimiento Preventivo Split 18k BTU Inverter R32', quantity: 1, unit_price: 55000, total: 55000, type: 'servicio' },
     ],
     subtotal: 55000,
     tax: 10450,
@@ -466,7 +466,7 @@ export const INITIAL_SERVICE_ORDERS: ServiceOrder[] = [
     scheduled_date: format(subMonths(today, 1), 'yyyy-MM-dd'),
     scheduled_time_slot: '15:00 - 17:00',
     assigned_technician_id: 'tech-2',
-    description: 'Mantención preventiva completada. Equipo con flujo de aire restaurado.',
+    description: 'Mantenimiento preventivo completado. Equipo con flujo de aire restaurado.',
     checklist: {
       clean_evaporator_coil: true,
       clean_turbine_fan: true,
@@ -480,7 +480,7 @@ export const INITIAL_SERVICE_ORDERS: ServiceOrder[] = [
       amperage_amps: 3.9,
     },
     items: [
-      { id: 'it-8', description: 'Mantención Preventiva Split 9k BTU Inverter', quantity: 1, unit_price: 40000, total: 40000, type: 'servicio' },
+      { id: 'it-8', description: 'Mantenimiento Preventivo Split 9k BTU Inverter', quantity: 1, unit_price: 40000, total: 40000, type: 'servicio' },
     ],
     subtotal: 40000,
     tax: 7600,

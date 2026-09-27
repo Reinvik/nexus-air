@@ -41,7 +41,7 @@ type DateFilterScope = 'completed_only' | 'all_columns';
 const COLUMNS: { id: OrderStatus; title: string; icon: React.ElementType; color: string; badgeColor: string }[] = [
   { id: 'ingresado', title: 'Solicitudes / Nuevas', icon: Inbox, color: 'border-slate-200 bg-slate-100/70', badgeColor: 'bg-slate-200 text-slate-700' },
   { id: 'en_ruta', title: 'Técnico en Ruta', icon: Truck, color: 'border-blue-200 bg-blue-50/50', badgeColor: 'bg-blue-100 text-blue-800' },
-  { id: 'en_proceso', title: 'En Terreno / Mantención', icon: Wrench, color: 'border-cyan-200 bg-cyan-50/50', badgeColor: 'bg-cyan-100 text-cyan-800' },
+  { id: 'en_proceso', title: 'En Terreno / Mantenimiento', icon: Wrench, color: 'border-cyan-200 bg-cyan-50/50', badgeColor: 'bg-cyan-100 text-cyan-800' },
   { id: 'pruebas_qa', title: 'Medición & Pruebas QA', icon: Gauge, color: 'border-amber-200 bg-amber-50/50', badgeColor: 'bg-amber-100 text-amber-800' },
   { id: 'completado', title: 'Finalizado / Entregado', icon: CheckCircle, color: 'border-emerald-200 bg-emerald-50/50', badgeColor: 'bg-emerald-100 text-emerald-800' },
 ];
@@ -267,7 +267,7 @@ export const KanbanBoardAir: React.FC<KanbanBoardAirProps> = ({
               className="bg-transparent text-slate-700 font-medium focus:outline-none cursor-pointer text-xs"
             >
               <option value="all">Servicios: Todos</option>
-              <option value="mantencion_preventiva">Mantención (6M)</option>
+              <option value="mantencion_preventiva">Mantenimiento (6M)</option>
               <option value="instalacion">Instalación Nueva</option>
               <option value="mantencion_correctiva">Reparación / Fuga</option>
               <option value="visita_tecnica">Visita Factibilidad</option>
