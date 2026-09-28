@@ -16,6 +16,7 @@ import {
 
 interface KanbanCardAirProps {
   order: ServiceOrder;
+  hideAmount?: boolean;
   onEdit: (order: ServiceOrder) => void;
   onOpenInspection: (order: ServiceOrder) => void;
   onUpdateStatus: (orderId: string, status: OrderStatus) => void;
@@ -58,6 +59,7 @@ export const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = 'w-
 
 export const KanbanCardAir: React.FC<KanbanCardAirProps> = ({
   order,
+  hideAmount = false,
   onEdit,
   onOpenInspection,
   onUpdateStatus,
@@ -122,7 +124,7 @@ export const KanbanCardAir: React.FC<KanbanCardAirProps> = ({
         )}
       </div>
 
-      {/* 2. Cliente y Precio/Delta T */}
+      {/* 2. Cliente y Precio/Delta T (Oculto para técnicos en NK-047) */}
       <div className="flex items-center justify-between gap-1">
         <h4 
           onClick={() => onEdit(order)}
@@ -135,6 +137,13 @@ export const KanbanCardAir: React.FC<KanbanCardAirProps> = ({
           <span className="flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-cyan-50 text-cyan-800 border border-cyan-200 text-[9.5px] font-mono font-bold shrink-0">
             <Thermometer className="w-2.5 h-2.5 text-cyan-600" />
             ΔT {order.checklist.delta_t_celsius}°C
+          </span>
+        ) : hideAmount ? (
+          <span 
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200 text-[9.5px] font-mono font-bold shrink-0" 
+            title="Monto a cobrar reservado (no visible para técnicos)"
+          >
+            🔒 Confidencial
           </span>
         ) : (
           <span className="text-slate-900 font-black text-xs font-mono shrink-0">

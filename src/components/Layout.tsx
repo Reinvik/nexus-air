@@ -79,7 +79,9 @@ export const Layout: React.FC<LayoutProps> = ({
     { id: 'cotizador', label: 'Cotizador BTU', icon: Calculator },
   ];
 
-  const manageNav: { id: ViewTab; label: string; icon: React.ElementType }[] = [
+  const isTechnician = !isNexusOwner && (currentUserProfile?.role === 'tecnico' || currentUserProfile?.role === 'ayudante' || currentUserProfile?.role === 'technician');
+
+  const allManageNav: { id: ViewTab; label: string; icon: React.ElementType }[] = [
     { id: 'inventory', label: 'Equipos & Stock', icon: Boxes },
     { id: 'customers', label: 'Clientes', icon: Users },
     { id: 'technicians', label: 'Técnicos HVAC', icon: Wrench },
@@ -88,6 +90,10 @@ export const Layout: React.FC<LayoutProps> = ({
     { id: 'landingpage', label: 'Mi Landing Page', icon: Globe },
     { id: 'settings', label: 'Configuración', icon: Settings },
   ];
+
+  const manageNav = isTechnician 
+    ? allManageNav.filter(item => item.id !== 'sales' && item.id !== 'finances' && item.id !== 'settings')
+    : allManageNav;
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">

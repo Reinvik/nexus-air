@@ -431,6 +431,7 @@ export default function App() {
             orders={orders}
             technicians={technicians}
             settings={effectiveSettings}
+            currentUserProfile={currentProfile}
             searchTerm={dashboardSearchTerm}
             setSearchTerm={setDashboardSearchTerm}
             onOpenNewOrder={() => setIsAddOrderModalOpen(true)}
@@ -512,7 +513,10 @@ export default function App() {
             orders={orders} 
             settings={tenantSettings || settings}
             technicianPayouts={technicianPayouts}
+            expenses={expenses}
             onUpdateOrder={updateOrder}
+            onAddExpense={addExpense}
+            onDeleteExpense={deleteExpense}
           />
         )}
 
@@ -600,6 +604,7 @@ export default function App() {
             setSelectedOrder(null);
           }}
           order={selectedOrder}
+          currentUserProfile={currentProfile}
           technicians={technicians}
           customers={customers}
           equipments={equipments}

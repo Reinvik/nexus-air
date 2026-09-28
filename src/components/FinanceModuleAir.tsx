@@ -248,6 +248,43 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
     }, 0);
   }, [expenses, selectedMonth, selectedYear]);
 
+  // NK-045: Desglose específico para servicios públicos, gasolina/combustible e insumos del mes
+  const monthPublicServicesExpense = useMemo(() => {
+    return expenses.reduce((sum, exp) => {
+      const d = new Date(exp.date || Date.now());
+      if (d.getMonth() === selectedMonth && d.getFullYear() === selectedYear) {
+        if (exp.category === 'servicios_basicos') {
+          return sum + (Number(exp.amount) || 0);
+        }
+      }
+      return sum;
+    }, 0);
+  }, [expenses, selectedMonth, selectedYear]);
+
+  const monthFuelExpense = useMemo(() => {
+    return expenses.reduce((sum, exp) => {
+      const d = new Date(exp.date || Date.now());
+      if (d.getMonth() === selectedMonth && d.getFullYear() === selectedYear) {
+        if (exp.category === 'combustible') {
+          return sum + (Number(exp.amount) || 0);
+        }
+      }
+      return sum;
+    }, 0);
+  }, [expenses, selectedMonth, selectedYear]);
+
+  const monthSuppliesExpense = useMemo(() => {
+    return expenses.reduce((sum, exp) => {
+      const d = new Date(exp.date || Date.now());
+      if (d.getMonth() === selectedMonth && d.getFullYear() === selectedYear) {
+        if (exp.category === 'repuestos_insumos' || exp.category === 'herramientas') {
+          return sum + (Number(exp.amount) || 0);
+        }
+      }
+      return sum;
+    }, 0);
+  }, [expenses, selectedMonth, selectedYear]);
+
   // Total de Costos Fijos
   const totalFixedCosts = Math.max(structuralFixedCosts, monthRegisteredFixedExpenses > 0 ? (structuralFixedCosts + monthRegisteredFixedExpenses) : structuralFixedCosts);
 
@@ -807,17 +844,17 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
               </div>
             </div>
 
-            {/* Costos Fijos Estructurales (Plantilla Mensual) */}
+            {/* Estructura de Gastos: Fijos vs Variables (NK-045 Estilo Solago Residencial) */}
             <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-cyan-600" />
-                    Costos Fijos Estructurales
+                  <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                    <Building2 className="w-5 h-5 text-cyan-600" />
+                    Estructura de Gastos: Fijos vs Variables
                   </h3>
-                  <span className="text-xs text-slate-500">
-                    Total: <strong className="text-slate-900 font-mono">{formatAirPrice(totalFixedCosts, settings.currency_symbol, countryCode)}</strong> / mes
-                  </span>
+                  <p className="text-xs text-slate-500">
+                    Costos fijos recurrentes + servicios variables de {MONTH_NAMES[selectedMonth]} {selectedYear}.
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -825,72 +862,145 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                     setTempFixedCosts({ ...fixedCosts });
                     setShowFixedCostsModal(true);
                   }}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 transition-all cursor-pointer self-start sm:self-auto"
                 >
-                  <Edit3 className="w-3 h-3 text-slate-500" />
-                  <span>Editar Plantilla</span>
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Editar Fijos</span>
                 </button>
               </div>
 
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                  <span className="text-slate-600 flex items-center gap-1.5">
-                    <Building2 className="w-3.5 h-3.5 text-purple-500" />
-                    Arriendo Taller & Bodega:
+              {/* Contenedor 1: GASTOS FIJOS RECURRENTES (BASE MENSUAL) */}
+              <div className="rounded-2xl border border-sky-200/90 bg-sky-50/40 p-4 space-y-2.5">
+                <div className="flex items-center justify-between pb-2 border-b border-sky-100">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-sky-800 flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-sky-600" />
+                    GASTOS FIJOS RECURRENTES (BASE MENSUAL)
                   </span>
-                  <span className="font-mono font-bold text-slate-800">
-                    {formatAirPrice(fixedCosts?.rent || 0, settings.currency_symbol, countryCode)}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                  <span className="text-slate-600 flex items-center gap-1.5">
-                    <CreditCard className="w-3.5 h-3.5 text-emerald-500" />
-                    Nómina & Sueldos Base:
-                  </span>
-                  <span className="font-mono font-bold text-slate-800">
-                    {formatAirPrice(fixedCosts?.salaries || 0, settings.currency_symbol, countryCode)}
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 border border-sky-200">
+                    Se repiten mes a mes
                   </span>
                 </div>
 
-                <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                  <span className="text-slate-600 flex items-center gap-1.5">
-                    <Truck className="w-3.5 h-3.5 text-amber-500" />
-                    Movilización & Combustible Fijo:
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between py-1 border-b border-sky-100/60">
+                    <span className="text-slate-700 flex items-center gap-2">
+                      <span>🏠</span>
+                      <span className="font-medium">Arriendo / Alquiler:</span>
+                    </span>
+                    <DualCurrencyAir amount={fixedCosts?.rent || 0} countryCode={countryCode} fontSize="12.5px" primaryColor="#0f172a" align="right" exchangeRate={financeSettings?.exchange_rate} ufValue={financeSettings?.uf_value} />
+                  </div>
+
+                  <div className="flex items-center justify-between py-1 border-b border-sky-100/60">
+                    <span className="text-slate-700 flex items-center gap-2">
+                      <span>👥</span>
+                      <span className="font-medium">Sueldos y Nómina Fija:</span>
+                    </span>
+                    <DualCurrencyAir amount={fixedCosts?.salaries || 0} countryCode={countryCode} fontSize="12.5px" primaryColor="#0f172a" align="right" exchangeRate={financeSettings?.exchange_rate} ufValue={financeSettings?.uf_value} />
+                  </div>
+
+                  <div className="flex items-center justify-between py-1 border-b border-sky-100/60">
+                    <span className="text-slate-700 flex items-center gap-2">
+                      <span>💻</span>
+                      <span className="font-medium">Software y POS:</span>
+                    </span>
+                    <DualCurrencyAir amount={fixedCosts?.software || 0} countryCode={countryCode} fontSize="12.5px" primaryColor="#0f172a" align="right" exchangeRate={financeSettings?.exchange_rate} ufValue={financeSettings?.uf_value} />
+                  </div>
+
+                  <div className="flex items-center justify-between py-1 border-b border-sky-100/60">
+                    <span className="text-slate-700 flex items-center gap-2">
+                      <span>📢</span>
+                      <span className="font-medium">Publicidad Fija:</span>
+                    </span>
+                    <DualCurrencyAir amount={fixedCosts?.marketing || 0} countryCode={countryCode} fontSize="12.5px" primaryColor="#0f172a" align="right" exchangeRate={financeSettings?.exchange_rate} ufValue={financeSettings?.uf_value} />
+                  </div>
+
+                  <div className="flex items-center justify-between py-1 border-b border-sky-100/60">
+                    <span className="text-slate-700 flex items-center gap-2">
+                      <span>📦</span>
+                      <span className="font-medium">Otros Fijos:</span>
+                    </span>
+                    <DualCurrencyAir amount={(fixedCosts?.transport || 0) + (fixedCosts?.other || 0)} countryCode={countryCode} fontSize="12.5px" primaryColor="#0f172a" align="right" exchangeRate={financeSettings?.exchange_rate} ufValue={financeSettings?.uf_value} />
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 text-xs font-black bg-sky-100/60 px-2.5 py-1.5 rounded-xl text-sky-950">
+                    <span>Subtotal Fijos Base:</span>
+                    <DualCurrencyAir amount={structuralFixedCosts} countryCode={countryCode} fontSize="13px" primaryColor="#0369a1" align="right" exchangeRate={financeSettings?.exchange_rate} ufValue={financeSettings?.uf_value} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Contenedor 2: SERVICIOS PÚBLICOS Y GASTOS VARIABLES */}
+              <div className="rounded-2xl border border-amber-300 bg-amber-50/40 p-4 space-y-2.5">
+                <div className="flex items-center justify-between pb-2 border-b border-amber-100">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-800 flex items-center gap-1.5">
+                    <Flame className="w-3.5 h-3.5 text-amber-600" />
+                    SERVICIOS PÚBLICOS Y GASTOS VARIABLES ({MONTH_NAMES[selectedMonth].toUpperCase()} {selectedYear})
                   </span>
-                  <span className="font-mono font-bold text-slate-800">
-                    {formatAirPrice(fixedCosts?.transport || 0, settings.currency_symbol, countryCode)}
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                    Se rellena mes a mes
                   </span>
                 </div>
 
-                <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                  <span className="text-slate-600 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-pink-500" />
-                    Marketing & Pauta (Google/Meta):
-                  </span>
-                  <span className="font-mono font-bold text-slate-800">
-                    {formatAirPrice(fixedCosts?.marketing || 0, settings.currency_symbol, countryCode)}
-                  </span>
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center justify-between py-1 border-b border-amber-100/60">
+                    <div>
+                      <span className="text-slate-800 font-bold flex items-center gap-1.5">
+                        <Flame className="w-3.5 h-3.5 text-amber-600" />
+                        Servicios Públicos del Mes:
+                      </span>
+                      <span className="text-[10.5px] text-slate-500 block">Luz, agua, gas e internet para {MONTH_NAMES[selectedMonth]} {selectedYear}</span>
+                    </div>
+                    <DualCurrencyAir amount={monthPublicServicesExpense} countryCode={countryCode} fontSize="12.5px" primaryColor="#b45309" align="right" exchangeRate={financeSettings?.exchange_rate} ufValue={financeSettings?.uf_value} />
+                  </div>
+
+                  <div className="flex items-center justify-between py-1 border-b border-amber-100/60">
+                    <div>
+                      <span className="text-slate-800 font-bold flex items-center gap-1.5">
+                        <Truck className="w-3.5 h-3.5 text-amber-600" />
+                        Gasolina & Combustible:
+                      </span>
+                      <span className="text-[10.5px] text-slate-500 block">Combustible y movilidad de camionetas</span>
+                    </div>
+                    <DualCurrencyAir amount={monthFuelExpense} countryCode={countryCode} fontSize="12.5px" primaryColor="#b45309" align="right" exchangeRate={financeSettings?.exchange_rate} ufValue={financeSettings?.uf_value} />
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-slate-800 font-bold">Subtotal Variables del Mes:</span>
+                    <DualCurrencyAir amount={monthVariableExpensesTotal} countryCode={countryCode} fontSize="13px" primaryColor="#92400e" align="right" exchangeRate={financeSettings?.exchange_rate} ufValue={financeSettings?.uf_value} />
+                  </div>
                 </div>
 
-                <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                  <span className="text-slate-600 flex items-center gap-1.5">
-                    <Flame className="w-3.5 h-3.5 text-rose-500" />
-                    Servicios Básicos (Luz/Agua/Net):
-                  </span>
-                  <span className="font-mono font-bold text-slate-800">
-                    {formatAirPrice(fixedCosts?.services || 0, settings.currency_symbol, countryCode)}
-                  </span>
-                </div>
+                {/* Botones Directos de Carga */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExpCategory('servicios_basicos');
+                      setExpDescription(`Servicios públicos ${MONTH_NAMES[selectedMonth]} ${selectedYear}`);
+                      setExpAmount(0);
+                      setExpDate(`${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`);
+                      setShowAddExpenseModal(true);
+                    }}
+                    className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <Plus className="w-4 h-4 stroke-[3]" />
+                    <span>+ Cargar Servicios de {MONTH_NAMES[selectedMonth]} {selectedYear}</span>
+                  </button>
 
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-slate-600 flex items-center gap-1.5">
-                    <Calculator className="w-3.5 h-3.5 text-indigo-500" />
-                    Software, Licencias & Otros:
-                  </span>
-                  <span className="font-mono font-bold text-slate-800">
-                    {formatAirPrice((fixedCosts?.software || 0) + (fixedCosts?.other || 0), settings.currency_symbol, countryCode)}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExpCategory('combustible');
+                      setExpDescription(`Gasolina camionetas ${MONTH_NAMES[selectedMonth]} ${selectedYear}`);
+                      setExpAmount(0);
+                      setExpDate(`${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`);
+                      setShowAddExpenseModal(true);
+                    }}
+                    className="w-full py-2.5 px-3 rounded-xl bg-white border border-amber-300 hover:bg-amber-100/60 text-amber-900 font-bold text-xs shadow-2xs transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <Truck className="w-4 h-4 text-amber-600" />
+                    <span>+ Cargar Gasolina</span>
+                  </button>
                 </div>
               </div>
             </div>

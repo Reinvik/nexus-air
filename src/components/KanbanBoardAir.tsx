@@ -31,6 +31,7 @@ interface KanbanBoardAirProps {
   onOpenInspection: (order: ServiceOrder) => void;
   onUpdateStatus: (orderId: string, status: OrderStatus) => void;
   onOpenReceipt?: (order: ServiceOrder) => void;
+  currentUserProfile?: any;
   searchTerm?: string;
   setSearchTerm?: (val: string) => void;
 }
@@ -73,6 +74,7 @@ export const KanbanBoardAir: React.FC<KanbanBoardAirProps> = ({
   onOpenInspection,
   onUpdateStatus,
   onOpenReceipt,
+  currentUserProfile,
   searchTerm: externalSearchTerm,
   setSearchTerm: setExternalSearchTerm,
 }) => {
@@ -81,6 +83,12 @@ export const KanbanBoardAir: React.FC<KanbanBoardAirProps> = ({
   const setSearchTerm = setExternalSearchTerm || setInternalSearchTerm;
   const [filterType, setFilterType] = useState<string>('all');
   const [filterTech, setFilterTech] = useState<string>('all');
+
+  // NK-047: Detección y simulación de rol técnico para proteger montos confidenciales
+  const userIsTechnician = currentUserProfile?.role === 'tecnico' || currentUserProfile?.role === 'ayudante' || currentUserProfile?.role === 'technician';
+  const [simulatedRole, setSimulatedRole] = useState<'admin' | 'tecnico'>('admin');
+  const effectiveIsTechnician = userIsTechnician || (simulatedRole === 'tecnico');
+  const shouldHideAmounts = effectiveIsTechnician && (settings?.hide_technician_amounts !== false);
 
   // Fechas de referencia
   const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
@@ -420,8 +428,37 @@ export const KanbanBoardAir: React.FC<KanbanBoardAirProps> = ({
           </button>
         </div>
 
-        {/* Derecha: Checkbox de Alcance y Botón Resumen */}
+        {/* Derecha: Selector de Modo (Admin/Técnico), Checkbox de Alcance y Botón Resumen */}
         <div className="flex items-center gap-2 shrink-0">
+          {!userIsTechnician ? (
+            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[11px]">
+              <span className="text-[10px] text-slate-500 font-bold px-1 hidden sm:inline">Vista:</span>
+              <button
+                type="button"
+                onClick={() => setSimulatedRole('admin')}
+                className={`px-1.5 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
+                  simulatedRole === 'admin' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Admin
+              </button>
+              <button
+                type="button"
+                onClick={() => setSimulatedRole('tecnico')}
+                className={`px-1.5 py-0.5 rounded-md font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                  simulatedRole === 'tecnico' ? 'bg-cyan-600 text-white shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                }`}
+                title="Simular visualización como técnico (oculta los precios al cliente)"
+              >
+                <span>🔒 Técnico</span>
+              </button>
+            </div>
+          ) : (
+            <span className="px-2 py-0.5 rounded-lg bg-cyan-50 text-cyan-800 border border-cyan-200 text-[11px] font-bold flex items-center gap-1">
+              <span>👷 Modo Técnico</span>
+            </span>
+          )}
+
           <label className="flex items-center gap-1.5 text-slate-600 cursor-pointer select-none text-[11px]">
             <input
               type="checkbox"
@@ -437,15 +474,17 @@ export const KanbanBoardAir: React.FC<KanbanBoardAirProps> = ({
             </span>
           </label>
 
-          <button
-            type="button"
-            onClick={() => setIsSummaryModalOpen(true)}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold transition-all cursor-pointer text-xs shadow-2xs active:scale-95"
-            title="Abrir resumen y auditoría de productividad diaria de cierres"
-          >
-            <BarChart2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Resumen ({dailyClosures.length}d)</span>
-          </button>
+          {!shouldHideAmounts && (
+            <button
+              type="button"
+              onClick={() => setIsSummaryModalOpen(true)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold transition-all cursor-pointer text-xs shadow-2xs active:scale-95"
+              title="Abrir resumen y auditoría de productividad diaria de cierres"
+            >
+              <BarChart2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Resumen ({dailyClosures.length}d)</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -492,12 +531,14 @@ export const KanbanBoardAir: React.FC<KanbanBoardAirProps> = ({
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between text-emerald-800 font-medium">
-                      <span>Total facturado:</span>
-                      <span className="font-mono font-bold">
-                        {formatAirPrice(completedColRevenue, currencySymbol, countryCode)}
-                      </span>
-                    </div>
+                    {!shouldHideAmounts && (
+                      <div className="flex items-center justify-between text-emerald-800 font-medium">
+                        <span>Total facturado:</span>
+                        <span className="font-mono font-bold">
+                          {formatAirPrice(completedColRevenue, currencySymbol, countryCode)}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Botones de Cambio Rápido */}
                     <div className="pt-1 border-t border-emerald-200 flex items-center justify-between text-[10px]">
@@ -571,6 +612,7 @@ export const KanbanBoardAir: React.FC<KanbanBoardAirProps> = ({
                     <KanbanCardAir
                       key={ord.id}
                       order={ord}
+                      hideAmount={shouldHideAmounts}
                       onEdit={onEditOrder}
                       onOpenInspection={onOpenInspection}
                       onUpdateStatus={onUpdateStatus}

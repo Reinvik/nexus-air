@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Customer, AirEquipment, Technician, ServiceOrder, ServiceType, AirSettings } from '../types';
 import { X, Plus, Calendar, Clock, User, Wrench, UserCheck, Users, Percent, DollarSign, AlertTriangle, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
@@ -42,13 +42,26 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
     };
   }, [isOpen, onClose]);
 
+  // NK-046: Filtrar para que solo salgan técnicos en el selector de técnicos y solo ayudantes en el de ayudantes
+  const availableTechnicians = useMemo(() => 
+    technicians.filter(t => t.role !== 'ayudante'), 
+    [technicians]
+  );
+
   const [customerId, setCustomerId] = useState(customers[0]?.id || '');
   const [equipmentId, setEquipmentId] = useState('');
   const [serviceType, setServiceType] = useState<ServiceType>('mantencion_preventiva');
   const [scheduledDate, setScheduledDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [scheduledSlot, setScheduledSlot] = useState('09:30 - 11:30');
-  const [technicianId, setTechnicianId] = useState(technicians[0]?.id || '');
+  const [technicianId, setTechnicianId] = useState(
+    technicians.find(t => t.role !== 'ayudante')?.id || technicians[0]?.id || ''
+  );
   const [assistantId, setAssistantId] = useState('');
+
+  const availableAssistants = useMemo(() => 
+    technicians.filter(t => t.role === 'ayudante' && t.id !== technicianId), 
+    [technicians, technicianId]
+  );
   const [techPayoutType, setTechPayoutType] = useState<'fixed' | 'percentage'>('fixed');
   const [techPayoutValue, setTechPayoutValue] = useState<number>(20000);
   const [assistantPayoutType, setAssistantPayoutType] = useState<'fixed' | 'percentage'>('fixed');
@@ -405,14 +418,14 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                         className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs focus:border-cyan-500 focus:outline-none"
                         required
                       >
-                        {technicians.length === 0 ? (
+                        {availableTechnicians.length === 0 ? (
                           <option value="" disabled>
-                            ⚠️ Sin técnicos registrados (Crea uno en Técnicos)
+                            ⚠️ Sin técnicos registrados (rol: Técnico)
                           </option>
                         ) : (
-                          technicians.map(t => (
+                          availableTechnicians.map(t => (
                             <option key={t.id} value={t.id}>
-                              {t.name}
+                              {t.name} (Técnico)
                             </option>
                           ))
                         )}
@@ -463,9 +476,9 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                         className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs focus:border-cyan-500 focus:outline-none"
                       >
                         <option value="">Sin ayudante</option>
-                        {technicians.filter(t => t.id !== technicianId).map(t => (
+                        {availableAssistants.map(t => (
                           <option key={t.id} value={t.id}>
-                            {t.name}
+                            {t.name} (Ayudante)
                           </option>
                         ))}
                       </select>

@@ -241,25 +241,49 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
     return map;
   }, [technicians, orders, selectedMonth]);
 
-  // Totales globales del mes
-  const monthGlobalStats = useMemo(() => {
-    let totalCommissions = 0;
-    let totalOrders = 0;
-    let activeWorkers = 0;
-
-    techSettlementMap.forEach(val => {
-      totalCommissions += val.totalCommission;
-      totalOrders += val.completedCount;
-      if (val.completedCount > 0) activeWorkers += 1;
-    });
-
-    return { totalCommissions, totalOrders, activeWorkers };
-  }, [techSettlementMap]);
-
   // Helpers para Liquidación de Honorarios (NK-043)
   const getExistingPayout = (techId: string, month: string) => {
     return (technicianPayouts || []).find(p => p.technician_id === techId && p.period_month === month);
   };
+
+  // Totales globales del mes con cálculo exacto de saldo pendiente vs liquidado (NK-043 fix)
+  const monthGlobalStats = useMemo(() => {
+    let totalCommissions = 0;
+    let totalOrders = 0;
+    let totalLiquidated = 0;
+    let totalPending = 0;
+    let activeWorkers = 0;
+    let pendingWorkers = 0;
+    let liquidatedWorkers = 0;
+
+    techSettlementMap.forEach((val, techId) => {
+      totalCommissions += val.totalCommission;
+      totalOrders += val.completedCount;
+      if (val.completedCount > 0) activeWorkers += 1;
+
+      const existing = getExistingPayout(techId, selectedMonth);
+      if (existing) {
+        totalLiquidated += existing.amount;
+        liquidatedWorkers += 1;
+        const remaining = Math.max(0, val.totalCommission - existing.amount);
+        totalPending += remaining;
+        if (remaining > 0) pendingWorkers += 1;
+      } else {
+        totalPending += val.totalCommission;
+        if (val.totalCommission > 0) pendingWorkers += 1;
+      }
+    });
+
+    return { 
+      totalCommissions, 
+      totalOrders, 
+      totalLiquidated,
+      totalPending,
+      activeWorkers,
+      pendingWorkers,
+      liquidatedWorkers
+    };
+  }, [techSettlementMap, technicianPayouts, selectedMonth]);
 
   const handleOpenLiquidation = (tech: Technician) => {
     const settlement = techSettlementMap.get(tech.id) || { completedCount: 0, totalCommission: 0, services: [] };
@@ -450,25 +474,50 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-            <span className="text-[11px] text-slate-400 block font-medium">Total Comisiones a Liquidar</span>
+            <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium mb-1">
+              <span>Pendiente por Liquidar</span>
+              {monthGlobalStats.totalPending === 0 ? (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Al día
+                </span>
+              ) : (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  {monthGlobalStats.pendingWorkers} pendiente{monthGlobalStats.pendingWorkers !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+            <span className={`text-xl sm:text-2xl font-black font-mono ${
+              monthGlobalStats.totalPending === 0 ? 'text-emerald-400' : 'text-amber-400'
+            }`}>
+              {formatAirPrice(monthGlobalStats.totalPending, currencySymbol, countryCode)}
+            </span>
+          </div>
+
+          <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+            <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium mb-1">
+              <span>Total Ya Liquidado</span>
+              <span className="text-[10px] text-emerald-300/80 font-mono">
+                {monthGlobalStats.liquidatedWorkers} pagado{monthGlobalStats.liquidatedWorkers !== 1 ? 's' : ''}
+              </span>
+            </div>
+            <span className="text-xl sm:text-2xl font-black text-emerald-400 font-mono">
+              {formatAirPrice(monthGlobalStats.totalLiquidated, currencySymbol, countryCode)}
+            </span>
+          </div>
+
+          <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+            <span className="text-[11px] text-slate-400 block font-medium mb-1">Total Comisiones Mes</span>
             <span className="text-xl sm:text-2xl font-black text-cyan-400 font-mono">
               {formatAirPrice(monthGlobalStats.totalCommissions, currencySymbol, countryCode)}
             </span>
           </div>
 
           <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-            <span className="text-[11px] text-slate-400 block font-medium">Servicios Técnicos Realizados</span>
-            <span className="text-xl sm:text-2xl font-black text-emerald-400 font-mono">
-              {monthGlobalStats.totalOrders} órdenes
-            </span>
-          </div>
-
-          <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-            <span className="text-[11px] text-slate-400 block font-medium">Personal con Liquidación Activa</span>
+            <span className="text-[11px] text-slate-400 block font-medium mb-1">Servicios Realizados</span>
             <span className="text-xl sm:text-2xl font-black text-white font-mono">
-              {monthGlobalStats.activeWorkers} colaboradores
+              {monthGlobalStats.totalOrders} órdenes
             </span>
           </div>
         </div>

@@ -44,6 +44,7 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
     city: settings.city || 'Santiago',
     company_slogan: settings.company_slogan || 'Especialistas en Climatización y Refrigeración',
     default_apply_tax: settings.default_apply_tax !== false,
+    hide_technician_amounts: settings.hide_technician_amounts !== false,
     quality_control_days: settings.quality_control_days || 7,
     inactive_recovery_months: settings.inactive_recovery_months || 9,
     pre_expiration_warning_days: settings.pre_expiration_warning_days || 15,
@@ -70,6 +71,7 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
       city: settings.city || 'Santiago',
       company_slogan: settings.company_slogan || 'Especialistas en Climatización y Refrigeración',
       default_apply_tax: settings.default_apply_tax !== false,
+      hide_technician_amounts: settings.hide_technician_amounts !== false,
       quality_control_days: settings.quality_control_days || 7,
       inactive_recovery_months: settings.inactive_recovery_months || 9,
       pre_expiration_warning_days: settings.pre_expiration_warning_days || 15,
@@ -490,6 +492,26 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
                   </span>
                   <span className="block text-[11px] text-slate-400 leading-relaxed">
                     Al desmarcar esta opción, todas las cotizaciones y proformas se generarán como exentas (0%) por omisión, permitiendo activarlo manualmente cuando aplique.
+                  </span>
+                </div>
+              </label>
+            </div>
+
+            {/* Toggle Ocultar montos a técnicos (NK-047) */}
+            <div className="sm:col-span-2 pt-3 border-t border-slate-100">
+              <label className="flex items-start gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={formData.hide_technician_amounts !== false}
+                  onChange={(e) => setFormData(prev => ({ ...prev, hide_technician_amounts: e.target.checked }))}
+                  className="w-4 h-4 text-cyan-600 rounded border-slate-300 focus:ring-cyan-500 cursor-pointer mt-0.5"
+                />
+                <div>
+                  <span className="text-xs font-bold text-slate-800">
+                    🔒 Ocultar montos a cobrar a los técnicos en el tablero (NK-047)
+                  </span>
+                  <span className="block text-[11px] text-slate-400 leading-relaxed">
+                    Protege la privacidad de las tarifas cobradas al cliente, impidiendo que el personal técnico o ayudantes visualicen los precios de las órdenes en el tablero y modales.
                   </span>
                 </div>
               </label>

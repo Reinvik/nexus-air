@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ServiceOrder, Technician, OrderStatus, ServiceType, AirSettings, Customer, AirEquipment } from '../types';
 import { 
   X, 
@@ -41,6 +41,7 @@ interface EditServiceOrderModalProps {
   customers?: Customer[];
   equipments?: AirEquipment[];
   settings?: AirSettings;
+  currentUserProfile?: any;
   onUpdateOrder: (id: string, updates: Partial<ServiceOrder>) => void;
   onDeleteOrder: (id: string) => void;
   onOpenReceipt?: (order: ServiceOrder) => void;
@@ -57,6 +58,7 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
   customers,
   equipments,
   settings,
+  currentUserProfile,
   onUpdateOrder,
   onDeleteOrder,
   onOpenReceipt,
@@ -64,6 +66,9 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
   onAddCustomer,
   onAddEquipment,
 }) => {
+  // NK-047: Ocultar montos a cobrar a los técnicos
+  const isTechnician = currentUserProfile?.role === 'tecnico' || currentUserProfile?.role === 'ayudante' || currentUserProfile?.role === 'technician';
+  const hideFinancialDetails = isTechnician && (settings?.hide_technician_amounts !== false);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -88,9 +93,21 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
   const [equipmentId, setEquipmentId] = useState(order?.equipment_id || '');
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
 
+  // NK-046: Filtrar para que solo salgan técnicos en el selector de técnicos y solo ayudantes en el de ayudantes
+  const availableTechnicians = useMemo(() => 
+    technicians.filter(t => t.role !== 'ayudante' || t.id === order?.assigned_technician_id), 
+    [technicians, order?.assigned_technician_id]
+  );
+
   // Technician & Crew
   const [technicianId, setTechnicianId] = useState(order?.assigned_technician_id || '');
   const [assistantId, setAssistantId] = useState(order?.assigned_assistant_id || '');
+
+  const availableAssistants = useMemo(() => 
+    technicians.filter(t => (t.role === 'ayudante' || t.id === order?.assigned_assistant_id) && t.id !== technicianId), 
+    [technicians, order?.assigned_assistant_id, technicianId]
+  );
+
   const [techPayoutType, setTechPayoutType] = useState<'fixed' | 'percentage'>(order?.technician_payout_type || 'fixed');
   const [techPayoutValue, setTechPayoutValue] = useState<number>(order?.technician_payout_value ?? 20000);
   const [assistantPayoutType, setAssistantPayoutType] = useState<'fixed' | 'percentage'>(order?.assistant_payout_type || 'fixed');
@@ -708,8 +725,8 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                         className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs focus:border-cyan-500 focus:outline-none"
                       >
                         <option value="">Sin asignar</option>
-                        {technicians.map(t => (
-                          <option key={t.id} value={t.id}>{t.name}</option>
+                        {availableTechnicians.map(t => (
+                          <option key={t.id} value={t.id}>{t.name} {t.role === 'ayudante' ? '(Ayudante)' : '(Técnico)'}</option>
                         ))}
                       </select>
                     </div>
@@ -758,8 +775,8 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                         className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs focus:border-cyan-500 focus:outline-none"
                       >
                         <option value="">Sin ayudante</option>
-                        {technicians.filter(t => t.id !== technicianId).map(t => (
-                          <option key={t.id} value={t.id}>{t.name}</option>
+                        {availableAssistants.map(t => (
+                          <option key={t.id} value={t.id}>{t.name} (Ayudante)</option>
                         ))}
                       </select>
                     </div>
@@ -896,65 +913,77 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {/* Total y Desglose de Impuestos */}
-                  <div className="p-4 rounded-xl bg-gradient-to-br from-slate-50 to-blue-50/40 border border-slate-200/90 shadow-xs space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
-                        <DollarSign className="w-4 h-4 text-emerald-600" />
-                        Total Facturado de la Orden
-                      </span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-white border border-slate-200 font-bold text-slate-600 uppercase">
-                        {settings?.country || 'Chile'} • {settings?.currency_code || 'CLP'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <div className="relative flex-1">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
-                          {settings?.currency_symbol || '$'}
-                        </span>
-                        <input
-                          type="number"
-                          value={total}
-                          onChange={(e) => setTotal(parseInt(e.target.value) || 0)}
-                          className="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-900 font-mono font-black text-lg focus:border-cyan-500 focus:outline-none transition-colors"
-                        />
+                  {hideFinancialDetails ? (
+                    <div className="p-4 rounded-xl bg-slate-100 border border-slate-200 shadow-xs space-y-2 flex flex-col justify-center">
+                      <div className="flex items-center gap-2 text-slate-700 font-bold text-xs">
+                        <ShieldCheck className="w-5 h-5 text-cyan-600 shrink-0" />
+                        <span>Montos y Tarifas Protegidos</span>
                       </div>
-
-                      {onOpenReceipt && (
-                        <button
-                          type="button"
-                          onClick={() => onOpenReceipt(order)}
-                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs transition-all cursor-pointer shrink-0 shadow-xs"
-                        >
-                          <FileText className="w-4 h-4 text-emerald-600" />
-                          <span>Comprobante</span>
-                        </button>
-                      )}
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        El monto total a cobrar al cliente y el desglose de IVA están restringidos para el perfil técnico por políticas de privacidad del negocio.
+                      </p>
                     </div>
-
-                    {/* Toggle Aplica IVA y Desglose */}
-                    <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-2 text-xs">
+                  ) : (
+                    <div className="p-4 rounded-xl bg-gradient-to-br from-slate-50 to-blue-50/40 border border-slate-200/90 shadow-xs space-y-3">
                       <div className="flex items-center justify-between">
-                        <label className="font-semibold text-slate-700 flex items-center gap-1.5 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={applyTax}
-                            onChange={(e) => setApplyTax(e.target.checked)}
-                            className="rounded text-cyan-600 focus:ring-cyan-500"
-                          />
-                          <span>Aplica IVA ({Math.round(taxRate * 100)}%)</span>
-                        </label>
-                        <span className="text-[10px] text-slate-400 font-semibold">
-                          {applyTax ? 'Factura con IVA' : 'Boleta Exenta'}
+                        <span className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                          <DollarSign className="w-4 h-4 text-emerald-600" />
+                          Total Facturado de la Orden
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-white border border-slate-200 font-bold text-slate-600 uppercase">
+                          {settings?.country || 'Chile'} • {settings?.currency_code || 'CLP'}
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100 font-mono text-[11px] text-slate-600">
-                        <div>Subtotal Neto: <strong>{settings?.currency_symbol || '$'} {subtotal.toLocaleString()}</strong></div>
-                        <div>IVA ({Math.round(taxRate * 100)}%): <strong>{settings?.currency_symbol || '$'} {tax.toLocaleString()}</strong></div>
+                      <div className="flex items-center gap-3">
+                        <div className="relative flex-1">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
+                            {settings?.currency_symbol || '$'}
+                          </span>
+                          <input
+                            type="number"
+                            value={total}
+                            onChange={(e) => setTotal(parseInt(e.target.value) || 0)}
+                            className="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-900 font-mono font-black text-lg focus:border-cyan-500 focus:outline-none transition-colors"
+                          />
+                        </div>
+
+                        {onOpenReceipt && (
+                          <button
+                            type="button"
+                            onClick={() => onOpenReceipt(order)}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs transition-all cursor-pointer shrink-0 shadow-xs"
+                          >
+                            <FileText className="w-4 h-4 text-emerald-600" />
+                            <span>Comprobante</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Toggle Aplica IVA y Desglose */}
+                      <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <label className="font-semibold text-slate-700 flex items-center gap-1.5 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={applyTax}
+                              onChange={(e) => setApplyTax(e.target.checked)}
+                              className="rounded text-cyan-600 focus:ring-cyan-500"
+                            />
+                            <span>Aplica IVA ({Math.round(taxRate * 100)}%)</span>
+                          </label>
+                          <span className="text-[10px] text-slate-400 font-semibold">
+                            {applyTax ? 'Factura con IVA' : 'Boleta Exenta'}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100 font-mono text-[11px] text-slate-600">
+                          <div>Subtotal Neto: <strong>{settings?.currency_symbol || '$'} {subtotal.toLocaleString()}</strong></div>
+                          <div>IVA ({Math.round(taxRate * 100)}%): <strong>{settings?.currency_symbol || '$'} {tax.toLocaleString()}</strong></div>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Estado de Pago, Método y Referencia */}
                   <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ServiceOrder, AirSettings, TechnicianPayout, formatServiceType } from '../types';
+import { ServiceOrder, AirSettings, TechnicianPayout, Expense, ExpenseCategory, formatServiceType } from '../types';
 import { formatAirPrice } from '../lib/countries';
 import { 
   TrendingUp, 
@@ -25,7 +25,13 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Wallet,
-  Users
+  Users,
+  Plus,
+  Building2,
+  Flame,
+  Truck,
+  Wrench,
+  HelpCircle
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { 
@@ -48,13 +54,24 @@ interface SalesAirProps {
   orders: ServiceOrder[];
   settings?: AirSettings;
   technicianPayouts?: TechnicianPayout[];
+  expenses?: Expense[];
   onUpdateOrder?: (orderId: string, updates: Partial<ServiceOrder>) => void;
+  onAddExpense?: (data: Omit<Expense, 'id' | 'created_at'>) => void;
+  onDeleteExpense?: (id: string) => void;
 }
 
 type DatePreset = 'all' | 'today' | 'yesterday' | 'this_week' | 'last_week' | 'this_month' | 'last_30_days' | 'custom';
 type ProgressViewMode = 'weekly' | 'daily';
 
-export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings, technicianPayouts = [], onUpdateOrder }) => {
+export const SalesAir: React.FC<SalesAirProps> = ({ 
+  orders, 
+  settings, 
+  technicianPayouts = [], 
+  expenses = [],
+  onUpdateOrder,
+  onAddExpense,
+  onDeleteExpense
+}) => {
   const currencySymbol = settings?.currency_symbol || '₡';
   const countryCode = settings?.country_code || 'CR';
 
@@ -64,8 +81,19 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings, technician
   const [customEndDate, setCustomEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [progressViewMode, setProgressViewMode] = useState<ProgressViewMode>('weekly');
 
-  // Tab para historial de movimientos (NK-043)
-  const [transactionTab, setTransactionTab] = useState<'todos' | 'ordenes' | 'honorarios'>('todos');
+  // Tab para historial de movimientos con soporte de gastos (NK-045)
+  const [transactionTab, setTransactionTab] = useState<'todos' | 'ordenes' | 'honorarios' | 'gastos'>('todos');
+
+  // Modal para registrar gastos de negocio (Renta, Servicios, Gasolina) (NK-045)
+  const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
+  const [expCategory, setExpCategory] = useState<ExpenseCategory>('combustible');
+  const [expDescription, setExpDescription] = useState('');
+  const [expAmount, setExpAmount] = useState<number>(0);
+  const [expDate, setExpDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [expPaymentMethod, setExpPaymentMethod] = useState('transferencia');
+  const [expSupplier, setExpSupplier] = useState('');
+  const [expInvoiceNumber, setExpInvoiceNumber] = useState('');
+  const [expIsFixed, setExpIsFixed] = useState(false);
 
   // Modal para ver detalle de liquidación de egreso (NK-043)
   const [selectedPayoutForView, setSelectedPayoutForView] = useState<TechnicianPayout | null>(null);
@@ -302,7 +330,57 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings, technician
     });
   }, [technicianPayouts, selectedPreset, customStartDate, customEndDate]);
 
-  // Estadísticas calculadas sobre las órdenes y egresos filtrados (NK-043)
+  // Filtrar egresos operativos del negocio por fecha (NK-045)
+  const filteredExpenses = useMemo(() => {
+    if (!expenses || expenses.length === 0) return [];
+    if (selectedPreset === 'all') return expenses;
+
+    const now = new Date();
+
+    return expenses.filter(e => {
+      if (!e.date) return false;
+      const d = parseISO(e.date);
+      if (!isValid(d)) return false;
+
+      switch (selectedPreset) {
+        case 'today':
+          return isToday(d);
+        case 'yesterday':
+          return isSameDay(d, subDays(now, 1));
+        case 'this_week': {
+          const start = startOfWeek(now, { weekStartsOn: 1 });
+          const end = endOfWeek(now, { weekStartsOn: 1 });
+          return isWithinInterval(d, { start, end });
+        }
+        case 'last_week': {
+          const prevWeek = subWeeks(now, 1);
+          const start = startOfWeek(prevWeek, { weekStartsOn: 1 });
+          const end = endOfWeek(prevWeek, { weekStartsOn: 1 });
+          return isWithinInterval(d, { start, end });
+        }
+        case 'this_month': {
+          const start = startOfMonth(now);
+          const end = endOfMonth(now);
+          return isWithinInterval(d, { start, end });
+        }
+        case 'last_30_days': {
+          const start = subDays(now, 30);
+          return isWithinInterval(d, { start, end: now });
+        }
+        case 'custom': {
+          if (!customStartDate || !customEndDate) return true;
+          const start = parseISO(customStartDate);
+          const end = parseISO(`${customEndDate}T23:59:59`);
+          if (!isValid(start) || !isValid(end)) return true;
+          return isWithinInterval(d, { start, end });
+        }
+        default:
+          return true;
+      }
+    });
+  }, [expenses, selectedPreset, customStartDate, customEndDate]);
+
+  // Estadísticas calculadas sobre las órdenes y egresos filtrados (NK-043 y NK-045)
   const stats = useMemo(() => {
     let totalIngresos = 0;
     let totalCobrado = 0;
@@ -354,7 +432,9 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings, technician
 
     const ticketPromedio = activas > 0 ? Math.round(totalIngresos / activas) : 0;
     const totalHonorariosPagados = filteredPayouts.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
-    const balanceNeto = totalCobrado - totalHonorariosPagados;
+    const totalGastosNegocio = filteredExpenses.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+    const totalEgresosGlobal = totalHonorariosPagados + totalGastosNegocio;
+    const balanceNeto = totalCobrado - totalEgresosGlobal;
 
     return { 
       totalIngresos, 
@@ -370,9 +450,11 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings, technician
       activas,
       ticketPromedio,
       totalHonorariosPagados,
+      totalGastosNegocio,
+      totalEgresosGlobal,
       balanceNeto
     };
-  }, [filteredOrders, filteredPayouts]);
+  }, [filteredOrders, filteredPayouts, filteredExpenses]);
 
   // Agrupamiento Semanal (NK-037)
   const weeklyProgress = useMemo(() => {
@@ -520,10 +602,11 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings, technician
     }
   }, [selectedPreset, customStartDate, customEndDate]);
 
-  // Movimientos unificados de ingresos y egresos (NK-043)
+  // Movimientos unificados de ingresos, honorarios y gastos operativos (NK-043 y NK-045)
   type MovementItem = 
     | { type: 'order'; date: string; data: ServiceOrder }
-    | { type: 'payout'; date: string; data: TechnicianPayout };
+    | { type: 'payout'; date: string; data: TechnicianPayout }
+    | { type: 'expense'; date: string; data: Expense };
 
   const displayedMovements = useMemo<MovementItem[]>(() => {
     const list: MovementItem[] = [];
@@ -545,14 +628,23 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings, technician
         });
       });
     }
+    if (transactionTab === 'todos' || transactionTab === 'gastos') {
+      filteredExpenses.forEach(e => {
+        list.push({
+          type: 'expense',
+          date: e.date || e.created_at?.split('T')[0] || '',
+          data: e
+        });
+      });
+    }
 
     return list.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : 0));
-  }, [transactionTab, filteredOrders, filteredPayouts]);
+  }, [transactionTab, filteredOrders, filteredPayouts, filteredExpenses]);
 
   return (
     <div className="space-y-6">
       {/* Header Principal con Resumen */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-white border border-slate-200/90 shadow-xs">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-5 rounded-2xl bg-white border border-slate-200/90 shadow-xs">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-cyan-50 border border-cyan-200 text-cyan-600 flex items-center justify-center">
             <TrendingUp className="w-5 h-5" />
@@ -567,35 +659,56 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings, technician
               )}
             </div>
             <p className="text-xs text-slate-500">
-              Rendimiento por venta de equipos, mantenimientos e ingresos recurrentes
+              Rendimiento por venta de equipos, mantenimientos, honorarios y gastos de operación
             </p>
           </div>
         </div>
 
-        {/* Resumen de cobros y balance cuadrado (NK-043) */}
+        {/* Resumen de cobros, egresos y balance cuadrado (NK-043 y NK-045) */}
         <div className="flex items-center gap-2 flex-wrap">
           <div className="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-1.5 font-medium">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
             <span>Cobrado: <strong>{formatAirPrice(stats.totalCobrado, currencySymbol, countryCode)}</strong></span>
           </div>
+
           <div className="px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-1.5 font-medium">
             <ArrowDownRight className="w-3.5 h-3.5 text-rose-600" />
-            <span>Honorarios Pagados: <strong>-{formatAirPrice(stats.totalHonorariosPagados, currencySymbol, countryCode)}</strong></span>
+            <span>Honorarios: <strong>-{formatAirPrice(stats.totalHonorariosPagados, currencySymbol, countryCode)}</strong></span>
           </div>
+
+          {stats.totalGastosNegocio > 0 && (
+            <div className="px-3 py-1.5 rounded-xl bg-purple-50 border border-purple-200 text-purple-800 text-xs flex items-center gap-1.5 font-medium">
+              <Building2 className="w-3.5 h-3.5 text-purple-600" />
+              <span>Gastos Negocio: <strong>-{formatAirPrice(stats.totalGastosNegocio, currencySymbol, countryCode)}</strong></span>
+            </div>
+          )}
+
           <div className={`px-3 py-1.5 rounded-xl border text-xs flex items-center gap-1.5 font-bold ${
             stats.balanceNeto >= 0
               ? 'bg-cyan-50 border-cyan-300 text-cyan-900'
               : 'bg-rose-100 border-rose-300 text-rose-900'
           }`}>
             <Wallet className="w-3.5 h-3.5 text-cyan-600" />
-            <span>Balance Neto: <strong>{formatAirPrice(stats.balanceNeto, currencySymbol, countryCode)}</strong></span>
+            <span>Balance Real: <strong>{formatAirPrice(stats.balanceNeto, currencySymbol, countryCode)}</strong></span>
           </div>
-          {stats.totalPendiente > 0 && (
-            <div className="px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-1.5 font-medium">
-              <CreditCard className="w-3.5 h-3.5 text-amber-600" />
-              <span>Por Cobrar: <strong>{formatAirPrice(stats.totalPendiente, currencySymbol, countryCode)}</strong></span>
-            </div>
-          )}
+
+          {/* Botón rápido para registrar gasto del negocio (NK-045) */}
+          <button
+            type="button"
+            onClick={() => {
+              setExpCategory('combustible');
+              setExpDescription('');
+              setExpAmount(0);
+              setExpSupplier('');
+              setExpInvoiceNumber('');
+              setIsAddExpenseModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer shrink-0"
+            title="Registrar gastos de negocio como renta, gasolina o servicios"
+          >
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>+ Registrar Gasto</span>
+          </button>
         </div>
       </div>
 
@@ -1048,7 +1161,7 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings, technician
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                Todos ({filteredOrders.length + filteredPayouts.length})
+                Todos ({filteredOrders.length + filteredPayouts.length + filteredExpenses.length})
               </button>
               <button
                 type="button"
@@ -1070,7 +1183,19 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings, technician
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                Honorarios Técnicos ({filteredPayouts.length})
+                Honorarios ({filteredPayouts.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTransactionTab('gastos')}
+                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+                  transactionTab === 'gastos'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>Gastos Negocio</span>
+                <span className="font-mono">({filteredExpenses.length})</span>
               </button>
             </div>
 
@@ -1191,62 +1316,131 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings, technician
                   }
 
                   // Renderizar Egreso de Liquidación a Técnico (NK-043)
-                  const p = item.data;
-                  return (
-                    <tr key={`pay-${p.id}`} className="hover:bg-rose-50/40 bg-rose-50/15 transition-colors">
-                      <td className="py-3 px-4 font-mono font-bold">
-                        <span className="px-2 py-0.5 rounded text-[10px] bg-rose-100 text-rose-800 border border-rose-200">
-                          {p.payout_number}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                          <Users className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                          <span>{p.technician_name}</span>
-                        </div>
-                        <div className="text-[10px] text-slate-400 capitalize">
-                          {p.technician_role} • Período {p.period_month}
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 text-rose-800 border border-rose-200">
-                          EGRESO • Liquidación Honorarios
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 font-mono text-slate-600">{p.payment_date}</td>
-                      <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          Liquidado
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="space-y-0.5">
-                          <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 capitalize">
-                            Pagado ({p.payment_method})
+                  if (item.type === 'payout') {
+                    const p = item.data;
+                    return (
+                      <tr key={`pay-${p.id}`} className="hover:bg-rose-50/40 bg-rose-50/15 transition-colors">
+                        <td className="py-3 px-4 font-mono font-bold">
+                          <span className="px-2 py-0.5 rounded text-[10px] bg-rose-100 text-rose-800 border border-rose-200">
+                            {p.payout_number}
                           </span>
-                          {p.payment_reference && (
-                            <div className="text-[9px] font-mono text-slate-500 font-medium truncate max-w-[120px]" title={p.payment_reference}>
-                              Ref: {p.payment_reference}
-                            </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                            <Users className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                            <span>{p.technician_name}</span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 capitalize">
+                            {p.technician_role} • Período {p.period_month}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 text-rose-800 border border-rose-200">
+                            EGRESO • Liquidación Honorarios
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 font-mono text-slate-600">{p.payment_date}</td>
+                        <td className="py-3 px-4">
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Liquidado
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="space-y-0.5">
+                            <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 capitalize">
+                              Pagado ({p.payment_method})
+                            </span>
+                            {p.payment_reference && (
+                              <div className="text-[9px] font-mono text-slate-500 font-medium truncate max-w-[120px]" title={p.payment_reference}>
+                                Ref: {p.payment_reference}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-black text-sm text-rose-600">
+                          -{formatAirPrice(p.amount, currencySymbol, countryCode)}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPayoutForView(p)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-all shadow-2xs cursor-pointer"
+                            title="Ver detalle y comprobante de la liquidación de honorarios"
+                          >
+                            <Receipt className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Ver Egreso</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  // Renderizar Gasto del Negocio (Renta, Servicios, Gasolina, etc.) (NK-045)
+                  if (item.type === 'expense') {
+                    const exp = item.data;
+                    return (
+                      <tr key={`exp-${exp.id}`} className="hover:bg-purple-50/40 bg-purple-50/15 transition-colors">
+                        <td className="py-3 px-4 font-mono font-bold">
+                          <span className="px-2 py-0.5 rounded text-[10px] bg-purple-100 text-purple-800 border border-purple-200">
+                            {exp.invoice_number || `EXP-${exp.id.slice(0, 6)}`}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                            {exp.category === 'arriendo' ? <Building2 className="w-3.5 h-3.5 text-purple-600 shrink-0" /> :
+                             exp.category === 'combustible' ? <Truck className="w-3.5 h-3.5 text-amber-600 shrink-0" /> :
+                             exp.category === 'servicios_basicos' ? <Flame className="w-3.5 h-3.5 text-rose-600 shrink-0" /> :
+                             <Wrench className="w-3.5 h-3.5 text-cyan-600 shrink-0" />}
+                            <span>{exp.supplier || exp.description}</span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 capitalize">
+                            {exp.category === 'arriendo' ? 'Renta / Arriendo' :
+                             exp.category === 'combustible' ? 'Gasolina / Combustible' :
+                             exp.category === 'servicios_basicos' ? 'Servicios Básicos' :
+                             exp.category.replace('_', ' ')}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-800 border border-purple-200">
+                            GASTO • {exp.description}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 font-mono text-slate-600">{exp.date}</td>
+                        <td className="py-3 px-4">
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Registrado
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 capitalize">
+                            {exp.status || 'Pagado'} ({exp.payment_method})
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-black text-sm text-purple-600">
+                          -{formatAirPrice(exp.amount, currencySymbol, countryCode)}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          {onDeleteExpense && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm('¿Seguro que deseas eliminar este gasto del negocio?')) {
+                                  onDeleteExpense(exp.id);
+                                  toast.success('Gasto eliminado correctamente');
+                                }
+                              }}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              title="Eliminar gasto"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           )}
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 text-right font-mono font-black text-sm text-rose-600">
-                        -{formatAirPrice(p.amount, currencySymbol, countryCode)}
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedPayoutForView(p)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-all shadow-2xs cursor-pointer"
-                          title="Ver detalle y comprobante de la liquidación de honorarios"
-                        >
-                          <Receipt className="w-3.5 h-3.5 text-rose-600" />
-                          <span>Ver Egreso</span>
-                        </button>
-                      </td>
-                    </tr>
-                  );
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return null;
                 })
               )}
             </tbody>
@@ -1797,6 +1991,231 @@ export const SalesAir: React.FC<SalesAirProps> = ({ orders, settings, technician
                 Cerrar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Registrar Gasto de Negocio (NK-045) */}
+      {isAddExpenseModalOpen && (
+        <div 
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsAddExpenseModalOpen(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg bg-white border border-slate-200 rounded-3xl shadow-2xl p-6 text-slate-900 cursor-default animate-in fade-in zoom-in-95 duration-150 space-y-4"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm text-slate-900">Registrar Gasto del Negocio (NK-045)</h3>
+                  <p className="text-[11px] text-slate-500">Renta, servicios, gasolina, insumos y otros egresos</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddExpenseModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Presets Rápidos */}
+            <div>
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                Rubros Principales
+              </label>
+              <div className="grid grid-cols-3 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExpCategory('arriendo');
+                    setExpDescription('Renta / Arriendo Taller');
+                  }}
+                  className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    expCategory === 'arriendo'
+                      ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>🏠 Renta</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExpCategory('combustible');
+                    setExpDescription('Gasolina / Combustible');
+                  }}
+                  className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    expCategory === 'combustible'
+                      ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>⛽ Gasolina</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExpCategory('servicios_basicos');
+                    setExpDescription('Luz, Agua, Gas o Internet');
+                  }}
+                  className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    expCategory === 'servicios_basicos'
+                      ? 'bg-cyan-600 text-white border-cyan-600 shadow-xs'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>⚡ Servicios</span>
+                </button>
+              </div>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!expAmount || expAmount <= 0) {
+                  toast.error('El monto debe ser mayor a 0');
+                  return;
+                }
+                if (!expDescription.trim()) {
+                  toast.error('Indica una descripción del gasto');
+                  return;
+                }
+                if (onAddExpense) {
+                  onAddExpense({
+                    category: expCategory,
+                    description: expDescription.trim(),
+                    amount: expAmount,
+                    date: expDate,
+                    payment_method: expPaymentMethod,
+                    supplier: expSupplier.trim() || undefined,
+                    invoice_number: expInvoiceNumber.trim() || undefined,
+                    is_fixed: expIsFixed,
+                    status: 'pagado',
+                  });
+                  toast.success('Gasto del negocio registrado exitosamente');
+                  setIsAddExpenseModalOpen(false);
+                } else {
+                  toast.error('Función de registro no disponible');
+                }
+              }}
+              className="space-y-3 text-xs"
+            >
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Descripción del Gasto *</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Pago de renta mes / Gasolina camioneta 1 / Factura de luz..."
+                  value={expDescription}
+                  onChange={(e) => setExpDescription(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Monto ({currencySymbol}) *</label>
+                  <input
+                    type="number"
+                    value={expAmount || ''}
+                    onChange={(e) => setExpAmount(parseFloat(e.target.value) || 0)}
+                    placeholder="0"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold text-sm focus:bg-white focus:border-cyan-500 focus:outline-none"
+                    required
+                    min="1"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Fecha *</label>
+                  <input
+                    type="date"
+                    value={expDate}
+                    onChange={(e) => setExpDate(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:border-cyan-500 focus:outline-none"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Proveedor / Comercio</label>
+                  <input
+                    type="text"
+                    placeholder="Ej: Arrendador / Gasolinera / Enel"
+                    value={expSupplier}
+                    onChange={(e) => setExpSupplier(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Método de Pago</label>
+                  <select
+                    value={expPaymentMethod}
+                    onChange={(e) => setExpPaymentMethod(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
+                  >
+                    <option value="transferencia">Transferencia Bancaria</option>
+                    <option value="efectivo">Efectivo</option>
+                    <option value="tarjeta_debito">Tarjeta Débito</option>
+                    <option value="tarjeta_credito">Tarjeta Crédito</option>
+                    <option value="otro">Otro</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">N° Boleta / Factura (Opcional)</label>
+                <input
+                  type="text"
+                  placeholder="Ej: FAC-99182"
+                  value={expInvoiceNumber}
+                  onChange={(e) => setExpInvoiceNumber(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:border-cyan-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div>
+                  <span className="font-bold text-slate-800 block text-xs">¿Es Costo Fijo Recurrente?</span>
+                  <span className="text-[11px] text-slate-500">
+                    Marca si este gasto (como la renta) se repite mensualmente en el taller.
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={expIsFixed}
+                  onChange={(e) => setExpIsFixed(e.target.checked)}
+                  className="w-4 h-4 text-cyan-600 rounded cursor-pointer"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsAddExpenseModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
+                >
+                  Guardar Gasto
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
