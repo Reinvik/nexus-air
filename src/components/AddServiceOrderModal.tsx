@@ -74,6 +74,9 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
   );
   const [basePrice, setBasePrice] = useState<number>(45000);
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
+  // NK-053: Mantenimiento Periódico Acordado con el Cliente
+  const [isRecurringConfirmed, setIsRecurringConfirmed] = useState(false);
+  const [recurringFrequencyMonths, setRecurringFrequencyMonths] = useState<number>(6);
 
   const taxRate = settings?.tax_rate !== undefined ? Number(settings.tax_rate) : 0.13;
   const taxRatePercent = Math.round(taxRate * 100);
@@ -202,6 +205,8 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
       total: calculatedFinancials.total,
       apply_tax: applyTax,
       tax_mode: applyTax ? taxMode : 'exempt',
+      is_recurring_confirmed: isRecurringConfirmed,
+      recurring_frequency_months: isRecurringConfirmed ? recurringFrequencyMonths : undefined,
       payment_status: 'pendiente',
     });
 
@@ -387,6 +392,62 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                       </select>
                     </div>
                   </div>
+                </div>
+
+                {/* NK-053: Acuerdo de Mantenimiento Periódico con el Cliente */}
+                <div className={`p-3.5 rounded-xl border transition-all ${
+                  isRecurringConfirmed 
+                    ? 'bg-gradient-to-br from-amber-50 to-orange-50/40 border-amber-300 shadow-xs' 
+                    : 'bg-slate-50 border-slate-200'
+                }`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
+                        isRecurringConfirmed ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-600'
+                      }`}>
+                        ⭐
+                      </div>
+                      <div>
+                        <label htmlFor="recurring-checkbox" className="font-bold text-xs text-slate-900 cursor-pointer block">
+                          Plan Periódico Acordado con el Cliente
+                        </label>
+                        <span className="text-[11px] text-slate-500 block">
+                          El cliente solicitó agendar y recordar este servicio periódicamente.
+                        </span>
+                      </div>
+                    </div>
+                    <input
+                      id="recurring-checkbox"
+                      type="checkbox"
+                      checked={isRecurringConfirmed}
+                      onChange={(e) => setIsRecurringConfirmed(e.target.checked)}
+                      className="w-4 h-4 text-amber-600 rounded cursor-pointer accent-amber-600 shrink-0"
+                    />
+                  </div>
+
+                  {isRecurringConfirmed && (
+                    <div className="mt-3 pt-3 border-t border-amber-200/80 space-y-2.5 animate-fade-in text-xs">
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                          Frecuencia Pactada
+                        </label>
+                        <select
+                          value={recurringFrequencyMonths}
+                          onChange={(e) => setRecurringFrequencyMonths(Number(e.target.value))}
+                          className="w-full p-2 bg-white border border-amber-300 rounded-lg text-slate-900 text-xs font-bold focus:border-amber-500 focus:outline-none"
+                        >
+                          <option value={3}>Cada 3 meses (Comercial / Servidores)</option>
+                          <option value={4}>Cada 4 meses (Cuatrimestral)</option>
+                          <option value={6}>Cada 6 meses (Semestral - Habitual)</option>
+                          <option value={12}>Cada 12 meses (Anual)</option>
+                        </select>
+                      </div>
+                      <div className="p-2 bg-amber-100/70 rounded-lg border border-amber-200 text-amber-950 font-medium text-[11px] flex items-center justify-between">
+                        <span>Próximo contacto acordado:</span>
+                        <span className="font-bold font-mono text-xs">+ {recurringFrequencyMonths} meses</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Descripción / Síntomas */}

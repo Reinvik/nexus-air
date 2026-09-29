@@ -13,7 +13,8 @@ import {
   TechnicianPayout,
   FixedCosts,
   Expense,
-  FinanceSettings
+  FinanceSettings,
+  RecurringMaintenanceSchedule
 } from '../types';
 import { 
   INITIAL_SETTINGS, 
@@ -24,7 +25,8 @@ import {
   INITIAL_SERVICE_ORDERS,
   INITIAL_FIXED_COSTS,
   INITIAL_EXPENSES,
-  INITIAL_FINANCE_SETTINGS
+  INITIAL_FINANCE_SETTINGS,
+  INITIAL_RECURRING_SCHEDULES
 } from '../lib/mockAirData';
 import { addDays, differenceInDays, format, parseISO } from 'date-fns';
 import { toast } from 'react-hot-toast';
@@ -174,6 +176,30 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       return {};
     }
   });
+
+  // NK-053: Mantenimientos Periódicos Acordados con el Cliente
+  const [recurringSchedules, setRecurringSchedules] = useState<RecurringMaintenanceSchedule[]>(() => {
+    try {
+      const saved = localStorage.getItem(`nexus_air_recurring_schedules_${companyId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+      if (isMockCompany) return INITIAL_RECURRING_SCHEDULES;
+    } catch (e) {
+      console.warn('Error reading recurring schedules from localStorage:', e);
+    }
+    return isMockCompany ? INITIAL_RECURRING_SCHEDULES : [];
+  });
+
+  // Persistir mantenimientos periódicos acordados localmente
+  useEffect(() => {
+    try {
+      localStorage.setItem(`nexus_air_recurring_schedules_${companyId}`, JSON.stringify(recurringSchedules));
+    } catch (e) {
+      console.warn('Error saving recurring schedules:', e);
+    }
+  }, [recurringSchedules, companyId]);
 
   // Guardar recordatorios contactados en localStorage
   useEffect(() => {
@@ -1286,12 +1312,52 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       subtotal: subtotal ?? 0,
       tax: tax ?? 0,
       total: total ?? 0,
+      apply_tax: (orderData as any).apply_tax ?? true,
+      tax_mode: (orderData as any).tax_mode || 'included',
+      is_recurring_confirmed: orderData.is_recurring_confirmed || false,
+      recurring_frequency_months: orderData.recurring_frequency_months,
+      recurring_schedule_id: orderData.recurring_schedule_id,
       payment_status: orderData.payment_status || 'pendiente',
       payment_method: orderData.payment_method || 'efectivo',
       technician_location: orderData.technician_location,
       created_at: format(new Date(), 'yyyy-MM-dd HH:mm'),
       completed_at: orderData.status === 'completado' ? format(new Date(), 'yyyy-MM-dd HH:mm') : undefined
     };
+
+    // NK-053: Si el cliente solicitó mantenimiento periódico acordado y no tiene schedule asociado, registrarlo
+    if (orderData.is_recurring_confirmed && !orderData.recurring_schedule_id && orderData.customer_id) {
+      const cust = customers.find(c => c.id === orderData.customer_id);
+      const eq = equipments.find(e => e.id === orderData.equipment_id);
+      const freq = orderData.recurring_frequency_months || 6;
+      const startDate = orderData.scheduled_date || format(new Date(), 'yyyy-MM-dd');
+      let nextDate = startDate;
+      try {
+        nextDate = format(addDays(parseISO(startDate), freq * 30), 'yyyy-MM-dd');
+      } catch {
+        nextDate = format(addDays(new Date(), freq * 30), 'yyyy-MM-dd');
+      }
+
+      const newRecSchedule: RecurringMaintenanceSchedule = {
+        id: crypto.randomUUID(),
+        company_id: activeId,
+        customer_id: orderData.customer_id,
+        customer_name: cust?.name || 'Cliente',
+        customer_phone: cust?.phone || '',
+        customer_address: cust?.address || '',
+        customer_commune: cust?.commune,
+        equipment_ids: orderData.equipment_id ? [orderData.equipment_id] : [],
+        equipments_summary: eq ? `${eq.brand} ${eq.btu} BTU (${eq.location_in_property})` : 'Equipos de climatización',
+        frequency_months: freq,
+        start_date: startDate,
+        next_suggested_date: nextDate,
+        preferred_time_slot: orderData.scheduled_time_slot,
+        preferred_technician_id: orderData.assigned_technician_id,
+        notes: `Acordado en orden ${ticketNumber}`,
+        status: 'programado',
+        created_at: new Date().toISOString()
+      };
+      setRecurringSchedules(prev => [newRecSchedule, ...prev]);
+    }
 
     setOrders(prev => [newOrder, ...prev]);
     toast.success(`Orden ${ticketNumber} creada`);
@@ -1399,6 +1465,130 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     const cleanPhone = reminder.customer_phone.replace(/[^0-9]/g, '');
     return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
   }, [settings.whatsapp_template_recaptacion]);
+
+  // NK-053: Métodos de Mantenimientos Periódicos Acordados con el Cliente
+  const addRecurringSchedule = useCallback(async (data: Omit<RecurringMaintenanceSchedule, 'id' | 'created_at'>): Promise<RecurringMaintenanceSchedule> => {
+    const activeId = companyId || DEFAULT_COMPANY_ID;
+    const newId = crypto.randomUUID();
+    const newSchedule: RecurringMaintenanceSchedule = {
+      ...data,
+      id: newId,
+      company_id: activeId,
+      created_at: new Date().toISOString(),
+      status: data.status || 'programado'
+    };
+
+    setRecurringSchedules(prev => [newSchedule, ...prev]);
+    toast.success(`Plan periódico registrado para ${data.customer_name}`);
+    return newSchedule;
+  }, [companyId]);
+
+  const updateRecurringSchedule = useCallback(async (id: string, updates: Partial<RecurringMaintenanceSchedule>) => {
+    setRecurringSchedules(prev => prev.map(s => s.id === id ? { ...s, ...updates, updated_at: new Date().toISOString() } : s));
+    toast.success('Acuerdo periódico actualizado');
+  }, []);
+
+  const deleteRecurringSchedule = useCallback(async (id: string) => {
+    setRecurringSchedules(prev => prev.filter(s => s.id !== id));
+    toast.success('Acuerdo periódico eliminado');
+  }, []);
+
+  const confirmAndScheduleRecurringOrder = useCallback(async (
+    scheduleId: string,
+    scheduledDate: string,
+    scheduledSlot: string,
+    technicianId?: string,
+    customPrice?: number
+  ): Promise<ServiceOrder | null> => {
+    const schedule = recurringSchedules.find(s => s.id === scheduleId);
+    if (!schedule) {
+      toast.error('No se encontró el acuerdo periódico');
+      return null;
+    }
+
+    const price = customPrice || settings.standard_maintenance_price || 45000;
+    const taxRate = settings?.tax_rate !== undefined ? Number(settings.tax_rate) : 0.19;
+    const isTaxApplied = settings?.default_apply_tax !== false;
+    const taxMode = settings?.default_tax_mode || 'included';
+
+    let subtotal = price;
+    let tax = 0;
+    let total = price;
+
+    if (isTaxApplied) {
+      if (taxMode === 'plus') {
+        tax = Math.round(price * taxRate);
+        total = price + tax;
+      } else {
+        total = price;
+        subtotal = Math.round(total / (1 + taxRate));
+        tax = total - subtotal;
+      }
+    }
+
+    // Crear la orden de servicio en el calendario
+    const newOrder = await addOrder({
+      customer_id: schedule.customer_id,
+      equipment_id: schedule.equipment_ids[0] || undefined,
+      service_type: 'mantencion_preventiva',
+      status: 'ingresado',
+      scheduled_date: scheduledDate,
+      scheduled_time_slot: scheduledSlot,
+      assigned_technician_id: technicianId || schedule.preferred_technician_id,
+      is_recurring_confirmed: true,
+      recurring_frequency_months: schedule.frequency_months,
+      recurring_schedule_id: schedule.id,
+      description: `Mantenimiento periódico acordado (${schedule.equipments_summary}). Frecuencia cada ${schedule.frequency_months} meses. ${schedule.notes ? 'Nota: ' + schedule.notes : ''}`,
+      items: [
+        {
+          id: `it-${Date.now()}`,
+          description: `Mantenimiento periódico preventivo (${schedule.equipments_summary})`,
+          quantity: 1,
+          unit_price: total,
+          total: total,
+          type: 'servicio'
+        }
+      ],
+      subtotal,
+      tax,
+      total,
+      apply_tax: isTaxApplied,
+      tax_mode: isTaxApplied ? taxMode : 'exempt',
+      payment_status: 'pendiente'
+    });
+
+    // Actualizar el estado del acuerdo periódico
+    setRecurringSchedules(prev => prev.map(s => {
+      if (s.id === scheduleId) {
+        return {
+          ...s,
+          status: 'confirmado_agendado',
+          confirmed_date: scheduledDate,
+          associated_order_id: newOrder.id,
+          updated_at: new Date().toISOString()
+        };
+      }
+      return s;
+    }));
+
+    toast.success(`Visita confirmada y agendada para el ${scheduledDate}`);
+    return newOrder;
+  }, [recurringSchedules, settings, addOrder]);
+
+  const generateWhatsAppRecurringUrl = useCallback((schedule: RecurringMaintenanceSchedule) => {
+    let template = settings.whatsapp_template_recurring_confirmation || 
+      'Hola {cliente}, le saludamos de {empresa}. Le recordamos que según lo acordado tenemos programado el mantenimiento periódico de sus equipos de aire acondicionado ({equipos}) para estas fechas. Nos comunicamos para coordinar con usted el día y bloque horario que le resulte más conveniente para la visita del técnico. ¿Le acomoda agendar esta semana?';
+
+    const companyName = settings.fantasy_name || settings.company_name || 'Nexus Air';
+    let text = template
+      .replace(/{cliente}/g, schedule.customer_name)
+      .replace(/{empresa}/g, companyName)
+      .replace(/{equipos}/g, schedule.equipments_summary)
+      .replace(/{fecha}/g, schedule.confirmed_date || schedule.next_suggested_date);
+
+    const cleanPhone = schedule.customer_phone.replace(/[^0-9]/g, '');
+    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
+  }, [settings.whatsapp_template_recurring_confirmation, settings.fantasy_name, settings.company_name]);
 
   // Acciones de Clientes
   const addCustomer = useCallback(async (custData: Omit<Customer, 'id' | 'created_at'>) => {
@@ -2164,6 +2354,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     rawOrders: orders,
     technicianPayouts,
     reminders,
+    recurringSchedules, // NK-053: Mantenimientos Periódicos Acordados
     settings,
     fixedCosts,
     expenses,
@@ -2181,6 +2372,11 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     markReminderContacted,
     scheduleReminderService,
     generateWhatsAppUrl,
+    addRecurringSchedule, // NK-053
+    updateRecurringSchedule, // NK-053
+    deleteRecurringSchedule, // NK-053
+    confirmAndScheduleRecurringOrder, // NK-053
+    generateWhatsAppRecurringUrl, // NK-053
     addCustomer,
     updateCustomer,
     deleteCustomer,

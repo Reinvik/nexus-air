@@ -7,7 +7,8 @@ import {
   AirSettings,
   FixedCosts,
   Expense,
-  FinanceSettings
+  FinanceSettings,
+  RecurringMaintenanceSchedule
 } from '../types';
 import { subMonths, subDays, addDays, format } from 'date-fns';
 
@@ -44,6 +45,7 @@ export const INITIAL_SETTINGS: AirSettings = {
   whatsapp_template_agendamiento: 'Estimado/a {cliente}, tu servicio técnico para {tipo_servicio} ha sido programado para el día {fecha} en el bloque {hora}. El técnico asignado es {tecnico}.',
   whatsapp_template_terminado: 'Estimado/a {cliente}, el servicio de {tipo_servicio} para tu equipo {marca} ha finalizado con éxito. Tu salto térmico medido fue de {delta_t}°C y presiones en norma. Tu próximo mantenimiento preventivo está programada para dentro de 6 meses ({proxima_fecha}). ¡Gracias por confiar en Nexus Air!',
   whatsapp_template_cobro: 'Hola {cliente}, le saludamos de {empresa}. Le recordamos que mantiene un saldo pendiente de {saldo} por el servicio {servicio} (Folio {ticket}).\n\nDatos de transferencia:\nBanco: {banco}\nTipo de Cuenta: {tipo_cuenta}\nN° de Cuenta: {numero_cuenta}\nTitular / RUT: {rut}\nEmail de confirmación: {email}\n\nAgradecemos remitir su comprobante a este chat para actualizar su estado de pago. ¡Muchas gracias!',
+  whatsapp_template_recurring_confirmation: 'Hola {cliente}, le saludamos de {empresa}. Le recordamos que según lo acordado tenemos programado el mantenimiento periódico de sus equipos de aire acondicionado ({equipos}) para estas fechas. Nos comunicamos para coordinar con usted el día y bloque horario que le resulte más conveniente para la visita del técnico. ¿Le acomoda agendar esta semana?',
   bank_name: 'Banco de Chile / BAC Credomatic',
   bank_account_type: 'Cuenta Corriente',
   bank_account_number: '00-12345-67',
@@ -621,3 +623,44 @@ export const INITIAL_EXPENSES: Expense[] = [
     created_at: format(subMonths(today, 1), 'yyyy-MM-dd 12:00'),
   },
 ];
+
+// NK-053: Mantenimientos Periódicos Acordados con Clientes (Distinto a recaptación fría)
+export const INITIAL_RECURRING_SCHEDULES: RecurringMaintenanceSchedule[] = [
+  {
+    id: 'rec-1',
+    customer_id: 'cust-1',
+    customer_name: 'Carolina Baeza Donoso',
+    customer_phone: '+56 9 9876 5432',
+    customer_address: 'Av. Vitacura 4520, Depto 601',
+    customer_commune: 'Vitacura',
+    equipment_ids: ['eq-1', 'eq-5'],
+    equipments_summary: '2 Aires Split (Living Anwo 12k + Dormitorio Clark 9k)',
+    frequency_months: 6,
+    start_date: format(subMonths(today, 6), 'yyyy-MM-dd'),
+    next_suggested_date: format(addDays(today, 5), 'yyyy-MM-dd'), // Faltan 5 días -> POR CONFIRMAR FECHA
+    preferred_time_slot: '09:00 - 11:00',
+    preferred_technician_id: 'tech-1',
+    notes: 'Cliente acordó formalmente recordar cada 6 meses. Avisar con 5 a 7 días de anticipación para coordinar conserjería.',
+    status: 'por_confirmar',
+    created_at: format(subMonths(today, 6), 'yyyy-MM-dd 10:00'),
+  },
+  {
+    id: 'rec-2',
+    customer_id: 'cust-2',
+    customer_name: 'Inversiones & Cowork El Golf Ltda',
+    customer_phone: '+56 9 8765 1234',
+    customer_address: 'Apoquindo 3000, Piso 8',
+    customer_commune: 'Las Condes',
+    equipment_ids: ['eq-2'],
+    equipments_summary: '1 Aire Split Midea 18k (Oficina Central / Juntas)',
+    frequency_months: 3,
+    start_date: format(subMonths(today, 1), 'yyyy-MM-dd'),
+    next_suggested_date: format(addDays(today, 45), 'yyyy-MM-dd'), // Faltan 45 días -> PROGRAMADO
+    preferred_time_slot: '17:00 - 19:00',
+    preferred_technician_id: 'tech-2',
+    notes: 'Mantenimiento trimestral pactado en contrato coworking. Coordinar horario vespertino.',
+    status: 'programado',
+    created_at: format(subMonths(today, 1), 'yyyy-MM-dd 15:30'),
+  },
+];
+

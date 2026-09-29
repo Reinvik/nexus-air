@@ -224,6 +224,9 @@ export interface ServiceOrder {
   total: number;
   apply_tax?: boolean; // NK-039: IVA Seleccionable
   tax_mode?: 'included' | 'plus' | 'exempt'; // NK-050: Modalidad de IVA (incluido, adicional o exento)
+  is_recurring_confirmed?: boolean; // NK-053: Mantenimiento Periódico Acordado con el Cliente
+  recurring_frequency_months?: number; // NK-053: Periodicidad pactada (3, 6, 12 meses)
+  recurring_schedule_id?: string; // NK-053: Vínculo al acuerdo periódico
   payment_status: 'pendiente' | 'pagado' | 'abono';
   payment_method?: 'transferencia' | 'efectivo' | 'tarjeta' | 'webpay';
   payment_reference?: string; // NK-041: N° de Referencia de pago
@@ -272,6 +275,31 @@ export interface RecaptacionReminder {
   status: 'al_dia' | 'por_vencer' | 'vencido' | 'contactado' | 'reagendado';
   contacted_at?: string;
   notes?: string;
+}
+
+// NK-053: Mantenimiento Periódico Acordado con el Cliente (Lógica separada de recaptación fría)
+export interface RecurringMaintenanceSchedule {
+  id: string;
+  company_id?: string;
+  customer_id: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_address: string;
+  customer_commune?: string;
+  equipment_ids: string[];
+  equipments_summary: string;
+  frequency_months: number; // 3, 6, 12 meses (por defecto 6)
+  start_date: string; // YYYY-MM-DD
+  next_suggested_date: string; // YYYY-MM-DD (fecha tentativa estimada)
+  confirmed_date?: string; // YYYY-MM-DD (fecha fijada con el cliente)
+  preferred_time_slot?: string;
+  preferred_technician_id?: string;
+  notes?: string;
+  status: 'programado' | 'por_confirmar' | 'confirmado_agendado' | 'pausado';
+  last_notified_at?: string;
+  associated_order_id?: string;
+  created_at: string;
+  updated_at?: string;
 }
 
 export interface ThermalCalculationInput {
@@ -332,6 +360,7 @@ export interface AirSettings {
   whatsapp_template_agendamiento: string;
   whatsapp_template_terminado: string;
   whatsapp_template_cobro?: string; // NK-044: Plantilla recordatorio de cobro / pago
+  whatsapp_template_recurring_confirmation?: string; // NK-053: Confirmación de mantenimiento acordado
   bank_name?: string;               // NK-044: Banco receptor
   bank_account_type?: string;       // NK-044: Tipo de cuenta (Corriente, Vista, Ahorro, etc.)
   bank_account_number?: string;     // NK-044: N° de cuenta

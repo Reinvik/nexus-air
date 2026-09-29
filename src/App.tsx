@@ -83,7 +83,13 @@ export default function App() {
     addExpense,
     updateExpense,
     deleteExpense,
-    updateFinanceSettings
+    updateFinanceSettings,
+    recurringSchedules,
+    addRecurringSchedule,
+    updateRecurringSchedule,
+    deleteRecurringSchedule,
+    confirmAndScheduleRecurringOrder,
+    generateWhatsAppRecurringUrl
   } = useAirStore(effectiveCompanyId);
 
   // Tenant slug detection (ej: ?t=nexus-air)
@@ -458,8 +464,17 @@ export default function App() {
           <AgendaAir
             orders={orders}
             technicians={technicians}
+            customers={customers}
+            equipments={equipments}
+            settings={settings}
+            recurringSchedules={recurringSchedules}
             onOpenNewOrder={() => setIsAddOrderModalOpen(true)}
             onSelectOrder={handleOpenEdit}
+            onAddRecurringSchedule={addRecurringSchedule}
+            onUpdateRecurringSchedule={updateRecurringSchedule}
+            onDeleteRecurringSchedule={deleteRecurringSchedule}
+            onConfirmAndScheduleRecurringOrder={confirmAndScheduleRecurringOrder}
+            onGenerateWhatsAppRecurringUrl={generateWhatsAppRecurringUrl}
           />
         )}
 
