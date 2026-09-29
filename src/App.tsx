@@ -92,11 +92,16 @@ export default function App() {
     generateWhatsAppRecurringUrl
   } = useAirStore(effectiveCompanyId);
 
-  // Tenant slug detection (ej: ?t=nexus-air)
+  // Tenant slug detection (ej: ?t=nexus-air o dominio personalizado www.venefrio.com)
   const [tenantSlug] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      return params.get('t');
+      const querySlug = params.get('t');
+      if (querySlug) return querySlug;
+
+      const host = window.location.hostname.toLowerCase();
+      if (host.includes('venefrio')) return 'venefrio';
+      if (host.includes('shaddai')) return 'shaddai-air';
     }
     return null;
   });
@@ -156,10 +161,15 @@ export default function App() {
   const [view, setView] = useState<MainView>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('t')) return 'tenant_landing';
       if (params.get('rut') || params.get('p') || params.get('view') === 'customer') return 'customer';
       if (params.get('view') === 'login') return 'login';
       if (params.get('view') === 'dashboard') return 'dashboard';
+      if (params.get('t')) return 'tenant_landing';
+
+      const host = window.location.hostname.toLowerCase();
+      if (host.includes('venefrio') || host.includes('shaddai')) {
+        return 'tenant_landing';
+      }
     }
     const saved = localStorage.getItem('nexus_air_view');
     return (saved as MainView) || 'landing';
