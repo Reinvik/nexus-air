@@ -501,6 +501,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
             default_apply_tax: localSaved?.default_apply_tax !== undefined 
               ? localSaved.default_apply_tax 
               : (dbSettings.default_apply_tax !== undefined ? dbSettings.default_apply_tax : (prev.default_apply_tax !== false)),
+            default_tax_mode: localSaved?.default_tax_mode || dbSettings.default_tax_mode || prev.default_tax_mode || 'included',
             maintenance_interval_months: dbSettings.maintenance_interval_months !== null && dbSettings.maintenance_interval_months !== undefined
               ? Number(dbSettings.maintenance_interval_months)
               : (localSaved?.maintenance_interval_months ?? prev.maintenance_interval_months ?? 6),
@@ -1815,6 +1816,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       if (updates.company_slogan !== undefined) dbUpdates.company_slogan = updates.company_slogan;
       if (updates.city !== undefined) dbUpdates.city = updates.city;
       if (updates.default_apply_tax !== undefined) dbUpdates.default_apply_tax = updates.default_apply_tax;
+      if (updates.default_tax_mode !== undefined) dbUpdates.default_tax_mode = updates.default_tax_mode;
       if (updates.maintenance_interval_months !== undefined) dbUpdates.maintenance_interval_months = updates.maintenance_interval_months;
       if (updates.quality_control_days !== undefined) dbUpdates.quality_control_days = updates.quality_control_days;
       if (updates.inactive_recovery_months !== undefined) dbUpdates.inactive_recovery_months = updates.inactive_recovery_months;

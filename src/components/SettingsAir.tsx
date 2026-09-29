@@ -44,6 +44,7 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
     city: settings.city || 'Santiago',
     company_slogan: settings.company_slogan || 'Especialistas en Climatización y Refrigeración',
     default_apply_tax: settings.default_apply_tax !== false,
+    default_tax_mode: settings.default_tax_mode || 'included',
     hide_technician_amounts: settings.hide_technician_amounts !== false,
     quality_control_days: settings.quality_control_days || 7,
     inactive_recovery_months: settings.inactive_recovery_months || 9,
@@ -71,6 +72,7 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
       city: settings.city || 'Santiago',
       company_slogan: settings.company_slogan || 'Especialistas en Climatización y Refrigeración',
       default_apply_tax: settings.default_apply_tax !== false,
+      default_tax_mode: settings.default_tax_mode || 'included',
       hide_technician_amounts: settings.hide_technician_amounts !== false,
       quality_control_days: settings.quality_control_days || 7,
       inactive_recovery_months: settings.inactive_recovery_months || 9,
@@ -495,6 +497,42 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
                   </span>
                 </div>
               </label>
+            </div>
+
+            {/* Modalidad de cálculo de IVA por defecto (NK-050) */}
+            <div className="sm:col-span-2 pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-bold text-slate-800 block">
+                  Modalidad de cálculo de {formData.tax_name} por omisión (NK-050)
+                </span>
+                <span className="text-[11px] text-slate-400 block">
+                  Define si las nuevas órdenes de servicio calculan el monto como IVA Incluido o como Valor Neto (+ IVA adicional).
+                </span>
+              </div>
+              <div className="inline-flex rounded-lg bg-slate-100 p-1 border border-slate-200 text-xs font-semibold shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, default_tax_mode: 'included' }))}
+                  className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+                    (formData.default_tax_mode || 'included') === 'included'
+                      ? 'bg-cyan-600 text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  IVA Incluido
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, default_tax_mode: 'plus' }))}
+                  className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+                    formData.default_tax_mode === 'plus'
+                      ? 'bg-cyan-600 text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  + IVA Adicional
+                </button>
+              </div>
             </div>
 
             {/* Toggle Ocultar montos a técnicos (NK-047) */}

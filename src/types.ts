@@ -223,6 +223,7 @@ export interface ServiceOrder {
   tax: number;
   total: number;
   apply_tax?: boolean; // NK-039: IVA Seleccionable
+  tax_mode?: 'included' | 'plus' | 'exempt'; // NK-050: Modalidad de IVA (incluido, adicional o exento)
   payment_status: 'pendiente' | 'pagado' | 'abono';
   payment_method?: 'transferencia' | 'efectivo' | 'tarjeta' | 'webpay';
   payment_reference?: string; // NK-041: N° de Referencia de pago
@@ -323,6 +324,7 @@ export interface AirSettings {
   inactive_recovery_months?: number; // NK-038: Meses para recuperación de inactivos (ej: 9 meses)
   pre_expiration_warning_days?: number; // NK-038: Días de aviso de vencimiento (ej: 30 días)
   default_apply_tax?: boolean; // NK-039: IVA Seleccionable por defecto
+  default_tax_mode?: 'included' | 'plus' | 'exempt'; // NK-050: Modalidad de IVA por defecto
   hide_technician_amounts?: boolean; // NK-047: Ocultar montos y tarifas a técnicos en tablero
   standard_maintenance_price: number;
   standard_installation_price: number;

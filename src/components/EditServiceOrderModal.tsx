@@ -122,9 +122,16 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
   const [diagnosis, setDiagnosis] = useState(order?.diagnosis || '');
   const [resolution, setResolution] = useState(order?.resolution || '');
 
-  // Billing & Payment
-  const [total, setTotal] = useState(order?.total || 0);
+  // Billing & Payment (NK-050 & NK-051)
   const [applyTax, setApplyTax] = useState<boolean>(order?.apply_tax ?? true);
+  const [taxMode, setTaxMode] = useState<'included' | 'plus'>(() => 
+    order?.tax_mode === 'plus' ? 'plus' : 'included'
+  );
+  const [baseAmount, setBaseAmount] = useState<number>(() => {
+    if (!order) return 0;
+    if (order.tax_mode === 'plus') return order.subtotal || 0;
+    return order.total || 0;
+  });
   const [paymentStatus, setPaymentStatus] = useState<'pendiente' | 'pagado' | 'abono'>(order?.payment_status || 'pendiente');
   const [paymentMethod, setPaymentMethod] = useState<'transferencia' | 'efectivo' | 'tarjeta' | 'webpay'>(order?.payment_method || 'transferencia');
   const [paymentReference, setPaymentReference] = useState(order?.payment_reference || '');
@@ -156,8 +163,9 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
       setDescription(order.description || '');
       setDiagnosis(order.diagnosis || '');
       setResolution(order.resolution || '');
-      setTotal(order.total || 0);
       setApplyTax(order.apply_tax ?? true);
+      setTaxMode(order.tax_mode === 'plus' ? 'plus' : 'included');
+      setBaseAmount(order.tax_mode === 'plus' ? (order.subtotal || 0) : (order.total || 0));
       setPaymentStatus(order.payment_status || 'pendiente');
       setPaymentMethod(order.payment_method || 'transferencia');
       setPaymentReference(order.payment_reference || '');
@@ -194,10 +202,36 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
   const availableEquipments = equipments?.filter(e => e.customer_id === customerId) || [];
   const selectedEquipment = availableEquipments.find(e => e.id === equipmentId) || (order.equipment_id === equipmentId ? order.equipment : undefined);
 
-  // Financial calculations
-  const taxRate = settings?.tax_rate !== undefined ? Number(settings.tax_rate) : 0.19;
-  const subtotal = applyTax ? Math.round(total / (1 + taxRate)) : total;
-  const tax = applyTax ? (total - subtotal) : 0;
+  // Financial calculations (NK-050)
+  const taxRate = settings?.tax_rate !== undefined ? Number(settings.tax_rate) : 0.13;
+  const taxRatePercent = Math.round(taxRate * 100);
+
+  const calculatedFinancials = useMemo(() => {
+    const amt = baseAmount || 0;
+    if (!applyTax) {
+      return {
+        subtotal: amt,
+        tax: 0,
+        total: amt
+      };
+    }
+    if (taxMode === 'plus') {
+      const subtotal = amt;
+      const tax = Math.round(amt * taxRate);
+      const total = subtotal + tax;
+      return { subtotal, tax, total };
+    } else {
+      // taxMode === 'included'
+      const total = amt;
+      const subtotal = Math.round(total / (1 + taxRate));
+      const tax = total - subtotal;
+      return { subtotal, tax, total };
+    }
+  }, [baseAmount, applyTax, taxMode, taxRate]);
+
+  const subtotal = calculatedFinancials.subtotal;
+  const tax = calculatedFinancials.tax;
+  const total = calculatedFinancials.total;
 
   const calculatedTechPayout = techPayoutType === 'percentage' 
     ? Math.round((total * techPayoutValue) / 100) 
@@ -302,6 +336,7 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
       diagnosis,
       resolution,
       apply_tax: applyTax,
+      tax_mode: applyTax ? taxMode : 'exempt',
       payment_status: paymentStatus,
       payment_method: paymentMethod,
       payment_reference: paymentReference,
@@ -752,8 +787,13 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                       <div className="relative">
                         <input
                           type="number"
-                          value={techPayoutValue}
-                          onChange={(e) => setTechPayoutValue(parseFloat(e.target.value) || 0)}
+                          value={techPayoutValue === 0 ? '' : techPayoutValue}
+                          placeholder="0"
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setTechPayoutValue(val === '' ? 0 : parseFloat(val) || 0);
+                          }}
                           className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs font-mono font-bold focus:border-cyan-500 focus:outline-none"
                         />
                         <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">
@@ -804,8 +844,13 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                         <input
                           disabled={!assistantId}
                           type="number"
-                          value={assistantPayoutValue}
-                          onChange={(e) => setAssistantPayoutValue(parseFloat(e.target.value) || 0)}
+                          value={assistantPayoutValue === 0 ? '' : assistantPayoutValue}
+                          placeholder="0"
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setAssistantPayoutValue(val === '' ? 0 : parseFloat(val) || 0);
+                          }}
                           className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs font-mono font-bold focus:border-cyan-500 focus:outline-none disabled:bg-slate-100 disabled:text-slate-400"
                         />
                         <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">
@@ -925,10 +970,63 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                     </div>
                   ) : (
                     <div className="p-4 rounded-xl bg-gradient-to-br from-slate-50 to-blue-50/40 border border-slate-200/90 shadow-xs space-y-3">
+                      {/* Ticker / Selector de IVA idéntico a Proforma (NK-050) */}
+                      <div className="p-2.5 bg-white/95 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-2 shadow-xs">
+                        <label className="flex items-center gap-2 cursor-pointer font-bold text-xs text-slate-800 select-none">
+                          <input
+                            type="checkbox"
+                            checked={applyTax}
+                            onChange={(e) => setApplyTax(e.target.checked)}
+                            className="w-4 h-4 rounded text-cyan-600 focus:ring-cyan-500 cursor-pointer"
+                          />
+                          <span>Aplicar {settings?.tax_name || 'IVA'} ({taxRatePercent}%)</span>
+                        </label>
+                        <div className="flex items-center gap-2">
+                          {applyTax && (
+                            <div className="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200 text-[11px] font-semibold">
+                              <button
+                                type="button"
+                                onClick={() => setTaxMode('included')}
+                                className={`px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${
+                                  taxMode === 'included'
+                                    ? 'bg-cyan-600 text-white shadow-xs font-bold'
+                                    : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                              >
+                                IVA Incluido
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setTaxMode('plus')}
+                                className={`px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${
+                                  taxMode === 'plus'
+                                    ? 'bg-cyan-600 text-white shadow-xs font-bold'
+                                    : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                              >
+                                + IVA
+                              </button>
+                            </div>
+                          )}
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            applyTax 
+                              ? 'bg-blue-100 text-blue-800 border border-blue-200' 
+                              : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          }`}>
+                            {applyTax ? `Con ${settings?.tax_name || 'IVA'}` : 'Exento (0%)'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Header Monto y Comprobante */}
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
                           <DollarSign className="w-4 h-4 text-emerald-600" />
-                          Total Facturado de la Orden
+                          {applyTax 
+                            ? (taxMode === 'included' 
+                                ? 'Total Facturado (IVA Incluido)' 
+                                : 'Monto Neto (Antes de IVA)')
+                            : 'Monto Total Facturado (Exento)'}
                         </span>
                         <span className="text-[10px] px-2 py-0.5 rounded-md bg-white border border-slate-200 font-bold text-slate-600 uppercase">
                           {settings?.country || 'Chile'} • {settings?.currency_code || 'CLP'}
@@ -942,8 +1040,13 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                           </span>
                           <input
                             type="number"
-                            value={total}
-                            onChange={(e) => setTotal(parseInt(e.target.value) || 0)}
+                            value={baseAmount === 0 ? '' : baseAmount}
+                            placeholder="0"
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setBaseAmount(val === '' ? 0 : Math.max(0, parseInt(val, 10) || 0));
+                            }}
                             className="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-900 font-mono font-black text-lg focus:border-cyan-500 focus:outline-none transition-colors"
                           />
                         </div>
@@ -960,26 +1063,27 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                         )}
                       </div>
 
-                      {/* Toggle Aplica IVA y Desglose */}
-                      <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-2 text-xs">
-                        <div className="flex items-center justify-between">
-                          <label className="font-semibold text-slate-700 flex items-center gap-1.5 cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={applyTax}
-                              onChange={(e) => setApplyTax(e.target.checked)}
-                              className="rounded text-cyan-600 focus:ring-cyan-500"
-                            />
-                            <span>Aplica IVA ({Math.round(taxRate * 100)}%)</span>
-                          </label>
-                          <span className="text-[10px] text-slate-400 font-semibold">
-                            {applyTax ? 'Factura con IVA' : 'Boleta Exenta'}
+                      {/* Desglose Financiero en Vivo */}
+                      <div className="p-2.5 rounded-lg bg-white/80 border border-slate-200/90 text-xs space-y-1">
+                        <div className="flex items-center justify-between text-slate-600 text-[11px]">
+                          <span>Subtotal Neto:</span>
+                          <span className="font-mono font-bold text-slate-800">
+                            {settings?.currency_symbol || '$'} {subtotal.toLocaleString()}
                           </span>
                         </div>
-
-                        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100 font-mono text-[11px] text-slate-600">
-                          <div>Subtotal Neto: <strong>{settings?.currency_symbol || '$'} {subtotal.toLocaleString()}</strong></div>
-                          <div>IVA ({Math.round(taxRate * 100)}%): <strong>{settings?.currency_symbol || '$'} {tax.toLocaleString()}</strong></div>
+                        <div className="flex items-center justify-between text-slate-600 text-[11px]">
+                          <span>{settings?.tax_name || 'IVA'} ({applyTax ? `${taxRatePercent}%` : '0% Exento'}):</span>
+                          <span className={`font-mono font-bold ${applyTax ? 'text-cyan-700' : 'text-emerald-600'}`}>
+                            {applyTax 
+                              ? `${settings?.currency_symbol || '$'} ${tax.toLocaleString()}`
+                              : 'Exento (0%)'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-200 text-slate-900 font-bold text-xs">
+                          <span>Total Facturado a Cobrar:</span>
+                          <span className="font-mono text-emerald-700 text-sm font-black">
+                            {settings?.currency_symbol || '$'} {total.toLocaleString()}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -1039,8 +1143,13 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                         <div className="relative">
                           <input
                             type="number"
-                            value={paidAmount}
-                            onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)}
+                            value={paidAmount === 0 ? '' : paidAmount}
+                            placeholder="0"
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setPaidAmount(val === '' ? 0 : parseFloat(val) || 0);
+                            }}
                             className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono text-xs font-bold focus:border-cyan-500 focus:outline-none"
                           />
                           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-mono font-bold">

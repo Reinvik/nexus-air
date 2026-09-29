@@ -67,8 +67,39 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
   const [assistantPayoutType, setAssistantPayoutType] = useState<'fixed' | 'percentage'>('fixed');
   const [assistantPayoutValue, setAssistantPayoutValue] = useState<number>(10000);
   const [description, setDescription] = useState('');
-  const [totalPrice, setTotalPrice] = useState(45000);
+  // NK-050: Configuración de IVA seleccionable y modalidad (incluido vs + IVA vs exento)
+  const [applyTax, setApplyTax] = useState<boolean>(() => settings?.default_apply_tax !== false);
+  const [taxMode, setTaxMode] = useState<'included' | 'plus'>(() => 
+    settings?.default_tax_mode === 'plus' ? 'plus' : 'included'
+  );
+  const [basePrice, setBasePrice] = useState<number>(45000);
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
+
+  const taxRate = settings?.tax_rate !== undefined ? Number(settings.tax_rate) : 0.13;
+  const taxRatePercent = Math.round(taxRate * 100);
+
+  const calculatedFinancials = useMemo(() => {
+    const amt = basePrice || 0;
+    if (!applyTax) {
+      return {
+        subtotal: amt,
+        tax: 0,
+        total: amt
+      };
+    }
+    if (taxMode === 'plus') {
+      const subtotal = amt;
+      const tax = Math.round(amt * taxRate);
+      const total = subtotal + tax;
+      return { subtotal, tax, total };
+    } else {
+      // taxMode === 'included'
+      const total = amt;
+      const subtotal = Math.round(total / (1 + taxRate));
+      const tax = total - subtotal;
+      return { subtotal, tax, total };
+    }
+  }, [basePrice, applyTax, taxMode, taxRate]);
 
   const handleCustomerCreated = (newCust: Customer, newEq?: AirEquipment) => {
     setCustomerId(newCust.id);
@@ -120,11 +151,11 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
   }, [assistantId, serviceType, technicians]);
 
   const calculatedTechPayout = techPayoutType === 'percentage' 
-    ? Math.round((totalPrice * techPayoutValue) / 100) 
+    ? Math.round((calculatedFinancials.total * techPayoutValue) / 100) 
     : techPayoutValue;
   const calculatedAssistantPayout = assistantId 
     ? (assistantPayoutType === 'percentage' 
-        ? Math.round((totalPrice * assistantPayoutValue) / 100) 
+        ? Math.round((calculatedFinancials.total * assistantPayoutValue) / 100) 
         : assistantPayoutValue)
     : 0;
 
@@ -161,14 +192,16 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
           id: `it-${Date.now()}`,
           description: `Servicio de ${serviceType.replace('_', ' ')}`,
           quantity: 1,
-          unit_price: totalPrice,
-          total: totalPrice,
+          unit_price: calculatedFinancials.total,
+          total: calculatedFinancials.total,
           type: 'servicio',
         }
       ],
-      subtotal: Math.round(totalPrice / (1 + (settings?.tax_rate !== undefined ? Number(settings.tax_rate) : 0.19))),
-      tax: Math.round(totalPrice - (totalPrice / (1 + (settings?.tax_rate !== undefined ? Number(settings.tax_rate) : 0.19)))),
-      total: totalPrice,
+      subtotal: calculatedFinancials.subtotal,
+      tax: calculatedFinancials.tax,
+      total: calculatedFinancials.total,
+      apply_tax: applyTax,
+      tax_mode: applyTax ? taxMode : 'exempt',
       payment_status: 'pendiente',
     });
 
@@ -371,26 +404,111 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
 
               {/* COLUMNA DERECHA: Valor Estimado & Cuadrilla de Terreno */}
               <div className="lg:col-span-6 space-y-4">
-                {/* Valor Estimado Card */}
-                <div className="p-4 rounded-xl bg-gradient-to-br from-cyan-50/50 via-slate-50 to-blue-50/40 border border-slate-200 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="font-bold text-slate-800 flex items-center gap-1.5">
-                      <DollarSign className="w-4 h-4 text-emerald-600" />
-                      Valor Total Estimado ({settings?.currency_symbol || '$'} {settings?.currency_code || 'CLP'})
+                {/* Valor Estimado Card (NK-050 & NK-051) */}
+                <div className="p-4 rounded-xl bg-gradient-to-br from-cyan-50/50 via-slate-50 to-blue-50/40 border border-slate-200 space-y-3">
+                  {/* Ticker / Selector de IVA idéntico a Proforma */}
+                  <div className="p-2.5 bg-white/95 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-2 shadow-xs">
+                    <label className="flex items-center gap-2 cursor-pointer font-bold text-xs text-slate-800 select-none">
+                      <input
+                        type="checkbox"
+                        checked={applyTax}
+                        onChange={(e) => setApplyTax(e.target.checked)}
+                        className="w-4 h-4 rounded text-cyan-600 focus:ring-cyan-500 cursor-pointer"
+                      />
+                      <span>Aplicar {settings?.tax_name || 'IVA'} ({taxRatePercent}%)</span>
                     </label>
-                    <span className="text-[11px] text-slate-500 font-medium">
-                      {settings?.tax_name || 'IVA'} incluido ({Math.round((settings?.tax_rate !== undefined ? Number(settings.tax_rate) : 0.19) * 100)}%)
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {applyTax && (
+                        <div className="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200 text-[11px] font-semibold">
+                          <button
+                            type="button"
+                            onClick={() => setTaxMode('included')}
+                            className={`px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${
+                              taxMode === 'included'
+                                ? 'bg-cyan-600 text-white shadow-xs font-bold'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            IVA Incluido
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTaxMode('plus')}
+                            className={`px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${
+                              taxMode === 'plus'
+                                ? 'bg-cyan-600 text-white shadow-xs font-bold'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            + IVA
+                          </button>
+                        </div>
+                      )}
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        applyTax 
+                          ? 'bg-blue-100 text-blue-800 border border-blue-200' 
+                          : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      }`}>
+                        {applyTax ? `Con ${settings?.tax_name || 'IVA'}` : 'Exento (0%)'}
+                      </span>
+                    </div>
                   </div>
-                  <input
-                    type="number"
-                    value={totalPrice}
-                    onChange={(e) => setTotalPrice(parseInt(e.target.value) || 0)}
-                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-slate-900 text-lg font-mono font-bold focus:border-cyan-500 focus:outline-none shadow-inner"
-                  />
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-                    <span>Neto: {settings?.currency_symbol || '$'}{Math.round(totalPrice / (1 + (settings?.tax_rate !== undefined ? Number(settings.tax_rate) : 0.19))).toLocaleString()}</span>
-                    <span>{settings?.tax_name || 'IVA'}: {settings?.currency_symbol || '$'}{Math.round(totalPrice - (totalPrice / (1 + (settings?.tax_rate !== undefined ? Number(settings.tax_rate) : 0.19)))).toLocaleString()}</span>
+
+                  {/* Input de Monto con sobreescritura automática de 0 (NK-051) */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                        <DollarSign className="w-4 h-4 text-emerald-600" />
+                        {applyTax 
+                          ? (taxMode === 'included' 
+                              ? `Monto a Cobrar (IVA Incluido)` 
+                              : `Monto Neto (Antes de IVA)`)
+                          : `Monto a Cobrar (Exento de IVA)`}
+                      </label>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-white border border-slate-200 font-mono text-slate-500 font-medium">
+                        {settings?.currency_symbol || '$'} {settings?.currency_code || 'CLP'}
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
+                        {settings?.currency_symbol || '$'}
+                      </span>
+                      <input
+                        type="number"
+                        value={basePrice === 0 ? '' : basePrice}
+                        placeholder="0"
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setBasePrice(val === '' ? 0 : Math.max(0, parseInt(val, 10) || 0));
+                        }}
+                        className="w-full pl-8 pr-3 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 text-lg font-mono font-bold focus:border-cyan-500 focus:outline-none shadow-inner transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Desglose Financiero en Vivo */}
+                  <div className="p-2.5 rounded-lg bg-white/80 border border-slate-200/90 text-xs space-y-1">
+                    <div className="flex items-center justify-between text-slate-600 text-[11px]">
+                      <span>Subtotal Neto:</span>
+                      <span className="font-mono font-bold text-slate-800">
+                        {settings?.currency_symbol || '$'} {calculatedFinancials.subtotal.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-600 text-[11px]">
+                      <span>{settings?.tax_name || 'IVA'} ({applyTax ? `${taxRatePercent}%` : '0% Exento'}):</span>
+                      <span className={`font-mono font-bold ${applyTax ? 'text-cyan-700' : 'text-emerald-600'}`}>
+                        {applyTax 
+                          ? `${settings?.currency_symbol || '$'} ${calculatedFinancials.tax.toLocaleString()}`
+                          : 'Exento (0%)'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-200 text-slate-900 font-bold text-xs">
+                      <span>Total Facturado:</span>
+                      <span className="font-mono text-emerald-700 text-sm font-black">
+                        {settings?.currency_symbol || '$'} {calculatedFinancials.total.toLocaleString()}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -441,24 +559,29 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                         onChange={(e) => setTechPayoutType(e.target.value as any)}
                         className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs focus:border-cyan-500 focus:outline-none"
                       >
-                        <option value="fixed">Monto Fijo ($)</option>
+                        <option value="fixed">Monto Fijo ({settings?.currency_symbol || '$'})</option>
                         <option value="percentage">Porcentaje (%)</option>
                       </select>
                     </div>
 
                     <div>
                       <label className="text-[11px] font-semibold text-slate-700 block mb-1">
-                        {techPayoutType === 'percentage' ? '% Mano de Obra' : 'Monto a Pagar ($)'}
+                        {techPayoutType === 'percentage' ? '% Mano de Obra' : `Monto (${settings?.currency_symbol || '$'})`}
                       </label>
                       <div className="relative">
                         <input
                           type="number"
-                          value={techPayoutValue}
-                          onChange={(e) => setTechPayoutValue(parseFloat(e.target.value) || 0)}
+                          value={techPayoutValue === 0 ? '' : techPayoutValue}
+                          placeholder="0"
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setTechPayoutValue(val === '' ? 0 : parseFloat(val) || 0);
+                          }}
                           className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs font-mono font-bold focus:border-cyan-500 focus:outline-none"
                         />
                         <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">
-                          {techPayoutType === 'percentage' ? '%' : '$'}
+                          {techPayoutType === 'percentage' ? '%' : (settings?.currency_symbol || '$')}
                         </span>
                       </div>
                     </div>
@@ -494,25 +617,30 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                         onChange={(e) => setAssistantPayoutType(e.target.value as any)}
                         className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs focus:border-cyan-500 focus:outline-none disabled:bg-slate-100 disabled:text-slate-400"
                       >
-                        <option value="fixed">Monto Fijo ($)</option>
+                        <option value="fixed">Monto Fijo ({settings?.currency_symbol || '$'})</option>
                         <option value="percentage">Porcentaje (%)</option>
                       </select>
                     </div>
 
                     <div>
                       <label className="text-[11px] font-semibold text-slate-700 block mb-1">
-                        {assistantPayoutType === 'percentage' ? '% Mano de Obra' : 'Monto a Pagar ($)'}
+                        {assistantPayoutType === 'percentage' ? '% Mano de Obra' : `Monto (${settings?.currency_symbol || '$'})`}
                       </label>
                       <div className="relative">
                         <input
                           disabled={!assistantId}
                           type="number"
-                          value={assistantPayoutValue}
-                          onChange={(e) => setAssistantPayoutValue(parseFloat(e.target.value) || 0)}
+                          value={assistantPayoutValue === 0 ? '' : assistantPayoutValue}
+                          placeholder="0"
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setAssistantPayoutValue(val === '' ? 0 : parseFloat(val) || 0);
+                          }}
                           className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs font-mono font-bold focus:border-cyan-500 focus:outline-none disabled:bg-slate-100 disabled:text-slate-400"
                         />
                         <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">
-                          {assistantPayoutType === 'percentage' ? '%' : '$'}
+                          {assistantPayoutType === 'percentage' ? '%' : (settings?.currency_symbol || '$')}
                         </span>
                       </div>
                     </div>
@@ -520,12 +648,12 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
 
                   {/* Resumen de Liquidación Estimada */}
                   <div className="p-3 rounded-lg bg-cyan-50/80 border border-cyan-200 text-xs flex flex-wrap items-center justify-between gap-2 text-cyan-950 font-medium">
-                    <span>Pago Técnico: <strong>${calculatedTechPayout.toLocaleString('es-CL')}</strong></span>
+                    <span>Pago Técnico: <strong>{settings?.currency_symbol || '$'} {calculatedTechPayout.toLocaleString()}</strong></span>
                     {assistantId && (
-                      <span>Pago Ayudante: <strong>${calculatedAssistantPayout.toLocaleString('es-CL')}</strong></span>
+                      <span>Pago Ayudante: <strong>{settings?.currency_symbol || '$'} {calculatedAssistantPayout.toLocaleString()}</strong></span>
                     )}
                     <span className="font-bold text-blue-900">
-                      Total Mano de Obra: ${(calculatedTechPayout + calculatedAssistantPayout).toLocaleString('es-CL')}
+                      Total Mano de Obra: {settings?.currency_symbol || '$'} {(calculatedTechPayout + calculatedAssistantPayout).toLocaleString()}
                     </span>
                   </div>
                 </div>
