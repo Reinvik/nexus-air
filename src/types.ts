@@ -454,6 +454,8 @@ export interface FinanceSettings {
   use_dual_currency: boolean;
   uf_value?: number;
   is_currency_swapped?: boolean;
+  auto_sync_exchange_rate?: boolean; // NK-049: Actualización automática vía API
+  exchange_rate_last_updated?: string; // NK-049: Fecha de última actualización de tasa
 }
 
 export type ViewTab = 

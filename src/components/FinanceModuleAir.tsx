@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ServiceOrder, 
   AirSettings, 
@@ -11,6 +11,7 @@ import {
 } from '../types';
 import { DualCurrencyAir } from './DualCurrencyAir';
 import { formatAirPrice, findCountry } from '../lib/countries';
+import { fetchLiveExchangeRate } from '../lib/exchangeRateService';
 import { 
   Scale, 
   Target, 
@@ -44,7 +45,9 @@ import {
   Snowflake,
   ShieldCheck,
   Flame,
-  FileSpreadsheet
+  FileSpreadsheet,
+  RefreshCw,
+  Globe
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -127,10 +130,75 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
   const [expenseSearch, setExpenseSearch] = useState('');
   const [expenseCategoryFilter, setExpenseCategoryFilter] = useState<string>('all');
 
-  // Modal de configuración de país / tipo de cambio
+  // Modal de configuración de país / tipo de cambio (NK-049)
   const [showCountrySettingsModal, setShowCountrySettingsModal] = useState(false);
   const [tempExchangeRate, setTempExchangeRate] = useState(financeSettings?.exchange_rate || (isVE ? 36.5 : isCR ? 520 : 940));
   const [tempUfValue, setTempUfValue] = useState(financeSettings?.uf_value || 38200);
+  const [isFetchingLiveRate, setIsFetchingLiveRate] = useState(false);
+  const [autoSyncRate, setAutoSyncRate] = useState<boolean>(() => financeSettings?.auto_sync_exchange_rate !== false);
+  const [liveRateInfo, setLiveRateInfo] = useState<{
+    provider?: string;
+    timestamp?: string;
+  } | null>(null);
+
+  // Mantener sincronizado tempExchangeRate con financeSettings
+  useEffect(() => {
+    if (financeSettings?.exchange_rate) {
+      setTempExchangeRate(financeSettings.exchange_rate);
+    }
+    if (financeSettings?.uf_value) {
+      setTempUfValue(financeSettings.uf_value);
+    }
+  }, [financeSettings?.exchange_rate, financeSettings?.uf_value]);
+
+  const handleFetchLiveRate = async (showToast: boolean = true) => {
+    setIsFetchingLiveRate(true);
+    try {
+      const res = await fetchLiveExchangeRate(countryCode, countryInfo.currency_code);
+      if (res.success && res.rate > 0) {
+        setTempExchangeRate(res.rate);
+        if (res.uf && isCL) {
+          setTempUfValue(res.uf);
+        }
+        setLiveRateInfo({
+          provider: res.provider,
+          timestamp: res.timestamp
+        });
+        if (showToast) {
+          toast.success(`Tasa oficial obtenida en vivo: ${res.rate} ${countryInfo.currency_code}/USD (${res.provider})`);
+        }
+        return res;
+      } else {
+        if (showToast) {
+          toast.error(res.error || 'No se pudo obtener la tasa en vivo');
+        }
+      }
+    } catch (err: any) {
+      if (showToast) toast.error('Error de conexión al consultar tasa de cambio');
+    } finally {
+      setIsFetchingLiveRate(false);
+    }
+  };
+
+  // Auto-sincronización de tipo de cambio al cargar la vista si está habilitado (NK-049)
+  useEffect(() => {
+    if (financeSettings?.auto_sync_exchange_rate !== false) {
+      const today = new Date().toISOString().split('T')[0];
+      const lastUpdate = financeSettings?.exchange_rate_last_updated?.split('T')[0];
+      if (lastUpdate !== today || !financeSettings?.exchange_rate) {
+        handleFetchLiveRate(false).then((res) => {
+          if (res?.success && res.rate > 0) {
+            onUpdateFinanceSettings({
+              exchange_rate: res.rate,
+              uf_value: res.uf || financeSettings?.uf_value,
+              auto_sync_exchange_rate: true,
+              exchange_rate_last_updated: new Date().toISOString()
+            });
+          }
+        }).catch(() => {});
+      }
+    }
+  }, [countryCode]);
 
   // Navegación de mes
   const handlePrevMonth = () => {
@@ -441,6 +509,8 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
     onUpdateFinanceSettings({
       exchange_rate: Number(tempExchangeRate),
       uf_value: Number(tempUfValue),
+      auto_sync_exchange_rate: autoSyncRate,
+      exchange_rate_last_updated: liveRateInfo?.timestamp || financeSettings?.exchange_rate_last_updated || new Date().toISOString()
     });
     setShowCountrySettingsModal(false);
     toast.success('Parámetros monetarios actualizados');
@@ -1621,6 +1691,35 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
             </div>
 
             <div className="space-y-4 text-xs">
+              {/* Botón para consultar Tasa en Vivo via API (NK-049) */}
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => handleFetchLiveRate(true)}
+                  disabled={isFetchingLiveRate}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-cyan-50 border border-cyan-200 text-cyan-800 hover:bg-cyan-100 font-bold text-xs transition-all disabled:opacity-50 cursor-pointer shadow-xs"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isFetchingLiveRate ? 'animate-spin text-cyan-600' : 'text-cyan-700'}`} />
+                  <span>{isFetchingLiveRate ? 'Consultando indicadores en vivo...' : 'Consultar Tasa Oficial en Vivo (API)'}</span>
+                </button>
+
+                {(liveRateInfo || financeSettings?.exchange_rate_last_updated) && (
+                  <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      {liveRateInfo?.provider || (isCL ? 'mindicador.cl / Open ER' : 'Open Exchange Rates API')}
+                    </span>
+                    <span className="text-slate-400 font-mono text-[10px]">
+                      {liveRateInfo?.timestamp 
+                        ? `Hoy ${new Date(liveRateInfo.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                        : financeSettings?.exchange_rate_last_updated
+                          ? new Date(financeSettings.exchange_rate_last_updated).toLocaleDateString([], { day: '2-digit', month: 'short' })
+                          : ''}
+                    </span>
+                  </div>
+                )}
+              </div>
+
               {isVE && (
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">
@@ -1629,7 +1728,9 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                   <input
                     type="number"
                     step="0.01"
-                    value={tempExchangeRate}
+                    value={tempExchangeRate === 0 ? '' : tempExchangeRate}
+                    placeholder="0"
+                    onFocus={(e) => e.target.select()}
                     onChange={(e) => setTempExchangeRate(Number(e.target.value))}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 font-bold"
                   />
@@ -1647,12 +1748,14 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                     </label>
                     <input
                       type="number"
-                      value={tempUfValue}
+                      value={tempUfValue === 0 ? '' : tempUfValue}
+                      placeholder="0"
+                      onFocus={(e) => e.target.select()}
                       onChange={(e) => setTempUfValue(Number(e.target.value))}
                       className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 font-bold"
                     />
                     <span className="text-[10px] text-slate-500 mt-1 block">
-                      Utilizado para equivalencias en arriendos comerciales y proyectos climatización.
+                      Obtenido automáticamente de mindicador.cl (Banco Central de Chile).
                     </span>
                   </div>
 
@@ -1662,7 +1765,9 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                     </label>
                     <input
                       type="number"
-                      value={tempExchangeRate}
+                      value={tempExchangeRate === 0 ? '' : tempExchangeRate}
+                      placeholder="0"
+                      onFocus={(e) => e.target.select()}
                       onChange={(e) => setTempExchangeRate(Number(e.target.value))}
                       className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 font-bold"
                     />
@@ -1677,7 +1782,9 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                   </label>
                   <input
                     type="number"
-                    value={tempExchangeRate}
+                    value={tempExchangeRate === 0 ? '' : tempExchangeRate}
+                    placeholder="0"
+                    onFocus={(e) => e.target.select()}
                     onChange={(e) => setTempExchangeRate(Number(e.target.value))}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 font-bold"
                   />
@@ -1691,12 +1798,30 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                   </label>
                   <input
                     type="number"
-                    value={tempExchangeRate}
+                    value={tempExchangeRate === 0 ? '' : tempExchangeRate}
+                    placeholder="0"
+                    onFocus={(e) => e.target.select()}
                     onChange={(e) => setTempExchangeRate(Number(e.target.value))}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 font-bold"
                   />
                 </div>
               )}
+
+              {/* Checkbox de Auto-sincronización */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div>
+                  <span className="font-bold text-slate-800 block text-xs">Actualización Automática Diaria</span>
+                  <span className="text-[11px] text-slate-500">
+                    Consultar la tasa oficial de la API al ingresar al módulo financiero.
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={autoSyncRate}
+                  onChange={(e) => setAutoSyncRate(e.target.checked)}
+                  className="w-4 h-4 text-cyan-600 rounded cursor-pointer"
+                />
+              </div>
             </div>
 
             <div className="pt-3 border-t border-slate-200 flex justify-end gap-2">
