@@ -125,6 +125,56 @@ export const DEFAULT_COVERAGE_COMMUNES = [
   'Chicureo / Colina'
 ];
 
+export const DEFAULT_COVERAGE_CANTONS_CR = [
+  'San José',
+  'Escazú',
+  'Santa Ana',
+  'Alajuela',
+  'Heredia',
+  'Cartago',
+  'Curridabat',
+  'San Pedro / Montes de Oca',
+  'Belén',
+  'Tibás',
+  'Moravia',
+  'Desamparados'
+];
+
+export const DEFAULT_HVAC_SERVICES_CR: LandingServiceItem[] = [
+  {
+    id: 'svc-1',
+    title: 'Mantenimiento Preventivo Profundo',
+    desc: 'Limpieza química integral de serpentines evaporador/condensador, sanitización bactericida y control de presiones de gas.',
+    price: 25000,
+    badge: 'Más Solicitado',
+    active: true,
+  },
+  {
+    id: 'svc-2',
+    title: 'Instalación Split Inverter',
+    desc: 'Montaje profesional en muro con soportes reforzados, vacío con bomba de 2 etapas, presurización y puesta en marcha.',
+    price: 60000,
+    badge: 'Garantía',
+    active: true,
+  },
+  {
+    id: 'svc-3',
+    title: 'Recarga y Detección de Fugas',
+    desc: 'Prueba de estanqueidad con nitrógeno seco a alta presión y recarga pesada en balanza digital con refrigerante ecológico (R410A / R32).',
+    price: 35000,
+    badge: 'Ecológico',
+    active: true,
+  },
+  {
+    id: 'svc-4',
+    title: 'Diagnóstico Electrónico & Reparación',
+    desc: 'Revisión exhaustiva de tarjetas lógicas inverter, sensores NTC, condensadores de arranque y compresores.',
+    price: 20000,
+    badge: 'Especialista',
+    active: true,
+  },
+];
+
 /**
  * Resuelve la configuración efectiva y fiel de la Landing Page para la empresa HVAC activa,
  * garantizando que lo que se edite en el módulo de personalización sea exactamente lo que
@@ -139,10 +189,29 @@ export function resolveAirLandingConfig(
     ...(overrides || {}),
   };
 
-  const companyName = settings?.fantasy_name || settings?.company_name || 'Nexus Air';
-  const companyPhone = cfg.phone || settings?.phone || '+56 9 3005 7769';
-  const companyAddress = cfg.address || settings?.address || (settings?.city ? `${settings.city}, ${settings.country || 'Chile'}` : 'Santiago, Chile');
-  const companyEmail = cfg.email || settings?.email || 'contacto@nexusair.cl';
+  const isCostaRica = settings?.country_code === 'CR' || 
+                      settings?.country === 'Costa Rica' || 
+                      settings?.company_slug === 'venefrio' ||
+                      (settings?.fantasy_name || '').toLowerCase().includes('venefrio');
+
+  const defaultPhone = isCostaRica ? '+506 7202 8833' : '+56 9 3005 7769';
+  const defaultAddress = isCostaRica 
+    ? 'San José, Costa Rica' 
+    : (settings?.city ? `${settings.city}, ${settings.country || 'Chile'}` : 'Santiago, Chile');
+  const defaultEmail = isCostaRica ? (settings?.email || 'josemele376@gmail.com') : 'contacto@nexusair.cl';
+  const defaultHeroBadge = isCostaRica 
+    ? 'Técnicos Especialistas • Garantía Certificada' 
+    : 'Técnicos Certificados SEC • Garantía 6 Meses';
+  const defaultHeroSubtitle = isCostaRica
+    ? 'Instalación profesional, mantenimiento preventivo profundo y servicio técnico de urgencia para hogares y empresas.'
+    : 'Instalación certificada SEC, mantenimiento preventivo profundo y servicio técnico de urgencia para hogares y empresas.';
+  const defaultCoverage = isCostaRica ? DEFAULT_COVERAGE_CANTONS_CR : DEFAULT_COVERAGE_COMMUNES;
+  const defaultServices = isCostaRica ? DEFAULT_HVAC_SERVICES_CR : DEFAULT_HVAC_SERVICES;
+
+  const companyName = cfg.fantasy_name || settings?.fantasy_name || settings?.company_name || 'Nexus Air';
+  const companyPhone = cfg.phone || settings?.phone || defaultPhone;
+  const companyAddress = cfg.address || settings?.address || (settings?.city ? `${settings.city}, ${settings.country || (isCostaRica ? 'Costa Rica' : 'Chile')}` : defaultAddress);
+  const companyEmail = cfg.email || settings?.email || defaultEmail;
   const companyLogo = cfg.header_logo_url || settings?.logo_url || '';
 
   const themePrimary = cfg.theme_primary_color || '#00d2ff';
@@ -160,7 +229,7 @@ export function resolveAirLandingConfig(
     header_logo_url: companyLogo,
     favicon_url: cfg.favicon_url || '',
     fantasy_name: cfg.fantasy_name || companyName,
-    slogan: cfg.slogan || settings?.company_slogan || 'Servicios Certificados de Climatización',
+    slogan: cfg.slogan || settings?.company_slogan || (isCostaRica ? 'Especialistas en Climatización y Refrigeración' : 'Servicios Certificados de Climatización'),
     footer_copyright: cfg.footer_copyright || `© ${new Date().getFullYear()} ${companyName}. Todos los derechos reservados.`,
 
     // Tema y Colores
@@ -171,9 +240,9 @@ export function resolveAirLandingConfig(
     theme_background_color: cfg.theme_background_color || (resolvedIsDark ? '#080c16' : '#f8fafc'),
 
     // Hero Section
-    hero_badge: cfg.hero_badge || 'Técnicos Certificados SEC • Garantía 6 Meses',
+    hero_badge: cfg.hero_badge || defaultHeroBadge,
     hero_title: cfg.hero_title || `Especialistas en Climatización y Confort Térmico`,
-    hero_subtitle: cfg.hero_subtitle || 'Instalación certificada SEC, mantenimiento preventivo profundo y servicio técnico de urgencia para hogares y empresas.',
+    hero_subtitle: cfg.hero_subtitle || defaultHeroSubtitle,
     hero_cta_text: cfg.hero_cta_text || 'Agendar Visita a Domicilio',
     hero_phone: companyPhone,
     hero_image_url: cfg.hero_image_url || '',
@@ -183,12 +252,12 @@ export function resolveAirLandingConfig(
     hero_stat2_label: cfg.hero_stat2_label || 'Garantía Estándar',
 
     // Servicios
-    services: cfg.services && cfg.services.length > 0 ? cfg.services : DEFAULT_HVAC_SERVICES,
+    services: cfg.services && cfg.services.length > 0 ? cfg.services : defaultServices,
     show_prices: cfg.show_prices !== false,
     show_thermal_calculator: cfg.show_thermal_calculator !== false,
 
     // Cobertura y Contacto
-    coverage_communes: cfg.coverage_communes && cfg.coverage_communes.length > 0 ? cfg.coverage_communes : DEFAULT_COVERAGE_COMMUNES,
+    coverage_communes: cfg.coverage_communes && cfg.coverage_communes.length > 0 ? cfg.coverage_communes : defaultCoverage,
     phone: companyPhone,
     email: companyEmail,
     address: companyAddress,

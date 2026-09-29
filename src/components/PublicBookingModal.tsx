@@ -37,8 +37,9 @@ export const PublicBookingModal: React.FC<PublicBookingModalProps> = ({
   prefill = null,
   onConfirmBooking,
 }) => {
-  const defaultPrefix = settings?.phone_prefix || '+56 9 ';
-  const defaultCity = settings?.sample_cities?.[0] || 'Las Condes';
+  const isCR = settings?.country_code === 'CR' || settings?.country === 'Costa Rica' || settings?.company_slug === 'venefrio';
+  const defaultPrefix = settings?.phone_prefix || (isCR ? '+506 ' : '+56 9 ');
+  const defaultCity = settings?.sample_cities?.[0] || (isCR ? 'San José' : 'Las Condes');
 
   const [rut, setRut] = useState('');
   const [name, setName] = useState('');

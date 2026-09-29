@@ -35,7 +35,9 @@ import {
   HVAC_COLOR_PRESETS, 
   HVAC_HERO_PRESETS, 
   DEFAULT_HVAC_SERVICES, 
+  DEFAULT_HVAC_SERVICES_CR,
   DEFAULT_COVERAGE_COMMUNES,
+  DEFAULT_COVERAGE_CANTONS_CR,
   resolveAirLandingConfig 
 } from '../lib/landingConfigAir';
 import { LandingTenantAir } from './LandingTenantAir';
@@ -56,6 +58,13 @@ export const LandingEditorAir: React.FC<LandingEditorAirProps> = ({
   onUpdateSettings,
   onBackToDashboard,
 }) => {
+  const isCR = settings.country_code === 'CR' || 
+               settings.country === 'Costa Rica' || 
+               settings.company_slug === 'venefrio' ||
+               (settings.fantasy_name || '').toLowerCase().includes('venefrio');
+  const defaultServices = isCR ? DEFAULT_HVAC_SERVICES_CR : DEFAULT_HVAC_SERVICES;
+  const defaultCoverage = isCR ? DEFAULT_COVERAGE_CANTONS_CR : DEFAULT_COVERAGE_COMMUNES;
+
   // Configuración de borrador en vivo
   const [draftConfig, setDraftConfig] = useState<LandingPageConfig>(() => {
     return resolveAirLandingConfig(settings);
@@ -91,6 +100,9 @@ export const LandingEditorAir: React.FC<LandingEditorAirProps> = ({
         logo_url: draftConfig.header_logo_url || settings.logo_url,
         fantasy_name: draftConfig.fantasy_name || settings.fantasy_name,
         company_slogan: draftConfig.slogan || settings.company_slogan,
+        phone: draftConfig.phone || settings.phone,
+        email: draftConfig.email || settings.email,
+        address: draftConfig.address || settings.address,
       });
       toast.success('Landing page guardada y publicada exitosamente', {
         icon: '🚀',
@@ -152,32 +164,32 @@ export const LandingEditorAir: React.FC<LandingEditorAirProps> = ({
   };
 
   const handleDeleteService = (index: number) => {
-    const current = [...(draftConfig.services || DEFAULT_HVAC_SERVICES)];
+    const current = [...(draftConfig.services || defaultServices)];
     current.splice(index, 1);
     updateField('services', current);
   };
 
   const handleResetServices = () => {
-    updateField('services', DEFAULT_HVAC_SERVICES);
+    updateField('services', defaultServices);
     toast.success('Catálogo de servicios restaurado a los valores estándar');
   };
 
-  // Gestión de Comunas
+  // Gestión de Comunas / Cantones
   const handleAddCommune = () => {
     if (!newCommune.trim()) return;
-    const current = [...(draftConfig.coverage_communes || DEFAULT_COVERAGE_COMMUNES)];
+    const current = [...(draftConfig.coverage_communes || defaultCoverage)];
     if (!current.includes(newCommune.trim())) {
       current.push(newCommune.trim());
       updateField('coverage_communes', current);
       setNewCommune('');
-      toast.success(`Comuna "${newCommune.trim()}" agregada`);
+      toast.success(`"${newCommune.trim()}" agregada`);
     } else {
-      toast.error('La comuna ya está en la lista');
+      toast.error('Ya está en la lista');
     }
   };
 
   const handleRemoveCommune = (communeToRemove: string) => {
-    const current = (draftConfig.coverage_communes || DEFAULT_COVERAGE_COMMUNES).filter(c => c !== communeToRemove);
+    const current = (draftConfig.coverage_communes || defaultCoverage).filter(c => c !== communeToRemove);
     updateField('coverage_communes', current);
   };
 
@@ -819,7 +831,7 @@ export const LandingEditorAir: React.FC<LandingEditorAirProps> = ({
                       type="text"
                       value={draftConfig.address || ''}
                       onChange={(e) => updateField('address', e.target.value)}
-                      placeholder="Ej: Av. Apoquindo 4500, Las Condes"
+                      placeholder={isCR ? "Ej: San José, Costa Rica" : "Ej: Av. Apoquindo 4500, Las Condes"}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-900"
                     />
                   </div>
@@ -831,7 +843,7 @@ export const LandingEditorAir: React.FC<LandingEditorAirProps> = ({
                         type="text"
                         value={draftConfig.phone || ''}
                         onChange={(e) => updateField('phone', e.target.value)}
-                        placeholder="+56 9 3005 7769"
+                        placeholder={isCR ? "+506 7202 8833" : "+56 9 3005 7769"}
                         className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 font-semibold"
                       />
                     </div>
@@ -842,7 +854,7 @@ export const LandingEditorAir: React.FC<LandingEditorAirProps> = ({
                         type="email"
                         value={draftConfig.email || ''}
                         onChange={(e) => updateField('email', e.target.value)}
-                        placeholder="contacto@miempresa.cl"
+                        placeholder={isCR ? "contacto@venefrio.cr" : "contacto@miempresa.cl"}
                         className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 font-semibold"
                       />
                     </div>
@@ -872,10 +884,10 @@ export const LandingEditorAir: React.FC<LandingEditorAirProps> = ({
 
                   <hr className="border-slate-100" />
 
-                  {/* Comunas de Cobertura */}
+                  {/* Comunas / Cantones de Cobertura */}
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-slate-700">
-                      Comunas o Ciudades de Cobertura
+                      {settings.division_label || (isCR ? 'Cantones' : 'Comunas')} o Ciudades de Cobertura
                     </label>
 
                     <div className="flex gap-2">
@@ -884,7 +896,7 @@ export const LandingEditorAir: React.FC<LandingEditorAirProps> = ({
                         value={newCommune}
                         onChange={(e) => setNewCommune(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleAddCommune()}
-                        placeholder="Añadir comuna (ej: Vitacura)"
+                        placeholder={isCR ? "Añadir cantón (ej: Escazú)" : "Añadir comuna (ej: Vitacura)"}
                         className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-200"
                       />
                       <button
@@ -896,7 +908,7 @@ export const LandingEditorAir: React.FC<LandingEditorAirProps> = ({
                     </div>
 
                     <div className="flex flex-wrap gap-1.5 p-3 rounded-2xl bg-slate-50 border border-slate-200 max-h-40 overflow-y-auto">
-                      {(draftConfig.coverage_communes || DEFAULT_COVERAGE_COMMUNES).map((commune, i) => (
+                      {(draftConfig.coverage_communes || defaultCoverage).map((commune, i) => (
                         <span
                           key={i}
                           className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-800 shadow-2xs"

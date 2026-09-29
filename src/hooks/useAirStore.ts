@@ -557,7 +557,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
           return merged;
         });
       } else if (!isMock) {
-        // Fallback para empresas nuevas sin registro en air.settings: obtener de public.companies
+        // Fallback y auto-inicialización para empresas sin registro en air.settings: obtener de public.companies
         try {
           const { data: compData } = await supabase
             .from('companies')
@@ -566,13 +566,36 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
             .maybeSingle();
 
           if (compData) {
+            const isCR = compData.name?.toLowerCase().includes('venefrio') || (compData.phone && compData.phone.startsWith('+506'));
+            const initialTenantSettings: any = {
+              company_id: compData.id,
+              company_name: compData.name,
+              company_slug: compData.slug || activeId.substring(0, 8),
+              phone: compData.phone || (isCR ? '+506 7202 8833' : ''),
+              address: compData.address || (isCR ? 'San José, Costa Rica' : ''),
+              country: isCR ? 'Costa Rica' : 'Chile',
+              country_code: isCR ? 'CR' : 'CL',
+              currency_symbol: isCR ? '₡' : '$',
+              currency_code: isCR ? 'CRC' : 'CLP',
+              tax_id_label: isCR ? 'Cédula Jurídica' : 'RUT',
+              tax_rate: isCR ? 0.13 : 0.19,
+              tax_name: 'IVA',
+              division_label: isCR ? 'Cantón' : 'Comuna',
+              updated_at: new Date().toISOString()
+            };
+
+            // Guardar automáticamente en air.settings para que persista
+            try {
+              await supabaseAir.from('settings').upsert(initialTenantSettings, { onConflict: 'company_id' });
+            } catch (err) {
+              console.warn('[useAirStore] Auto-inserting air.settings failed:', err);
+            }
+
             setSettings(prev => {
               const freshSettings: AirSettings = {
                 ...prev,
-                company_id: compData.id,
-                company_name: compData.name,
+                ...initialTenantSettings,
                 fantasy_name: compData.name,
-                company_slug: compData.slug || '',
               };
               try {
                 localStorage.setItem(`nexus_air_settings_${activeId}`, JSON.stringify(freshSettings));
@@ -1987,10 +2010,14 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     toast.success('Configuración de Nexus Air actualizada');
 
     try {
+      const activeId = companyId || DEFAULT_COMPANY_ID;
+      if (activeId === DEMO_SANDBOX_COMPANY_ID) return;
+
       const dbUpdates: any = {
         updated_at: new Date().toISOString()
       };
       if (updates.company_name !== undefined) dbUpdates.company_name = updates.company_name;
+      if (updates.company_slug !== undefined) dbUpdates.company_slug = updates.company_slug;
       if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
       if (updates.email !== undefined) dbUpdates.email = updates.email;
       if (updates.address !== undefined) dbUpdates.address = updates.address;
@@ -2020,22 +2047,46 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       if (updates.whatsapp_template_cobro !== undefined) dbUpdates.whatsapp_template_cobro = updates.whatsapp_template_cobro;
       if (updates.admin_pin !== undefined) dbUpdates.admin_pin = updates.admin_pin;
 
-      // Intentar update primero por company_id
-      const { error: updateErr } = await supabaseAir
-        .from('settings')
-        .update(dbUpdates)
-        .eq('company_id', activeId);
+      // Obtener o asegurar nombre y slug de la empresa (evitar NOT NULL violation en settings)
+      let compName = dbUpdates.company_name || settings.company_name || settings.fantasy_name;
+      let compSlug = dbUpdates.company_slug || settings.company_slug;
 
-      if (updateErr) {
-        // Fallback a upsert
+      if (!compName || !compSlug) {
+        try {
+          const { data: comp } = await supabase.from('companies').select('name, slug').eq('id', activeId).maybeSingle();
+          if (comp) {
+            if (!compName) compName = comp.name;
+            if (!compSlug) compSlug = comp.slug;
+          }
+        } catch {}
+      }
+
+      if (!compName) compName = 'Empresa Climatización';
+      if (!compSlug) compSlug = activeId.substring(0, 8);
+
+      const upsertPayload = {
+        company_id: activeId,
+        company_name: compName,
+        company_slug: compSlug,
+        ...dbUpdates,
+      };
+
+      // Upsert atómico por company_id
+      const { error: upsertErr } = await supabaseAir
+        .from('settings')
+        .upsert(upsertPayload, { onConflict: 'company_id' });
+
+      if (upsertErr) {
+        console.warn('[useAirStore] Upsert failed, fallback to update:', upsertErr);
         await supabaseAir
           .from('settings')
-          .upsert({ company_id: activeId, ...dbUpdates }, { onConflict: 'company_id' });
+          .update(dbUpdates)
+          .eq('company_id', activeId);
       }
     } catch (e) {
       console.warn('[useAirStore] Error updating settings in Supabase:', e);
     }
-  }, [companyId]);
+  }, [companyId, settings]);
 
   // Liquidación de Honorarios a Técnicos (NK-043)
   const addTechnicianPayout = useCallback(async (payoutData: Omit<TechnicianPayout, 'id' | 'company_id' | 'created_at'>) => {
@@ -2330,14 +2381,56 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
   // Helper para consultar landing pública de empresa por slug
   const fetchPublicCompanyBySlug = useCallback(async (slug: string) => {
     try {
+      const cleanSlug = slug.trim().toLowerCase();
       const { data, error } = await supabaseAir
         .from('settings')
         .select('*')
-        .ilike('company_slug', slug.trim().toLowerCase())
+        .ilike('company_slug', cleanSlug)
         .maybeSingle();
 
-      if (error || !data) return null;
-      return data;
+      if (data) return data;
+
+      // Fallback a public.companies si aún no existe en air.settings
+      const { data: comp } = await supabase
+        .from('companies')
+        .select('*')
+        .ilike('slug', cleanSlug)
+        .maybeSingle();
+
+      if (comp) {
+        const isCR = comp.name?.toLowerCase().includes('venefrio') || (comp.phone && comp.phone.startsWith('+506'));
+        const defaultRecord: any = {
+          company_id: comp.id,
+          company_name: comp.name,
+          company_slug: comp.slug,
+          fantasy_name: comp.name,
+          phone: comp.phone || (isCR ? '+506 7202 8833' : ''),
+          address: comp.address || (isCR ? 'San José, Costa Rica' : ''),
+          country: isCR ? 'Costa Rica' : 'Chile',
+          country_code: isCR ? 'CR' : 'CL',
+          currency_symbol: isCR ? '₡' : '$',
+          currency_code: isCR ? 'CRC' : 'CLP',
+          tax_id_label: isCR ? 'Cédula Jurídica' : 'RUT',
+          tax_rate: isCR ? 0.13 : 0.19,
+          tax_name: 'IVA',
+          division_label: isCR ? 'Cantón' : 'Comuna',
+          landing_config: {}
+        };
+
+        try {
+          await supabaseAir.from('settings').upsert(defaultRecord, { onConflict: 'company_id' });
+        } catch {}
+
+        const { data: fresh } = await supabaseAir
+          .from('settings')
+          .select('*')
+          .eq('company_id', comp.id)
+          .maybeSingle();
+
+        return fresh || defaultRecord;
+      }
+
+      return null;
     } catch {
       return null;
     }

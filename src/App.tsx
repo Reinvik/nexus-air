@@ -137,8 +137,15 @@ export default function App() {
             city: data.city || settings.city,
             commune: data.commune || settings.commune,
             country: data.country || settings.country,
+            country_code: data.country_code || settings.country_code || (data.country === 'Costa Rica' ? 'CR' : 'CL'),
             currency_symbol: data.currency_symbol || settings.currency_symbol,
             currency_code: data.currency_code || settings.currency_code,
+            tax_id_label: data.tax_id_label || settings.tax_id_label,
+            tax_rate: data.tax_rate !== undefined && data.tax_rate !== null ? Number(data.tax_rate) : settings.tax_rate,
+            tax_name: data.tax_name || settings.tax_name,
+            division_label: data.division_label || settings.division_label,
+            warranty_months: data.warranty_months !== undefined && data.warranty_months !== null ? Number(data.warranty_months) : settings.warranty_months,
+            coverage_communes: data.coverage_communes || settings.coverage_communes,
             landing_config: data.landing_config || settings.landing_config
           });
         }
