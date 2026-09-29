@@ -43,6 +43,27 @@ export default function App() {
     login, 
     logout 
   } = useAuth();
+
+  // Tenant slug detection (ej: ?t=nexus-air o dominio personalizado www.venefrio.com)
+  const [tenantSlug] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const querySlug = params.get('t');
+      if (querySlug) return querySlug;
+
+      const host = window.location.hostname.toLowerCase();
+      if (host.includes('venefrio')) return 'venefrio';
+      if (host.includes('shaddai')) return 'shaddai-air';
+    }
+    return null;
+  });
+
+  const [tenantSettings, setTenantSettings] = useState<AirSettings | null>(null);
+
+  // NK-038: Identificar la empresa activa garantizando aislamiento y persistencia en Supabase
+  const activeTenantCompanyId = tenantSettings?.company_id || null;
+  const targetCompanyId = activeCompanyOverride || (user ? profile?.company_id : activeTenantCompanyId) || activeTenantCompanyId || effectiveCompanyId;
+
   const {
     customers,
     equipments,
@@ -90,23 +111,8 @@ export default function App() {
     deleteRecurringSchedule,
     confirmAndScheduleRecurringOrder,
     generateWhatsAppRecurringUrl
-  } = useAirStore(effectiveCompanyId);
+  } = useAirStore(targetCompanyId);
 
-  // Tenant slug detection (ej: ?t=nexus-air o dominio personalizado www.venefrio.com)
-  const [tenantSlug] = useState<string | null>(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const querySlug = params.get('t');
-      if (querySlug) return querySlug;
-
-      const host = window.location.hostname.toLowerCase();
-      if (host.includes('venefrio')) return 'venefrio';
-      if (host.includes('shaddai')) return 'shaddai-air';
-    }
-    return null;
-  });
-
-  const [tenantSettings, setTenantSettings] = useState<AirSettings | null>(null);
   const { isSolago, brand } = useBrand();
 
   const effectiveSettings = useMemo(() => {
@@ -122,6 +128,15 @@ export default function App() {
     }
     return base;
   }, [tenantSettings, settings, isSolago]);
+
+  // Wrapper para guardar ajustes sincronizando tanto el store como tenantSettings
+  const handleUpdateSettings = async (updates: Partial<AirSettings>) => {
+    const updated = await updateSettings(updates);
+    if (tenantSettings) {
+      setTenantSettings(prev => prev ? ({ ...prev, ...updates }) : null);
+    }
+    return updated;
+  };
 
   useEffect(() => {
     if (tenantSlug) {
@@ -151,7 +166,31 @@ export default function App() {
             division_label: data.division_label || settings.division_label,
             warranty_months: data.warranty_months !== undefined && data.warranty_months !== null ? Number(data.warranty_months) : settings.warranty_months,
             coverage_communes: data.coverage_communes || settings.coverage_communes,
-            landing_config: data.landing_config || settings.landing_config
+            landing_config: data.landing_config || settings.landing_config,
+            maintenance_interval_months: data.maintenance_interval_months !== undefined && data.maintenance_interval_months !== null 
+              ? Number(data.maintenance_interval_months) 
+              : (settings.maintenance_interval_months || 6),
+            quality_control_days: data.quality_control_days !== undefined && data.quality_control_days !== null 
+              ? Number(data.quality_control_days) 
+              : (settings.quality_control_days || 7),
+            inactive_recovery_months: data.inactive_recovery_months !== undefined && data.inactive_recovery_months !== null 
+              ? Number(data.inactive_recovery_months) 
+              : (settings.inactive_recovery_months || 9),
+            pre_expiration_warning_days: data.pre_expiration_warning_days !== undefined && data.pre_expiration_warning_days !== null 
+              ? Number(data.pre_expiration_warning_days) 
+              : (settings.pre_expiration_warning_days || 15),
+            standard_maintenance_price: data.standard_maintenance_price !== undefined && data.standard_maintenance_price !== null
+              ? Number(data.standard_maintenance_price)
+              : (settings.standard_maintenance_price || 45000),
+            default_apply_tax: data.default_apply_tax !== undefined ? data.default_apply_tax : settings.default_apply_tax,
+            default_tax_mode: data.default_tax_mode || settings.default_tax_mode,
+            bank_name: data.bank_name || settings.bank_name,
+            bank_account_type: data.bank_account_type || settings.bank_account_type,
+            bank_account_number: data.bank_account_number || settings.bank_account_number,
+            bank_account_rut: data.bank_account_rut || settings.bank_account_rut,
+            bank_account_email: data.bank_account_email || settings.bank_account_email,
+            whatsapp_template_cobro: data.whatsapp_template_cobro || settings.whatsapp_template_cobro,
+            admin_pin: data.admin_pin || settings.admin_pin,
           });
         }
       });
@@ -468,12 +507,12 @@ export default function App() {
         {activeTab === 'recaptacion' && (
           <RecaptacionSemestral
             reminders={reminders}
-            settings={settings}
+            settings={effectiveSettings}
             orders={orders}
             onMarkContacted={markReminderContacted}
             onScheduleService={scheduleReminderService}
             generateWhatsAppUrl={generateWhatsAppUrl}
-            onUpdateSettings={updateSettings}
+            onUpdateSettings={handleUpdateSettings}
           />
         )}
 
@@ -483,7 +522,7 @@ export default function App() {
             technicians={technicians}
             customers={customers}
             equipments={equipments}
-            settings={settings}
+            settings={effectiveSettings}
             recurringSchedules={recurringSchedules}
             onOpenNewOrder={() => setIsAddOrderModalOpen(true)}
             onSelectOrder={handleOpenEdit}
@@ -498,7 +537,7 @@ export default function App() {
         {activeTab === 'cotizador' && (
           <ThermalQuoterAir
             parts={parts}
-            settings={settings}
+            settings={effectiveSettings}
             customers={customers}
             onCreateOrderFromQuote={handleCreateOrderFromQuote}
           />
@@ -507,7 +546,7 @@ export default function App() {
         {activeTab === 'inventory' && (
           <InventoryAir
             parts={parts}
-            settings={tenantSettings || settings}
+            settings={effectiveSettings}
             onAddPart={addPart}
             onUpdatePart={updatePart}
             onDeletePart={deletePart}
@@ -518,7 +557,7 @@ export default function App() {
           <CustomersAir
             customers={customers}
             equipments={equipments}
-            settings={settings}
+            settings={effectiveSettings}
             onAddCustomer={addCustomer}
             onAddEquipment={addEquipment}
             onUpdateCustomer={updateCustomer}
@@ -530,7 +569,7 @@ export default function App() {
           <TechniciansAir
             technicians={technicians}
             orders={orders}
-            settings={tenantSettings || settings}
+            settings={effectiveSettings}
             technicianPayouts={technicianPayouts}
             onAddTechnician={addTechnician}
             onUpdateTechnician={updateTechnician}
@@ -543,7 +582,7 @@ export default function App() {
         {activeTab === 'sales' && (
           <SalesAir 
             orders={orders} 
-            settings={tenantSettings || settings}
+            settings={effectiveSettings}
             technicianPayouts={technicianPayouts}
             expenses={expenses}
             onUpdateOrder={updateOrder}
@@ -557,7 +596,7 @@ export default function App() {
         {activeTab === 'finances' && (
           <FinanceModuleAir
             orders={orders}
-            settings={tenantSettings || settings}
+            settings={effectiveSettings}
             fixedCosts={fixedCosts}
             expenses={expenses}
             financeSettings={financeSettings}
@@ -572,16 +611,16 @@ export default function App() {
 
         {activeTab === 'landingpage' && (
           <LandingEditorAir
-            settings={settings}
-            onUpdateSettings={updateSettings}
+            settings={effectiveSettings}
+            onUpdateSettings={handleUpdateSettings}
             onBackToDashboard={() => setActiveTab('dashboard')}
           />
         )}
 
         {activeTab === 'settings' && (
           <SettingsAir
-            settings={settings}
-            onUpdateSettings={updateSettings}
+            settings={effectiveSettings}
+            onUpdateSettings={handleUpdateSettings}
             onResetDefaults={resetToDefaults}
           />
         )}

@@ -114,7 +114,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
 
   const [settings, setSettings] = useState<AirSettings>(() => {
     try {
-      const saved = localStorage.getItem(`nexus_air_settings_${companyId}`) || localStorage.getItem('nexus_air_active_settings');
+      const saved = localStorage.getItem(`nexus_air_settings_${companyId}`);
       if (saved) {
         return {
           ...INITIAL_SETTINGS,
@@ -133,6 +133,24 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       company_slug: isMockCompany ? 'nexus-air' : '',
     };
   });
+
+  // NK-038: Recargar configuración específica de la empresa al alternar de compañía
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`nexus_air_settings_${companyId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setSettings(prev => ({
+          ...INITIAL_SETTINGS,
+          ...prev,
+          ...parsed,
+          company_id: companyId
+        }));
+      }
+    } catch (e) {
+      console.warn('Error reloading company settings from localStorage:', e);
+    }
+  }, [companyId]);
 
   const [fixedCosts, setFixedCosts] = useState<FixedCosts>(() => {
     try {
@@ -460,12 +478,10 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         .maybeSingle();
 
       if (dbSettings) {
-        // Leer configuración local para respetar la selección explícita del usuario
+        // Leer configuración local específica de la empresa
         let localSaved: Partial<AirSettings> | null = null;
         try {
-          const raw = 
-            localStorage.getItem(`nexus_air_settings_${activeId}`) ||
-            localStorage.getItem('nexus_air_active_settings');
+          const raw = localStorage.getItem(`nexus_air_settings_${activeId}`);
           if (raw) localSaved = JSON.parse(raw);
         } catch {}
 
@@ -505,7 +521,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
 
           const merged: AirSettings = {
             ...prev,
-            company_id: dbSettings.company_id || prev.company_id,
+            company_id: dbSettings.company_id || activeId,
             company_name: dbSettings.company_name || prev.company_name,
             fantasy_name: dbSettings.company_name || prev.fantasy_name,
             country: preferredCountry,
@@ -524,20 +540,20 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
             logo_url: dbSettings.logo_url || localSaved?.logo_url || prev.logo_url,
             company_slogan: dbSettings.company_slogan || localSaved?.company_slogan || prev.company_slogan,
             city: dbSettings.city || localSaved?.city || prev.city,
-            default_apply_tax: localSaved?.default_apply_tax !== undefined 
-              ? localSaved.default_apply_tax 
-              : (dbSettings.default_apply_tax !== undefined ? dbSettings.default_apply_tax : (prev.default_apply_tax !== false)),
-            default_tax_mode: localSaved?.default_tax_mode || dbSettings.default_tax_mode || prev.default_tax_mode || 'included',
-            maintenance_interval_months: dbSettings.maintenance_interval_months !== null && dbSettings.maintenance_interval_months !== undefined
+            default_apply_tax: dbSettings.default_apply_tax !== undefined 
+              ? dbSettings.default_apply_tax 
+              : (localSaved?.default_apply_tax !== undefined ? localSaved.default_apply_tax : (prev.default_apply_tax !== false)),
+            default_tax_mode: dbSettings.default_tax_mode || localSaved?.default_tax_mode || prev.default_tax_mode || 'included',
+            maintenance_interval_months: (dbSettings.maintenance_interval_months !== null && dbSettings.maintenance_interval_months !== undefined)
               ? Number(dbSettings.maintenance_interval_months)
               : (localSaved?.maintenance_interval_months ?? prev.maintenance_interval_months ?? 6),
-            quality_control_days: dbSettings.quality_control_days !== null && dbSettings.quality_control_days !== undefined
+            quality_control_days: (dbSettings.quality_control_days !== null && dbSettings.quality_control_days !== undefined)
               ? Number(dbSettings.quality_control_days)
               : (localSaved?.quality_control_days ?? prev.quality_control_days ?? 7),
-            inactive_recovery_months: dbSettings.inactive_recovery_months !== null && dbSettings.inactive_recovery_months !== undefined
+            inactive_recovery_months: (dbSettings.inactive_recovery_months !== null && dbSettings.inactive_recovery_months !== undefined)
               ? Number(dbSettings.inactive_recovery_months)
               : (localSaved?.inactive_recovery_months ?? prev.inactive_recovery_months ?? 9),
-            pre_expiration_warning_days: dbSettings.pre_expiration_warning_days !== null && dbSettings.pre_expiration_warning_days !== undefined
+            pre_expiration_warning_days: (dbSettings.pre_expiration_warning_days !== null && dbSettings.pre_expiration_warning_days !== undefined)
               ? Number(dbSettings.pre_expiration_warning_days)
               : (localSaved?.pre_expiration_warning_days ?? prev.pre_expiration_warning_days ?? 15),
             bank_name: dbSettings.bank_name || localSaved?.bank_name || prev.bank_name || '',
@@ -551,7 +567,6 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
 
           try {
             localStorage.setItem(`nexus_air_settings_${activeId}`, JSON.stringify(merged));
-            localStorage.setItem('nexus_air_active_settings', JSON.stringify(merged));
           } catch {}
 
           return merged;
@@ -645,6 +660,8 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       // Verificar si hubo otra llamada a fetchData mientras esta petición estaba en curso
       if (fetchCounterRef.current !== fetchId) return;
 
+      const companyIntervalDays = (dbSettings?.maintenance_interval_months ? Number(dbSettings.maintenance_interval_months) : 6) * 30;
+
       if (dbCustomers && dbCustomers.length > 0) {
         setCustomers(dbCustomers.map((c: any) => ({
           id: c.id,
@@ -673,7 +690,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
             location_in_property: e.location_in_property,
             installation_date: e.installation_date,
             last_maintenance_date: e.last_maintenance_date,
-            next_maintenance_date: e.next_maintenance_date || format(addDays(new Date(), 180), 'yyyy-MM-dd'),
+            next_maintenance_date: e.next_maintenance_date || format(addDays(new Date(), companyIntervalDays), 'yyyy-MM-dd'),
             notes: e.notes,
           }))
         })));
@@ -697,7 +714,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
           location_in_property: e.location_in_property,
           installation_date: e.installation_date,
           last_maintenance_date: e.last_maintenance_date,
-          next_maintenance_date: e.next_maintenance_date || format(addDays(new Date(), 180), 'yyyy-MM-dd'),
+          next_maintenance_date: e.next_maintenance_date || format(addDays(new Date(), companyIntervalDays), 'yyyy-MM-dd'),
           notes: e.notes,
         })));
       } else if (!isMock) {
@@ -1994,24 +2011,27 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     }
   }, []);
 
-  // Configuración de la Empresa
-  const updateSettings = useCallback(async (updates: Partial<AirSettings>) => {
+  // Configuración de la Empresa (NK-038: Persistencia atómica por empresa)
+  const updateSettings = useCallback(async (updates: Partial<AirSettings>): Promise<AirSettings> => {
     const activeId = companyId || DEFAULT_COMPANY_ID;
+    let nextSettings: AirSettings = settings;
+
     setSettings(prev => {
-      const next = { ...prev, ...updates };
+      const next = { ...prev, ...updates, company_id: activeId };
+      nextSettings = next;
       try {
         localStorage.setItem(`nexus_air_settings_${activeId}`, JSON.stringify(next));
-        localStorage.setItem('nexus_air_active_settings', JSON.stringify(next));
       } catch (e) {
         console.warn('Error saving settings to localStorage:', e);
       }
       return next;
     });
-    toast.success('Configuración de Nexus Air actualizada');
 
     try {
-      const activeId = companyId || DEFAULT_COMPANY_ID;
-      if (activeId === DEMO_SANDBOX_COMPANY_ID) return;
+      if (activeId === DEMO_SANDBOX_COMPANY_ID) {
+        toast.success('Configuración de Nexus Air actualizada (Modo Demo)');
+        return nextSettings;
+      }
 
       const dbUpdates: any = {
         updated_at: new Date().toISOString()
@@ -2026,7 +2046,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       if (updates.currency_symbol !== undefined) dbUpdates.currency_symbol = updates.currency_symbol;
       if (updates.currency_code !== undefined) dbUpdates.currency_code = updates.currency_code;
       if (updates.tax_id_label !== undefined) dbUpdates.tax_id_label = updates.tax_id_label;
-      if (updates.tax_rate !== undefined) dbUpdates.tax_rate = updates.tax_rate;
+      if (updates.tax_rate !== undefined) dbUpdates.tax_rate = Number(updates.tax_rate);
       if (updates.tax_name !== undefined) dbUpdates.tax_name = updates.tax_name;
       if (updates.division_label !== undefined) dbUpdates.division_label = updates.division_label;
       if (updates.landing_config !== undefined) dbUpdates.landing_config = updates.landing_config;
@@ -2035,10 +2055,12 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       if (updates.city !== undefined) dbUpdates.city = updates.city;
       if (updates.default_apply_tax !== undefined) dbUpdates.default_apply_tax = updates.default_apply_tax;
       if (updates.default_tax_mode !== undefined) dbUpdates.default_tax_mode = updates.default_tax_mode;
-      if (updates.maintenance_interval_months !== undefined) dbUpdates.maintenance_interval_months = updates.maintenance_interval_months;
-      if (updates.quality_control_days !== undefined) dbUpdates.quality_control_days = updates.quality_control_days;
-      if (updates.inactive_recovery_months !== undefined) dbUpdates.inactive_recovery_months = updates.inactive_recovery_months;
-      if (updates.pre_expiration_warning_days !== undefined) dbUpdates.pre_expiration_warning_days = updates.pre_expiration_warning_days;
+      if (updates.maintenance_interval_months !== undefined) dbUpdates.maintenance_interval_months = Number(updates.maintenance_interval_months);
+      if (updates.quality_control_days !== undefined) dbUpdates.quality_control_days = Number(updates.quality_control_days);
+      if (updates.inactive_recovery_months !== undefined) dbUpdates.inactive_recovery_months = Number(updates.inactive_recovery_months);
+      if (updates.pre_expiration_warning_days !== undefined) dbUpdates.pre_expiration_warning_days = Number(updates.pre_expiration_warning_days);
+      if (updates.standard_maintenance_price !== undefined) dbUpdates.standard_maintenance_price = Number(updates.standard_maintenance_price);
+      if (updates.standard_installation_price !== undefined) dbUpdates.standard_installation_price = Number(updates.standard_installation_price);
       if (updates.bank_name !== undefined) dbUpdates.bank_name = updates.bank_name;
       if (updates.bank_account_type !== undefined) dbUpdates.bank_account_type = updates.bank_account_type;
       if (updates.bank_account_number !== undefined) dbUpdates.bank_account_number = updates.bank_account_number;
@@ -2047,44 +2069,54 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       if (updates.whatsapp_template_cobro !== undefined) dbUpdates.whatsapp_template_cobro = updates.whatsapp_template_cobro;
       if (updates.admin_pin !== undefined) dbUpdates.admin_pin = updates.admin_pin;
 
-      // Obtener o asegurar nombre y slug de la empresa (evitar NOT NULL violation en settings)
-      let compName = dbUpdates.company_name || settings.company_name || settings.fantasy_name;
-      let compSlug = dbUpdates.company_slug || settings.company_slug;
-
-      if (!compName || !compSlug) {
-        try {
-          const { data: comp } = await supabase.from('companies').select('name, slug').eq('id', activeId).maybeSingle();
-          if (comp) {
-            if (!compName) compName = comp.name;
-            if (!compSlug) compSlug = comp.slug;
-          }
-        } catch {}
-      }
-
-      if (!compName) compName = 'Empresa Climatización';
-      if (!compSlug) compSlug = activeId.substring(0, 8);
-
-      const upsertPayload = {
-        company_id: activeId,
-        company_name: compName,
-        company_slug: compSlug,
-        ...dbUpdates,
-      };
-
-      // Upsert atómico por company_id
-      const { error: upsertErr } = await supabaseAir
+      // 1. Intentar actualizar directamente la fila existente en air.settings
+      const { data: updatedRows, error: updateErr } = await supabaseAir
         .from('settings')
-        .upsert(upsertPayload, { onConflict: 'company_id' });
+        .update(dbUpdates)
+        .eq('company_id', activeId)
+        .select();
 
-      if (upsertErr) {
-        console.warn('[useAirStore] Upsert failed, fallback to update:', upsertErr);
-        await supabaseAir
+      // 2. Si no había registro previo para esta empresa, ejecutar upsert seguro
+      if (updateErr || !updatedRows || updatedRows.length === 0) {
+        let compName = dbUpdates.company_name || settings.company_name || settings.fantasy_name;
+        let compSlug = dbUpdates.company_slug || settings.company_slug;
+
+        if (!compName || !compSlug) {
+          try {
+            const { data: comp } = await supabase.from('companies').select('name, slug').eq('id', activeId).maybeSingle();
+            if (comp) {
+              if (!compName) compName = comp.name;
+              if (!compSlug) compSlug = comp.slug;
+            }
+          } catch {}
+        }
+
+        if (!compName) compName = 'Empresa Climatización';
+        if (!compSlug) compSlug = activeId.substring(0, 8);
+
+        const upsertPayload = {
+          company_id: activeId,
+          company_name: compName,
+          company_slug: compSlug,
+          ...dbUpdates,
+        };
+
+        const { error: upsertErr } = await supabaseAir
           .from('settings')
-          .update(dbUpdates)
-          .eq('company_id', activeId);
+          .upsert(upsertPayload, { onConflict: 'company_id' });
+
+        if (upsertErr) {
+          console.error('[useAirStore] Error in settings upsert:', upsertErr);
+          throw upsertErr;
+        }
       }
-    } catch (e) {
-      console.warn('[useAirStore] Error updating settings in Supabase:', e);
+
+      toast.success('Configuración y plazos guardados en la nube');
+      return nextSettings;
+    } catch (e: any) {
+      console.error('[useAirStore] Error updating settings in Supabase:', e);
+      toast.error('Error al sincronizar con la nube: ' + (e?.message || 'Error de conexión'));
+      throw e;
     }
   }, [companyId, settings]);
 

@@ -16,7 +16,8 @@ import {
   Trash2,
   Image as ImageIcon,
   CreditCard,
-  Lock
+  Lock,
+  Loader2
 } from 'lucide-react';
 import { LATIN_AMERICAN_COUNTRIES, findCountry, LatinCountry } from '../lib/countries';
 import { toast } from 'react-hot-toast';
@@ -32,6 +33,7 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
   onUpdateSettings,
   onResetDefaults,
 }) => {
+  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<AirSettings>({
     ...settings,
     country: settings.country || 'Chile',
@@ -47,6 +49,7 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
     default_apply_tax: settings.default_apply_tax !== false,
     default_tax_mode: settings.default_tax_mode || 'included',
     hide_technician_amounts: settings.hide_technician_amounts !== false,
+    maintenance_interval_months: settings.maintenance_interval_months || 6,
     quality_control_days: settings.quality_control_days || 7,
     inactive_recovery_months: settings.inactive_recovery_months || 9,
     pre_expiration_warning_days: settings.pre_expiration_warning_days || 15,
@@ -76,6 +79,7 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
       default_apply_tax: settings.default_apply_tax !== false,
       default_tax_mode: settings.default_tax_mode || 'included',
       hide_technician_amounts: settings.hide_technician_amounts !== false,
+      maintenance_interval_months: settings.maintenance_interval_months || 6,
       quality_control_days: settings.quality_control_days || 7,
       inactive_recovery_months: settings.inactive_recovery_months || 9,
       pre_expiration_warning_days: settings.pre_expiration_warning_days || 15,
@@ -124,9 +128,12 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
       commune: country.sample_cities[0] || formData.commune
     };
 
-    try {
-      localStorage.setItem('nexus_air_active_settings', JSON.stringify(updated));
-    } catch {}
+    const compId = formData.company_id || settings.company_id;
+    if (compId) {
+      try {
+        localStorage.setItem(`nexus_air_settings_${compId}`, JSON.stringify(updated));
+      } catch {}
+    }
 
     setFormData(updated);
     onUpdateSettings(updated);
@@ -134,15 +141,18 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
     toast.success(`País cambiado a ${country.flag} ${country.name}. Se adaptaron la moneda (${country.currency_symbol} ${country.currency_code}) y tasas fiscales.`);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSaving(true);
     try {
-      localStorage.setItem('nexus_air_active_settings', JSON.stringify(formData));
-      if (formData.company_id) {
-        localStorage.setItem(`nexus_air_settings_${formData.company_id}`, JSON.stringify(formData));
+      const compId = formData.company_id || settings.company_id;
+      if (compId) {
+        localStorage.setItem(`nexus_air_settings_${compId}`, JSON.stringify(formData));
       }
-    } catch {}
-    onUpdateSettings(formData);
+      await onUpdateSettings(formData);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -594,7 +604,7 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
             <div>
               <label className="text-slate-700 font-semibold block mb-1">Intervalo Mantenimiento Preventivo</label>
               <div className="flex items-center gap-1.5">
@@ -609,6 +619,22 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
                 <span className="text-slate-500 font-medium">meses</span>
               </div>
               <span className="text-[10px] text-slate-400 mt-1 block">Fórmula HVAC estándar: 6 meses</span>
+            </div>
+
+            <div>
+              <label className="text-slate-700 font-semibold block mb-1">Anticipación Alerta "Por Vencer"</label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={formData.pre_expiration_warning_days || 15}
+                  onChange={(e) => setFormData(prev => ({ ...prev, pre_expiration_warning_days: parseInt(e.target.value) || 15 }))}
+                  className="w-full p-2.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 font-mono font-bold focus:outline-none"
+                />
+                <span className="text-slate-500 font-medium">días</span>
+              </div>
+              <span className="text-[10px] text-slate-400 mt-1 block">Días previos para avisar al cliente</span>
             </div>
 
             <div>
@@ -636,57 +662,46 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
                   max={36}
                   value={formData.inactive_recovery_months || 9}
                   onChange={(e) => setFormData(prev => ({ ...prev, inactive_recovery_months: parseInt(e.target.value) || 9 }))}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
+                  className="w-full p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-900 font-mono font-bold focus:bg-white focus:border-rose-400 focus:outline-none"
                 />
                 <span className="text-slate-500 font-medium">meses</span>
               </div>
               <span className="text-[10px] text-slate-400 mt-1 block">Campaña de descuento reactivación</span>
             </div>
+          </div>
 
-            <div>
-              <label className="text-slate-700 font-semibold block mb-1">
-                Precio Mantenimiento ({formData.currency_symbol || '$'} {formData.currency_code})
-              </label>
-              <input
-                type="number"
-                value={formData.standard_maintenance_price}
-                onChange={(e) => setFormData(prev => ({ ...prev, standard_maintenance_price: parseInt(e.target.value) || 0 }))}
-                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
-              />
-              <span className="text-[10px] text-slate-400 mt-1 block">
-                + {formData.tax_name} ({Math.round((formData.tax_rate ?? 0.19) * 100)}%): {formData.currency_symbol} {Math.round(formData.standard_maintenance_price * (1 + (formData.tax_rate ?? 0.19)))}
-              </span>
-            </div>
-
-            <div>
-              <label className="text-slate-700 font-semibold block mb-1">
-                Precio Instalación ({formData.currency_symbol || '$'} {formData.currency_code})
-              </label>
-              <input
-                type="number"
-                value={formData.standard_installation_price}
-                onChange={(e) => setFormData(prev => ({ ...prev, standard_installation_price: parseInt(e.target.value) || 0 }))}
-                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
-              />
-              <span className="text-[10px] text-slate-400 mt-1 block">
-                + {formData.tax_name} ({Math.round((formData.tax_rate ?? 0.19) * 100)}%): {formData.currency_symbol} {Math.round(formData.standard_installation_price * (1 + (formData.tax_rate ?? 0.19)))}
-              </span>
-            </div>
-
-            <div>
-              <label className="text-slate-700 font-semibold block mb-1">Anticipación Alerta "Por Vencer"</label>
-              <div className="flex items-center gap-1.5">
+          <div className="pt-2 border-t border-slate-100">
+            <h4 className="text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-3">Precios de Referencia</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div>
+                <label className="text-slate-700 font-semibold block mb-1">
+                  Precio Mantenimiento ({formData.currency_symbol || '$'} {formData.currency_code})
+                </label>
                 <input
                   type="number"
-                  min={1}
-                  max={60}
-                  value={formData.pre_expiration_warning_days || 15}
-                  onChange={(e) => setFormData(prev => ({ ...prev, pre_expiration_warning_days: parseInt(e.target.value) || 15 }))}
+                  value={formData.standard_maintenance_price}
+                  onChange={(e) => setFormData(prev => ({ ...prev, standard_maintenance_price: parseInt(e.target.value) || 0 }))}
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
                 />
-                <span className="text-slate-500 font-medium">días</span>
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  + {formData.tax_name} ({Math.round((formData.tax_rate ?? 0.19) * 100)}%): {formData.currency_symbol} {Math.round(formData.standard_maintenance_price * (1 + (formData.tax_rate ?? 0.19)))}
+                </span>
               </div>
-              <span className="text-[10px] text-slate-400 mt-1 block">Días previos para avisar al cliente</span>
+
+              <div>
+                <label className="text-slate-700 font-semibold block mb-1">
+                  Precio Instalación ({formData.currency_symbol || '$'} {formData.currency_code})
+                </label>
+                <input
+                  type="number"
+                  value={formData.standard_installation_price}
+                  onChange={(e) => setFormData(prev => ({ ...prev, standard_installation_price: parseInt(e.target.value) || 0 }))}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  + {formData.tax_name} ({Math.round((formData.tax_rate ?? 0.19) * 100)}%): {formData.currency_symbol} {Math.round(formData.standard_installation_price * (1 + (formData.tax_rate ?? 0.19)))}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -821,10 +836,20 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
 
           <button
             type="submit"
-            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-[#00d2ff] to-[#2563eb] hover:from-[#38bdf8] hover:to-[#1d4ed8] text-white font-bold text-sm shadow-md shadow-blue-500/25 transition-all cursor-pointer"
+            disabled={isSaving}
+            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-[#00d2ff] to-[#2563eb] hover:from-[#38bdf8] hover:to-[#1d4ed8] text-white font-bold text-sm shadow-md shadow-blue-500/25 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Save className="w-4 h-4" />
-            <span>Guardar Configuración</span>
+            {isSaving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Guardando...</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                <span>Guardar Configuración</span>
+              </>
+            )}
           </button>
         </div>
       </form>

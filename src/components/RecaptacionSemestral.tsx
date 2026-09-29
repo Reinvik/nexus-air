@@ -37,7 +37,7 @@ interface RecaptacionSemestralProps {
   onMarkContacted: (equipmentId: string) => void;
   onScheduleService: (reminder: RecaptacionReminder) => void;
   generateWhatsAppUrl: (reminder: RecaptacionReminder) => string;
-  onUpdateSettings?: (updates: Partial<AirSettings>) => void;
+  onUpdateSettings?: (updates: Partial<AirSettings>) => Promise<any> | void;
 }
 
 export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
@@ -57,6 +57,7 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
 
   // Timing Config Modal State (NK-038)
   const [isTimingModalOpen, setIsTimingModalOpen] = useState(false);
+  const [isSavingTiming, setIsSavingTiming] = useState(false);
   const [timingIntervalMonths, setTimingIntervalMonths] = useState<number>(settings.maintenance_interval_months || 6);
   const [timingQualityDays, setTimingQualityDays] = useState<number>(settings.quality_control_days || 7);
   const [timingRecoveryMonths, setTimingRecoveryMonths] = useState<number>(settings.inactive_recovery_months || 9);
@@ -69,18 +70,26 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
     setTimingPreWarningDays(settings.pre_expiration_warning_days || 15);
   }, [settings.maintenance_interval_months, settings.quality_control_days, settings.inactive_recovery_months, settings.pre_expiration_warning_days]);
 
-  const handleSaveTiming = (e: React.FormEvent) => {
+  const handleSaveTiming = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (onUpdateSettings) {
-      onUpdateSettings({
-        maintenance_interval_months: timingIntervalMonths,
-        quality_control_days: timingQualityDays,
-        inactive_recovery_months: timingRecoveryMonths,
-        pre_expiration_warning_days: timingPreWarningDays,
-      });
+    setIsSavingTiming(true);
+    try {
+      if (onUpdateSettings) {
+        await onUpdateSettings({
+          maintenance_interval_months: timingIntervalMonths,
+          quality_control_days: timingQualityDays,
+          inactive_recovery_months: timingRecoveryMonths,
+          pre_expiration_warning_days: timingPreWarningDays,
+        });
+      }
+      toast.success('Plazos de recaptación actualizados y guardados correctamente');
+      setIsTimingModalOpen(false);
+    } catch (err: any) {
+      console.error('Error saving timing:', err);
+      toast.error('Error al guardar los plazos: ' + (err?.message || 'Intente nuevamente'));
+    } finally {
+      setIsSavingTiming(false);
     }
-    toast.success('Plazos de recaptación actualizados correctamente');
-    setIsTimingModalOpen(false);
   };
 
   // Clasificación por ciclo de vida (Lógica multietapa dinámica NK-038)
@@ -93,7 +102,7 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
 
     // 1. Preventivos: ciclo normal según intervalo configurado
     const preventiveList = reminders.filter(r => {
-      return r.days_until_due >= -recoveryThresholdDays && r.days_until_due <= 60;
+      return r.days_until_due >= -recoveryThresholdDays;
     });
 
     // 2. Control de Calidad: servicios completados recientemente (primeros días post servicio)
@@ -108,9 +117,9 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
     });
 
     return {
-      preventive: preventiveList.length > 0 ? preventiveList : reminders,
-      quality: qualityList.length > 0 ? qualityList : reminders.slice(0, 3), // Fallback para demostración fluida
-      recovery: recoveryList.length > 0 ? recoveryList : reminders.filter(r => r.status === 'vencido'),
+      preventive: preventiveList,
+      quality: qualityList,
+      recovery: recoveryList,
     };
   }, [reminders, settings.maintenance_interval_months, settings.quality_control_days, settings.inactive_recovery_months]);
 
@@ -750,15 +759,24 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsTimingModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-slate-500 hover:text-slate-800 text-xs font-semibold"
+                  disabled={isSavingTiming}
+                  className="px-4 py-2 rounded-xl text-slate-500 hover:text-slate-800 text-xs font-semibold cursor-pointer disabled:opacity-50"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#00d2ff] to-[#2563eb] hover:from-[#38bdf8] hover:to-[#1d4ed8] text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+                  disabled={isSavingTiming}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#00d2ff] to-[#2563eb] hover:from-[#38bdf8] hover:to-[#1d4ed8] text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-2"
                 >
-                  Guardar Plazos
+                  {isSavingTiming ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Guardando en la nube...</span>
+                    </>
+                  ) : (
+                    <span>Guardar Plazos</span>
+                  )}
                 </button>
               </div>
             </form>
