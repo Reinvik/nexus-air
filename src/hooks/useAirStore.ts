@@ -520,6 +520,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
             bank_account_rut: dbSettings.bank_account_rut || localSaved?.bank_account_rut || prev.bank_account_rut || '',
             bank_account_email: dbSettings.bank_account_email || localSaved?.bank_account_email || prev.bank_account_email || '',
             whatsapp_template_cobro: dbSettings.whatsapp_template_cobro || localSaved?.whatsapp_template_cobro || prev.whatsapp_template_cobro || '',
+            admin_pin: dbSettings.admin_pin || localSaved?.admin_pin || prev.admin_pin || '1234',
           };
 
           try {
@@ -1827,6 +1828,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       if (updates.bank_account_rut !== undefined) dbUpdates.bank_account_rut = updates.bank_account_rut;
       if (updates.bank_account_email !== undefined) dbUpdates.bank_account_email = updates.bank_account_email;
       if (updates.whatsapp_template_cobro !== undefined) dbUpdates.whatsapp_template_cobro = updates.whatsapp_template_cobro;
+      if (updates.admin_pin !== undefined) dbUpdates.admin_pin = updates.admin_pin;
 
       // Intentar update primero por company_id
       const { error: updateErr } = await supabaseAir

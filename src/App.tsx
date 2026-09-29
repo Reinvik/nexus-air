@@ -515,6 +515,8 @@ export default function App() {
             technicianPayouts={technicianPayouts}
             expenses={expenses}
             onUpdateOrder={updateOrder}
+            onDeleteOrder={deleteOrder}
+            onDeletePayout={deleteTechnicianPayout}
             onAddExpense={addExpense}
             onDeleteExpense={deleteExpense}
           />

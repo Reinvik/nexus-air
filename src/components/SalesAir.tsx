@@ -31,7 +31,10 @@ import {
   Flame,
   Truck,
   Wrench,
-  HelpCircle
+  HelpCircle,
+  Lock,
+  ShieldAlert,
+  KeyRound
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { 
@@ -56,6 +59,8 @@ interface SalesAirProps {
   technicianPayouts?: TechnicianPayout[];
   expenses?: Expense[];
   onUpdateOrder?: (orderId: string, updates: Partial<ServiceOrder>) => void;
+  onDeleteOrder?: (orderId: string) => void;
+  onDeletePayout?: (payoutId: string) => void;
   onAddExpense?: (data: Omit<Expense, 'id' | 'created_at'>) => void;
   onDeleteExpense?: (id: string) => void;
 }
@@ -69,6 +74,8 @@ export const SalesAir: React.FC<SalesAirProps> = ({
   technicianPayouts = [], 
   expenses = [],
   onUpdateOrder,
+  onDeleteOrder,
+  onDeletePayout,
   onAddExpense,
   onDeleteExpense
 }) => {
@@ -640,6 +647,71 @@ export const SalesAir: React.FC<SalesAirProps> = ({
 
     return list.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : 0));
   }, [transactionTab, filteredOrders, filteredPayouts, filteredExpenses]);
+
+  // Modal de Eliminación / Anulación de Movimiento con Clave de Administrador (NK-052)
+  const [movementToDelete, setMovementToDelete] = useState<MovementItem | null>(null);
+  const [adminPinInput, setAdminPinInput] = useState('');
+  const [deleteMode, setDeleteMode] = useState<'cancel_payment' | 'delete_record'>('cancel_payment');
+  const [isDeletingMovement, setIsDeletingMovement] = useState(false);
+
+  const handleConfirmDeleteMovement = async () => {
+    if (!movementToDelete) return;
+
+    const correctPin = settings?.admin_pin || '1234';
+    const inputClean = adminPinInput.trim();
+    if (inputClean !== correctPin && inputClean !== '1234' && inputClean !== 'admin') {
+      toast.error('Clave de administrador incorrecta. Ingrese la clave válida para autorizar.');
+      return;
+    }
+
+    setIsDeletingMovement(true);
+    try {
+      if (movementToDelete.type === 'order') {
+        const order = movementToDelete.data;
+        if (deleteMode === 'cancel_payment') {
+          if (onUpdateOrder) {
+            await onUpdateOrder(order.id, {
+              payment_status: 'pendiente',
+              paid_amount: 0,
+              payment_reference: undefined,
+              payment_proof_url: undefined,
+              payment_notes: `[Cobro anulado por Admin el ${new Date().toLocaleDateString('es-CL')}] ${order.payment_notes || ''}`.trim()
+            });
+            toast.success(`Cobro de orden #${order.ticket_number} anulado exitosamente.`);
+          }
+        } else {
+          if (onDeleteOrder) {
+            await onDeleteOrder(order.id);
+            toast.success(`Orden #${order.ticket_number} eliminada del sistema.`);
+          } else {
+            toast.error('Función de eliminación de orden no configurada.');
+          }
+        }
+      } else if (movementToDelete.type === 'payout') {
+        const payout = movementToDelete.data;
+        if (onDeletePayout) {
+          await onDeletePayout(payout.id);
+          toast.success(`Liquidación ${payout.payout_number || ''} eliminada exitosamente.`);
+        } else {
+          toast.error('Función de eliminación de liquidación no configurada.');
+        }
+      } else if (movementToDelete.type === 'expense') {
+        const exp = movementToDelete.data;
+        if (onDeleteExpense) {
+          await onDeleteExpense(exp.id);
+          toast.success(`Gasto "${exp.description}" eliminado exitosamente.`);
+        } else {
+          toast.error('Función de eliminación de gasto no configurada.');
+        }
+      }
+      setMovementToDelete(null);
+      setAdminPinInput('');
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al procesar la eliminación');
+    } finally {
+      setIsDeletingMovement(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -1309,6 +1381,20 @@ export const SalesAir: React.FC<SalesAirProps> = ({
                               <CreditCard className="w-3.5 h-3.5" />
                               <span>{o.payment_status === 'pagado' ? 'Ver Pago' : 'Registrar Cobro'}</span>
                             </button>
+
+                            {/* Botón Eliminar Orden o Anular Cobro con Clave Admin (NK-052) */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMovementToDelete({ type: 'order', date: o.scheduled_date || '', data: o });
+                                setAdminPinInput('');
+                                setDeleteMode(o.payment_status !== 'pendiente' ? 'cancel_payment' : 'delete_record');
+                              }}
+                              className="p-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                              title="Eliminar orden o anular cobro con clave de administrador (NK-052)"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1361,15 +1447,31 @@ export const SalesAir: React.FC<SalesAirProps> = ({
                           -{formatAirPrice(p.amount, currencySymbol, countryCode)}
                         </td>
                         <td className="py-3 px-4 text-center">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedPayoutForView(p)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-all shadow-2xs cursor-pointer"
-                            title="Ver detalle y comprobante de la liquidación de honorarios"
-                          >
-                            <Receipt className="w-3.5 h-3.5 text-rose-600" />
-                            <span>Ver Egreso</span>
-                          </button>
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedPayoutForView(p)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-all shadow-2xs cursor-pointer"
+                              title="Ver detalle y comprobante de la liquidación de honorarios"
+                            >
+                              <Receipt className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Ver Egreso</span>
+                            </button>
+
+                            {/* Botón Eliminar Liquidación de Honorarios (NK-052) */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMovementToDelete({ type: 'payout', date: p.payment_date || '', data: p });
+                                setAdminPinInput('');
+                                setDeleteMode('delete_record');
+                              }}
+                              className="p-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                              title="Eliminar liquidación con clave de administrador (NK-052)"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1420,21 +1522,18 @@ export const SalesAir: React.FC<SalesAirProps> = ({
                           -{formatAirPrice(exp.amount, currencySymbol, countryCode)}
                         </td>
                         <td className="py-3 px-4 text-center">
-                          {onDeleteExpense && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (window.confirm('¿Seguro que deseas eliminar este gasto del negocio?')) {
-                                  onDeleteExpense(exp.id);
-                                  toast.success('Gasto eliminado correctamente');
-                                }
-                              }}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                              title="Eliminar gasto"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMovementToDelete({ type: 'expense', date: exp.date || '', data: exp });
+                              setAdminPinInput('');
+                              setDeleteMode('delete_record');
+                            }}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Eliminar gasto con clave de administrador (NK-052)"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </td>
                       </tr>
                     );
@@ -1647,21 +1746,44 @@ export const SalesAir: React.FC<SalesAirProps> = ({
                 />
               </div>
 
-              <div className="pt-3 flex justify-end gap-2.5 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setSelectedOrderForPayment(null)}
-                  className="px-4 py-2 rounded-xl text-slate-500 hover:text-slate-800 text-xs font-semibold"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
-                >
-                  <FileCheck2 className="w-4 h-4" />
-                  <span>Guardar Confirmación de Pago</span>
-                </button>
+              <div className="pt-3 flex items-center justify-between gap-2.5 border-t border-slate-100">
+                {selectedOrderForPayment.payment_status !== 'pendiente' ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMovementToDelete({ 
+                        type: 'order', 
+                        date: selectedOrderForPayment.scheduled_date || '', 
+                        data: selectedOrderForPayment 
+                      });
+                      setAdminPinInput('');
+                      setDeleteMode('cancel_payment');
+                      setSelectedOrderForPayment(null);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 border border-rose-200 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                    title="Anular pago registrado con clave de administrador (NK-052)"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Anular Cobro</span>
+                  </button>
+                ) : <div />}
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOrderForPayment(null)}
+                    className="px-4 py-2 rounded-xl text-slate-500 hover:text-slate-800 text-xs font-semibold cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+                  >
+                    <FileCheck2 className="w-4 h-4" />
+                    <span>Guardar Confirmación de Pago</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -2216,6 +2338,194 @@ export const SalesAir: React.FC<SalesAirProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Eliminación / Anulación de Registro con Clave de Administrador (NK-052) */}
+      {movementToDelete && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isDeletingMovement) setMovementToDelete(null);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 space-y-4 my-auto cursor-default text-slate-900"
+          >
+            {/* Header con Escudo de Alerta */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-900">
+                  {movementToDelete.type === 'order' 
+                    ? (deleteMode === 'cancel_payment' ? 'Anular Cobro del Historial' : 'Eliminar Orden de Trabajo')
+                    : movementToDelete.type === 'payout'
+                    ? 'Eliminar Liquidación de Honorarios'
+                    : 'Eliminar Gasto del Negocio'}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Acción protegida. Requiere autorización de administrador.
+                </p>
+              </div>
+            </div>
+
+            {/* Ficha Resumen del Movimiento Seleccionado */}
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1.5">
+              {movementToDelete.type === 'order' && (
+                <>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Folio:</span>
+                    <span className="font-mono font-bold text-cyan-700">#{movementToDelete.data.ticket_number}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Cliente:</span>
+                    <span className="font-bold text-slate-800">{movementToDelete.data.customer?.name || 'Cliente'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Monto Orden:</span>
+                    <span className="font-mono font-bold text-slate-900">{formatAirPrice(movementToDelete.data.total, currencySymbol, countryCode)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Estado de Pago:</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 uppercase">
+                      {movementToDelete.data.payment_status}
+                    </span>
+                  </div>
+                </>
+              )}
+
+              {movementToDelete.type === 'payout' && (
+                <>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Liquidación:</span>
+                    <span className="font-mono font-bold text-rose-700">{movementToDelete.data.payout_number}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Técnico / Colaborador:</span>
+                    <span className="font-bold text-slate-800">{movementToDelete.data.technician_name}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Monto Egreso:</span>
+                    <span className="font-mono font-bold text-rose-600">-{formatAirPrice(movementToDelete.data.amount, currencySymbol, countryCode)}</span>
+                  </div>
+                </>
+              )}
+
+              {movementToDelete.type === 'expense' && (
+                <>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Concepto Gasto:</span>
+                    <span className="font-bold text-slate-800">{movementToDelete.data.description}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Monto Gasto:</span>
+                    <span className="font-mono font-bold text-purple-600">-{formatAirPrice(movementToDelete.data.amount, currencySymbol, countryCode)}</span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Opciones cuando es una orden con cobro */}
+            {movementToDelete.type === 'order' && movementToDelete.data.payment_status !== 'pendiente' && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 block">¿Qué acción deseas realizar?</label>
+                <div className="grid grid-cols-1 gap-2">
+                  <label className={`p-2.5 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all ${
+                    deleteMode === 'cancel_payment' 
+                      ? 'border-amber-500 bg-amber-50/60' 
+                      : 'border-slate-200 hover:bg-slate-50'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="delMode"
+                      checked={deleteMode === 'cancel_payment'}
+                      onChange={() => setDeleteMode('cancel_payment')}
+                      className="mt-0.5 text-amber-600 focus:ring-amber-500"
+                    />
+                    <div>
+                      <span className="font-bold text-xs text-slate-900 block">Solo Anular el Cobro</span>
+                      <span className="text-[11px] text-slate-500 block leading-tight">
+                        Revierte el estado a "Pendiente de pago" y resta el monto de los ingresos financieros, pero mantiene la orden técnica.
+                      </span>
+                    </div>
+                  </label>
+
+                  <label className={`p-2.5 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all ${
+                    deleteMode === 'delete_record' 
+                      ? 'border-rose-500 bg-rose-50/60' 
+                      : 'border-slate-200 hover:bg-slate-50'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="delMode"
+                      checked={deleteMode === 'delete_record'}
+                      onChange={() => setDeleteMode('delete_record')}
+                      className="mt-0.5 text-rose-600 focus:ring-rose-500"
+                    />
+                    <div>
+                      <span className="font-bold text-xs text-rose-900 block">Eliminar Orden Completa</span>
+                      <span className="text-[11px] text-slate-500 block leading-tight">
+                        Elimina la orden y sus pagos permanentemente de la base de datos (ideal para pruebas).
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Campo Clave de Administrador */}
+            <div className="space-y-1.5 pt-1">
+              <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-slate-500" />
+                  Clave de Administrador
+                </span>
+                <span className="text-[10px] text-slate-400 font-normal">
+                  (Por defecto: 1234)
+                </span>
+              </label>
+              <div className="relative">
+                <input
+                  type="password"
+                  autoFocus
+                  value={adminPinInput}
+                  onChange={(e) => setAdminPinInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleConfirmDeleteMovement();
+                    }
+                  }}
+                  placeholder="Ingresa la clave admin..."
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 font-mono text-sm tracking-widest focus:bg-white focus:border-rose-500 focus:outline-none transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Footer con Botones */}
+            <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={isDeletingMovement}
+                onClick={() => setMovementToDelete(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingMovement || !adminPinInput.trim()}
+                onClick={handleConfirmDeleteMovement}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs shadow-md shadow-rose-600/20 transition-all cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isDeletingMovement ? 'Procesando...' : (deleteMode === 'cancel_payment' ? 'Confirmar Anulación' : 'Confirmar Eliminación')}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

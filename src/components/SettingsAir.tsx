@@ -15,7 +15,8 @@ import {
   Upload,
   Trash2,
   Image as ImageIcon,
-  CreditCard
+  CreditCard,
+  Lock
 } from 'lucide-react';
 import { LATIN_AMERICAN_COUNTRIES, findCountry, LatinCountry } from '../lib/countries';
 import { toast } from 'react-hot-toast';
@@ -56,6 +57,7 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
     bank_account_rut: settings.bank_account_rut || '',
     bank_account_email: settings.bank_account_email || '',
     whatsapp_template_cobro: settings.whatsapp_template_cobro || '',
+    admin_pin: settings.admin_pin || '1234',
   });
 
   useEffect(() => {
@@ -84,6 +86,7 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
       bank_account_rut: settings.bank_account_rut || '',
       bank_account_email: settings.bank_account_email || '',
       whatsapp_template_cobro: settings.whatsapp_template_cobro || '',
+      admin_pin: settings.admin_pin || '1234',
     });
   }, [settings]);
 
@@ -553,6 +556,28 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
                   </span>
                 </div>
               </label>
+            </div>
+
+            {/* Clave de Administrador (PIN) (NK-052) */}
+            <div className="sm:col-span-2 pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-rose-600" />
+                  Clave o PIN de Administrador (NK-052)
+                </span>
+                <span className="text-[11px] text-slate-400 block leading-relaxed">
+                  Autoriza la eliminación definitiva de órdenes, anulación de pagos de prueba o liquidaciones en Ventas y Finanzas.
+                </span>
+              </div>
+              <div className="w-full sm:w-48">
+                <input
+                  type="text"
+                  value={formData.admin_pin || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, admin_pin: e.target.value }))}
+                  placeholder="Por omisión: 1234"
+                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold text-xs focus:bg-white focus:border-rose-500 focus:outline-none text-center"
+                />
+              </div>
             </div>
           </div>
         </div>
