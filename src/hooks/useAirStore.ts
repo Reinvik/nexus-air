@@ -856,6 +856,118 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       } else if (!isMock) {
         setTechnicianPayouts([]);
       }
+
+      // 8. Egresos y Gastos del Negocio en la Nube (NK-048)
+      const { data: dbExpenses } = await supabaseAir
+        .from('expenses')
+        .select('*')
+        .eq('company_id', activeId)
+        .order('date', { ascending: false });
+
+      if (dbExpenses && dbExpenses.length > 0) {
+        const mappedExp: Expense[] = dbExpenses.map((exp: any) => ({
+          id: exp.id,
+          company_id: exp.company_id,
+          date: typeof exp.date === 'string' ? exp.date.split('T')[0] : exp.date,
+          category: exp.category,
+          description: exp.description,
+          amount: Number(exp.amount) || 0,
+          amount_usd: exp.amount_usd !== null && exp.amount_usd !== undefined ? Number(exp.amount_usd) : undefined,
+          currency: exp.currency || 'CRC',
+          payment_method: exp.payment_method || 'transferencia',
+          status: exp.status || 'pagado',
+          supplier: exp.supplier || '',
+          invoice_number: exp.invoice_number || '',
+          is_fixed: Boolean(exp.is_fixed),
+          notes: exp.notes || '',
+          created_at: exp.created_at
+        }));
+        setExpenses(mappedExp);
+        try {
+          localStorage.setItem(`nexus_air_expenses_${activeId}`, JSON.stringify(mappedExp));
+        } catch {}
+      } else if (!isMock) {
+        // Si no hay en BD, migrar los gastos locales existentes a Supabase para no perderlos
+        let localExp: Expense[] = [];
+        try {
+          const raw = localStorage.getItem(`nexus_air_expenses_${activeId}`);
+          if (raw) localExp = JSON.parse(raw);
+        } catch {}
+
+        if (localExp && localExp.length > 0) {
+          for (const item of localExp) {
+            try {
+              await supabaseAir.from('expenses').upsert({
+                id: item.id || ('exp-' + crypto.randomUUID().slice(0, 8)),
+                company_id: activeId,
+                date: item.date || format(new Date(), 'yyyy-MM-dd'),
+                category: item.category || 'otro',
+                description: item.description || 'Gasto registrado',
+                amount: item.amount || 0,
+                amount_usd: item.amount_usd || 0,
+                currency: item.currency || 'CRC',
+                payment_method: item.payment_method || 'transferencia',
+                status: item.status || 'pagado',
+                supplier: item.supplier || '',
+                invoice_number: item.invoice_number || '',
+                is_fixed: Boolean(item.is_fixed),
+                notes: item.notes || ''
+              });
+            } catch (err) {
+              console.warn('[useAirStore] Error syncing local expense to cloud:', err);
+            }
+          }
+          setExpenses(localExp);
+        } else {
+          setExpenses([]);
+        }
+      }
+
+      // 9. Costos Fijos Estructurales en la Nube (NK-048)
+      const { data: dbFixedCosts } = await supabaseAir
+        .from('fixed_costs')
+        .select('*')
+        .eq('company_id', activeId)
+        .maybeSingle();
+
+      if (dbFixedCosts) {
+        const mappedFC: FixedCosts = {
+          rent: Number(dbFixedCosts.rent) || 0,
+          salaries: Number(dbFixedCosts.salaries) || 0,
+          services: Number(dbFixedCosts.services) || 0,
+          software: Number(dbFixedCosts.software) || 0,
+          marketing: Number(dbFixedCosts.marketing) || 0,
+          transport: Number(dbFixedCosts.transport) || 0,
+          other: Number(dbFixedCosts.other) || 0,
+        };
+        setFixedCosts(mappedFC);
+        try {
+          localStorage.setItem(`nexus_air_fixed_costs_${activeId}`, JSON.stringify(mappedFC));
+        } catch {}
+      } else if (!isMock) {
+        let localFC: FixedCosts | null = null;
+        try {
+          const raw = localStorage.getItem(`nexus_air_fixed_costs_${activeId}`);
+          if (raw) localFC = JSON.parse(raw);
+        } catch {}
+
+        if (localFC) {
+          try {
+            await supabaseAir.from('fixed_costs').upsert({
+              company_id: activeId,
+              rent: localFC.rent || 0,
+              salaries: localFC.salaries || 0,
+              services: localFC.services || 0,
+              software: localFC.software || 0,
+              marketing: localFC.marketing || 0,
+              transport: localFC.transport || 0,
+              other: localFC.other || 0,
+              updated_at: new Date().toISOString()
+            });
+            setFixedCosts(localFC);
+          } catch {}
+        }
+      }
     } catch (err) {
       console.warn('[useAirStore] Using offline/initial cache:', err);
     } finally {
@@ -868,7 +980,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
   useEffect(() => {
     fetchData();
 
-    // Supabase Realtime channel
+    // Supabase Realtime channel con soporte completo para todas las tablas de climatización
     const channel = supabase
       .channel(`air-realtime-${companyId || 'default'}`)
       .on('postgres_changes', { event: '*', schema: 'air', table: 'orders' }, () => {
@@ -878,6 +990,18 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         fetchData();
       })
       .on('postgres_changes', { event: '*', schema: 'air', table: 'technician_payouts' }, () => {
+        fetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'air', table: 'expenses' }, () => {
+        fetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'air', table: 'fixed_costs' }, () => {
+        fetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'air', table: 'customers' }, () => {
+        fetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'air', table: 'technicians' }, () => {
         fetchData();
       })
       .subscribe();
@@ -1832,67 +1956,181 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     }
   }, [companyId, fetchData]);
 
-  // Métodos de Finanzas & Punto de Equilibrio
-  const updateFixedCosts = useCallback((newCosts: Partial<FixedCosts>) => {
+  // Métodos de Finanzas & Punto de Equilibrio Sincronizados en Supabase (NK-048)
+  const updateFixedCosts = useCallback(async (newCosts: Partial<FixedCosts>) => {
+    const activeId = companyId || DEFAULT_COMPANY_ID;
+    let nextFC: FixedCosts;
     setFixedCosts(prev => {
-      const updated = { ...prev, ...newCosts };
+      nextFC = { ...prev, ...newCosts };
       try {
-        localStorage.setItem(`nexus_air_fixed_costs_${companyId}`, JSON.stringify(updated));
+        localStorage.setItem(`nexus_air_fixed_costs_${activeId}`, JSON.stringify(nextFC));
       } catch {}
-      return updated;
+      return nextFC;
     });
     toast.success('Costos fijos actualizados');
+
+    try {
+      const { error } = await supabaseAir
+        .from('fixed_costs')
+        .upsert({
+          company_id: activeId,
+          rent: nextFC!.rent,
+          salaries: nextFC!.salaries,
+          services: nextFC!.services,
+          software: nextFC!.software,
+          marketing: nextFC!.marketing,
+          transport: nextFC!.transport,
+          other: nextFC!.other,
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) {
+        console.warn('[useAirStore] Error saving fixed costs to Supabase:', error);
+      }
+    } catch (err) {
+      console.warn('[useAirStore] Exception saving fixed costs:', err);
+    }
   }, [companyId]);
 
-  const addExpense = useCallback((data: Omit<Expense, 'id' | 'created_at'>) => {
+  const addExpense = useCallback(async (data: Omit<Expense, 'id' | 'created_at'>) => {
+    const activeId = companyId || DEFAULT_COMPANY_ID;
     const newId = 'exp-' + crypto.randomUUID().slice(0, 8);
+    const nowStr = format(new Date(), 'yyyy-MM-dd HH:mm');
     const newExp: Expense = {
       ...data,
       id: newId,
-      company_id: companyId,
-      created_at: format(new Date(), 'yyyy-MM-dd HH:mm'),
+      company_id: activeId,
+      created_at: nowStr,
     };
     setExpenses(prev => {
       const updated = [newExp, ...prev];
       try {
-        localStorage.setItem(`nexus_air_expenses_${companyId}`, JSON.stringify(updated));
+        localStorage.setItem(`nexus_air_expenses_${activeId}`, JSON.stringify(updated));
       } catch {}
       return updated;
     });
     toast.success('Egreso operativo registrado con éxito');
+
+    try {
+      const { error } = await supabaseAir
+        .from('expenses')
+        .insert({
+          id: newId,
+          company_id: activeId,
+          date: newExp.date,
+          category: newExp.category,
+          description: newExp.description,
+          amount: newExp.amount,
+          amount_usd: newExp.amount_usd || 0,
+          currency: newExp.currency || 'CRC',
+          payment_method: newExp.payment_method || 'transferencia',
+          status: newExp.status || 'pagado',
+          supplier: newExp.supplier || '',
+          invoice_number: newExp.invoice_number || '',
+          is_fixed: Boolean(newExp.is_fixed),
+          notes: newExp.notes || ''
+        });
+
+      if (error) {
+        console.warn('[useAirStore] Error saving expense to Supabase:', error);
+      }
+    } catch (err) {
+      console.warn('[useAirStore] Exception saving expense:', err);
+    }
+
     return newExp;
   }, [companyId]);
 
-  const updateExpense = useCallback((id: string, updates: Partial<Expense>) => {
+  const updateExpense = useCallback(async (id: string, updates: Partial<Expense>) => {
+    const activeId = companyId || DEFAULT_COMPANY_ID;
     setExpenses(prev => {
       const updated = prev.map(exp => exp.id === id ? { ...exp, ...updates } : exp);
       try {
-        localStorage.setItem(`nexus_air_expenses_${companyId}`, JSON.stringify(updated));
+        localStorage.setItem(`nexus_air_expenses_${activeId}`, JSON.stringify(updated));
       } catch {}
       return updated;
     });
     toast.success('Gasto actualizado');
+
+    try {
+      const payload: any = { updated_at: new Date().toISOString() };
+      if (updates.date !== undefined) payload.date = updates.date;
+      if (updates.category !== undefined) payload.category = updates.category;
+      if (updates.description !== undefined) payload.description = updates.description;
+      if (updates.amount !== undefined) payload.amount = updates.amount;
+      if (updates.amount_usd !== undefined) payload.amount_usd = updates.amount_usd;
+      if (updates.currency !== undefined) payload.currency = updates.currency;
+      if (updates.payment_method !== undefined) payload.payment_method = updates.payment_method;
+      if (updates.status !== undefined) payload.status = updates.status;
+      if (updates.supplier !== undefined) payload.supplier = updates.supplier;
+      if (updates.invoice_number !== undefined) payload.invoice_number = updates.invoice_number;
+      if (updates.is_fixed !== undefined) payload.is_fixed = updates.is_fixed;
+      if (updates.notes !== undefined) payload.notes = updates.notes;
+
+      const { error } = await supabaseAir
+        .from('expenses')
+        .update(payload)
+        .eq('id', id);
+
+      if (error) {
+        console.warn('[useAirStore] Error updating expense in Supabase:', error);
+      }
+    } catch (err) {
+      console.warn('[useAirStore] Exception updating expense:', err);
+    }
   }, [companyId]);
 
-  const deleteExpense = useCallback((id: string) => {
+  const deleteExpense = useCallback(async (id: string) => {
+    const activeId = companyId || DEFAULT_COMPANY_ID;
     setExpenses(prev => {
       const updated = prev.filter(exp => exp.id !== id);
       try {
-        localStorage.setItem(`nexus_air_expenses_${companyId}`, JSON.stringify(updated));
+        localStorage.setItem(`nexus_air_expenses_${activeId}`, JSON.stringify(updated));
       } catch {}
       return updated;
     });
     toast.success('Gasto eliminado');
+
+    try {
+      const { error } = await supabaseAir
+        .from('expenses')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.warn('[useAirStore] Error deleting expense from Supabase:', error);
+      }
+    } catch (err) {
+      console.warn('[useAirStore] Exception deleting expense:', err);
+    }
   }, [companyId]);
 
-  const updateFinanceSettings = useCallback((newSettings: Partial<FinanceSettings>) => {
+  const updateFinanceSettings = useCallback(async (newSettings: Partial<FinanceSettings>) => {
+    const activeId = companyId || DEFAULT_COMPANY_ID;
+    let nextFS: FinanceSettings;
     setFinanceSettings(prev => {
-      const updated = { ...prev, ...newSettings };
+      nextFS = { ...prev, ...newSettings };
       try {
-        localStorage.setItem(`nexus_air_finance_settings_${companyId}`, JSON.stringify(updated));
+        localStorage.setItem(`nexus_air_finance_settings_${activeId}`, JSON.stringify(nextFS));
       } catch {}
-      return updated;
+      return nextFS;
     });
+
+    try {
+      const { error } = await supabaseAir
+        .from('settings')
+        .update({
+          finance_settings: nextFS!,
+          updated_at: new Date().toISOString()
+        })
+        .eq('company_id', activeId);
+
+      if (error) {
+        console.warn('[useAirStore] Error saving finance_settings to Supabase:', error);
+      }
+    } catch (err) {
+      console.warn('[useAirStore] Exception updating finance settings:', err);
+    }
   }, [companyId]);
 
   // Helper para consultar landing pública de empresa por slug
