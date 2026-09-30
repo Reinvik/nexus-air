@@ -235,6 +235,33 @@ export default function App() {
     }
   }, [user, loadingAuth, view]);
 
+  // Perfil del usuario activo (Top-level para evitar violación de reglas de hooks #310)
+  const currentProfile = profile || {
+    email: user?.email || 'admin@nexusair.cl',
+    full_name: profile?.full_name || user?.email?.split('@')[0] || 'Administrador HVAC',
+    role: profile?.role || 'admin',
+    company_id: effectiveCompanyId
+  };
+
+  // NK-067: Control de seguridad de pestaña activa según permisos de rol (siempre invocado al mismo nivel)
+  useEffect(() => {
+    if (view === 'dashboard') {
+      const userRole = currentProfile?.role || 'admin';
+      const permissions = effectiveSettings?.role_permissions;
+      if (!canUserAccessTab(activeTab, userRole, isNexusOwner, permissions)) {
+        const allPossibleTabs: ViewTab[] = [
+          'dashboard', 'agenda', 'recaptacion', 'cotizador', 
+          'inventory', 'customers', 'technicians', 'payroll', 
+          'sales', 'finances', 'landingpage', 'settings'
+        ];
+        const allowedFallback = allPossibleTabs.find(t => 
+          canUserAccessTab(t, userRole, isNexusOwner, permissions)
+        ) || 'dashboard';
+        setActiveTab(allowedFallback);
+      }
+    }
+  }, [activeTab, currentProfile?.role, isNexusOwner, effectiveSettings?.role_permissions, view]);
+
   // Modal States
   const [isAddOrderModalOpen, setIsAddOrderModalOpen] = useState(false);
   const [isEditOrderModalOpen, setIsEditOrderModalOpen] = useState(false);
@@ -457,32 +484,6 @@ export default function App() {
   }
 
   // 5. Vista Panel Operativo (Dashboard)
-  const currentProfile = profile || {
-    email: user?.email || 'admin@nexusair.cl',
-    full_name: profile?.full_name || user?.email?.split('@')[0] || 'Administrador HVAC',
-    role: profile?.role || 'admin',
-    company_id: effectiveCompanyId
-  };
-
-  // NK-067: Control de seguridad de pestaña activa según permisos de rol
-  useEffect(() => {
-    if (view === 'dashboard') {
-      const userRole = currentProfile?.role || 'admin';
-      const permissions = effectiveSettings?.role_permissions;
-      if (!canUserAccessTab(activeTab, userRole, isNexusOwner, permissions)) {
-        const allPossibleTabs: ViewTab[] = [
-          'dashboard', 'agenda', 'recaptacion', 'cotizador', 
-          'inventory', 'customers', 'technicians', 'payroll', 
-          'sales', 'finances', 'landingpage', 'settings'
-        ];
-        const allowedFallback = allPossibleTabs.find(t => 
-          canUserAccessTab(t, userRole, isNexusOwner, permissions)
-        ) || 'dashboard';
-        setActiveTab(allowedFallback);
-      }
-    }
-  }, [activeTab, currentProfile?.role, isNexusOwner, effectiveSettings?.role_permissions, view]);
-
   return (
     <>
       <Toaster position="top-right" />
