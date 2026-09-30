@@ -1646,7 +1646,9 @@ export const SalesAir: React.FC<SalesAirProps> = ({
                     <span className="absolute left-3 top-2.5 font-bold text-slate-400">{currencySymbol}</span>
                     <input
                       type="number"
-                      value={payAmount}
+                      value={payAmount === 0 ? '' : payAmount}
+                      placeholder="0"
+                      onFocus={(e) => e.target.select()}
                       onChange={(e) => setPayAmount(parseFloat(e.target.value) || 0)}
                       className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
                       required
@@ -2248,8 +2250,9 @@ export const SalesAir: React.FC<SalesAirProps> = ({
                   <input
                     type="number"
                     value={expAmount || ''}
-                    onChange={(e) => setExpAmount(parseFloat(e.target.value) || 0)}
                     placeholder="0"
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => setExpAmount(parseFloat(e.target.value) || 0)}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold text-sm focus:bg-white focus:border-cyan-500 focus:outline-none"
                     required
                     min="1"

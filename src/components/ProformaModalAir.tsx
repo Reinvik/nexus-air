@@ -980,7 +980,9 @@ export function ProformaModalAir({
                             <input
                               type="number"
                               min="0"
-                              value={equipmentPrice}
+                              value={equipmentPrice === 0 ? '' : equipmentPrice}
+                              placeholder="0"
+                              onFocus={(e) => e.target.select()}
                               onChange={e => setEquipmentPrice(Math.max(0, parseInt(e.target.value) || 0))}
                               className="w-24 text-right py-0.5 border rounded border-slate-300 font-mono font-bold focus:outline-none"
                             />
@@ -1048,7 +1050,9 @@ export function ProformaModalAir({
                               <input
                                 type="number"
                                 min="0"
-                                value={item.unitPrice}
+                                value={item.unitPrice === 0 ? '' : item.unitPrice}
+                                placeholder="0"
+                                onFocus={(e) => e.target.select()}
                                 onChange={e => handleItemChange(item.id, 'unitPrice', parseInt(e.target.value) || 0)}
                                 className="w-24 text-right py-0.5 border rounded border-slate-200 font-mono focus:outline-none"
                               />
@@ -1171,7 +1175,9 @@ export function ProformaModalAir({
                             <input
                               type="number"
                               min="0"
-                              value={item.unitPrice}
+                              value={item.unitPrice === 0 ? '' : item.unitPrice}
+                              placeholder="0"
+                              onFocus={(e) => e.target.select()}
                               onChange={e => handleMaintenanceItemChange(item.id, 'unitPrice', parseInt(e.target.value) || 0)}
                               className="w-24 text-right py-0.5 border rounded border-slate-200 font-mono focus:outline-none"
                             />
@@ -1293,7 +1299,9 @@ export function ProformaModalAir({
                             <input
                               type="number"
                               min="0"
-                              value={item.unitPrice}
+                              value={item.unitPrice === 0 ? '' : item.unitPrice}
+                              placeholder="0"
+                              onFocus={(e) => e.target.select()}
                               onChange={e => handleRepairItemChange(item.id, 'unitPrice', parseInt(e.target.value) || 0)}
                               className="w-24 text-right py-0.5 border rounded border-slate-200 font-mono focus:outline-none"
                             />

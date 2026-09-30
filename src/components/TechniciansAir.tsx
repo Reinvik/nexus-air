@@ -1090,8 +1090,10 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                     </select>
                     <input
                       type="number"
-                      value={commMantVal}
-                      onChange={(e) => setCommMantVal(Number(e.target.value))}
+                      value={commMantVal === 0 ? '' : commMantVal}
+                      placeholder="0"
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => setCommMantVal(e.target.value === '' ? 0 : Number(e.target.value))}
                       className="p-1.5 bg-slate-50 border border-slate-300 rounded-md text-xs font-mono font-bold"
                     />
                   </div>
@@ -1113,8 +1115,10 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                     </select>
                     <input
                       type="number"
-                      value={commInstVal}
-                      onChange={(e) => setCommInstVal(Number(e.target.value))}
+                      value={commInstVal === 0 ? '' : commInstVal}
+                      placeholder="0"
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => setCommInstVal(e.target.value === '' ? 0 : Number(e.target.value))}
                       className="p-1.5 bg-slate-50 border border-slate-300 rounded-md text-xs font-mono font-bold"
                     />
                   </div>
@@ -1297,8 +1301,10 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                     </select>
                     <input
                       type="number"
-                      value={editCommMantVal}
-                      onChange={(e) => setEditCommMantVal(Number(e.target.value))}
+                      value={editCommMantVal === 0 ? '' : editCommMantVal}
+                      placeholder="0"
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => setEditCommMantVal(e.target.value === '' ? 0 : Number(e.target.value))}
                       className="p-1.5 bg-slate-50 border border-slate-300 rounded-md text-xs font-mono font-bold"
                     />
                   </div>
@@ -1318,8 +1324,10 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                     </select>
                     <input
                       type="number"
-                      value={editCommInstVal}
-                      onChange={(e) => setEditCommInstVal(Number(e.target.value))}
+                      value={editCommInstVal === 0 ? '' : editCommInstVal}
+                      placeholder="0"
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => setEditCommInstVal(e.target.value === '' ? 0 : Number(e.target.value))}
                       className="p-1.5 bg-slate-50 border border-slate-300 rounded-md text-xs font-mono font-bold"
                     />
                   </div>
@@ -1777,8 +1785,10 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                   <span className="absolute left-3 top-2.5 text-slate-400 font-bold">{currencySymbol}</span>
                   <input
                     type="number"
-                    value={payoutAmount}
-                    onChange={(e) => setPayoutAmount(Number(e.target.value))}
+                    value={payoutAmount === 0 ? '' : payoutAmount}
+                    placeholder="0"
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => setPayoutAmount(e.target.value === '' ? 0 : Number(e.target.value))}
                     required
                     min={1}
                     className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 text-sm font-mono font-black focus:bg-white focus:border-cyan-500 focus:outline-none"

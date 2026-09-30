@@ -688,7 +688,9 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
                 </label>
                 <input
                   type="number"
-                  value={formData.standard_maintenance_price}
+                  value={formData.standard_maintenance_price === 0 ? '' : formData.standard_maintenance_price}
+                  placeholder="0"
+                  onFocus={(e) => e.target.select()}
                   onChange={(e) => setFormData(prev => ({ ...prev, standard_maintenance_price: parseInt(e.target.value) || 0 }))}
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
                 />
@@ -703,7 +705,9 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
                 </label>
                 <input
                   type="number"
-                  value={formData.standard_installation_price}
+                  value={formData.standard_installation_price === 0 ? '' : formData.standard_installation_price}
+                  placeholder="0"
+                  onFocus={(e) => e.target.select()}
                   onChange={(e) => setFormData(prev => ({ ...prev, standard_installation_price: parseInt(e.target.value) || 0 }))}
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
                 />

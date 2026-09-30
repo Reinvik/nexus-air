@@ -1202,8 +1202,10 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
                   </label>
                   <input
                     type="number"
-                    value={payBaseSalary}
-                    onChange={(e) => setPayBaseSalary(Number(e.target.value))}
+                    value={payBaseSalary === 0 ? '' : payBaseSalary}
+                    placeholder="0"
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => setPayBaseSalary(e.target.value === '' ? 0 : Number(e.target.value))}
                     min={0}
                     className="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
                   />
@@ -1217,8 +1219,10 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
                   </label>
                   <input
                     type="number"
-                    value={payCommissionAmount}
-                    onChange={(e) => setPayCommissionAmount(Number(e.target.value))}
+                    value={payCommissionAmount === 0 ? '' : payCommissionAmount}
+                    placeholder="0"
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => setPayCommissionAmount(e.target.value === '' ? 0 : Number(e.target.value))}
                     min={0}
                     className="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
                   />
@@ -1230,10 +1234,11 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
                   </label>
                   <input
                     type="number"
-                    value={payBonusAmount}
-                    onChange={(e) => setPayBonusAmount(Number(e.target.value))}
-                    min={0}
+                    value={payBonusAmount === 0 ? '' : payBonusAmount}
                     placeholder="0"
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => setPayBonusAmount(e.target.value === '' ? 0 : Number(e.target.value))}
+                    min={0}
                     className="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
                   />
                 </div>
@@ -1245,10 +1250,11 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
                 </label>
                 <input
                   type="number"
-                  value={payDeductionAmount}
-                  onChange={(e) => setPayDeductionAmount(Number(e.target.value))}
-                  min={0}
+                  value={payDeductionAmount === 0 ? '' : payDeductionAmount}
                   placeholder="0"
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => setPayDeductionAmount(e.target.value === '' ? 0 : Number(e.target.value))}
+                  min={0}
                   className="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 font-mono font-bold focus:bg-white focus:border-cyan-500 focus:outline-none"
                 />
               </div>
@@ -1789,9 +1795,10 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
                     </label>
                     <input
                       type="number"
-                      value={staffBaseSalary}
-                      onChange={(e) => setStaffBaseSalary(Number(e.target.value))}
-                      placeholder="Ej: 550000"
+                      value={staffBaseSalary === 0 ? '' : staffBaseSalary}
+                      placeholder="0"
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => setStaffBaseSalary(e.target.value === '' ? 0 : Number(e.target.value))}
                       min={0}
                       className="w-full p-2 bg-white border border-slate-300 rounded-xl text-slate-900 font-mono font-bold"
                     />
@@ -1810,8 +1817,10 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
                       <span className="text-slate-500 block">Mantenimiento:</span>
                       <input
                         type="number"
-                        value={commMantVal}
-                        onChange={(e) => setCommMantVal(Number(e.target.value))}
+                        value={commMantVal === 0 ? '' : commMantVal}
+                        placeholder="0"
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setCommMantVal(e.target.value === '' ? 0 : Number(e.target.value))}
                         className="w-full p-1 bg-slate-50 border rounded text-xs font-mono font-bold mt-1"
                       />
                     </div>
@@ -1819,8 +1828,10 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
                       <span className="text-slate-500 block">Instalación:</span>
                       <input
                         type="number"
-                        value={commInstVal}
-                        onChange={(e) => setCommInstVal(Number(e.target.value))}
+                        value={commInstVal === 0 ? '' : commInstVal}
+                        placeholder="0"
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setCommInstVal(e.target.value === '' ? 0 : Number(e.target.value))}
                         className="w-full p-1 bg-slate-50 border rounded text-xs font-mono font-bold mt-1"
                       />
                     </div>
@@ -1982,8 +1993,10 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
                     </label>
                     <input
                       type="number"
-                      value={staffBaseSalary}
-                      onChange={(e) => setStaffBaseSalary(Number(e.target.value))}
+                      value={staffBaseSalary === 0 ? '' : staffBaseSalary}
+                      placeholder="0"
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => setStaffBaseSalary(e.target.value === '' ? 0 : Number(e.target.value))}
                       min={0}
                       className="w-full p-2 bg-white border border-slate-300 rounded-xl text-slate-900 font-mono font-bold"
                     />
@@ -2002,8 +2015,10 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
                       <span className="text-slate-500 block">Mantenimiento:</span>
                       <input
                         type="number"
-                        value={commMantVal}
-                        onChange={(e) => setCommMantVal(Number(e.target.value))}
+                        value={commMantVal === 0 ? '' : commMantVal}
+                        placeholder="0"
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setCommMantVal(e.target.value === '' ? 0 : Number(e.target.value))}
                         className="w-full p-1 bg-slate-50 border rounded text-xs font-mono font-bold mt-1"
                       />
                     </div>
@@ -2011,8 +2026,10 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
                       <span className="text-slate-500 block">Instalación:</span>
                       <input
                         type="number"
-                        value={commInstVal}
-                        onChange={(e) => setCommInstVal(Number(e.target.value))}
+                        value={commInstVal === 0 ? '' : commInstVal}
+                        placeholder="0"
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setCommInstVal(e.target.value === '' ? 0 : Number(e.target.value))}
                         className="w-full p-1 bg-slate-50 border rounded text-xs font-mono font-bold mt-1"
                       />
                     </div>

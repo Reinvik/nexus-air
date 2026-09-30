@@ -1092,8 +1092,10 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                 <span className="text-xs text-slate-300">Meta Utilidad:</span>
                 <input
                   type="number"
-                  value={desiredProfit}
-                  onChange={(e) => onUpdateFinanceSettings({ target_monthly_profit: Number(e.target.value) })}
+                  value={desiredProfit === 0 ? '' : desiredProfit}
+                  placeholder="0"
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => onUpdateFinanceSettings({ target_monthly_profit: e.target.value === '' ? 0 : Number(e.target.value) })}
                   className="w-36 p-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono font-bold text-right focus:outline-none focus:border-cyan-400"
                 />
               </div>
@@ -1411,8 +1413,10 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                 <label className="font-semibold text-slate-700 block mb-1">🏢 Arriendo Taller / Bodega</label>
                 <input
                   type="number"
-                  value={tempFixedCosts.rent}
-                  onChange={(e) => setTempFixedCosts({ ...tempFixedCosts, rent: Number(e.target.value) })}
+                  value={tempFixedCosts.rent === 0 ? '' : tempFixedCosts.rent}
+                  placeholder="0"
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => setTempFixedCosts({ ...tempFixedCosts, rent: e.target.value === '' ? 0 : Number(e.target.value) })}
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900"
                 />
               </div>
@@ -1421,8 +1425,10 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                 <label className="font-semibold text-slate-700 block mb-1">👥 Nómina / Sueldos Fijos (Administrativo, etc.)</label>
                 <input
                   type="number"
-                  value={tempFixedCosts.salaries}
-                  onChange={(e) => setTempFixedCosts({ ...tempFixedCosts, salaries: Number(e.target.value) })}
+                  value={tempFixedCosts.salaries === 0 ? '' : tempFixedCosts.salaries}
+                  placeholder="0"
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => setTempFixedCosts({ ...tempFixedCosts, salaries: e.target.value === '' ? 0 : Number(e.target.value) })}
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900"
                 />
               </div>
@@ -1431,8 +1437,10 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                 <label className="font-semibold text-slate-700 block mb-1">🚚 Movilización & Combustible Fijo Camionetas</label>
                 <input
                   type="number"
-                  value={tempFixedCosts.transport}
-                  onChange={(e) => setTempFixedCosts({ ...tempFixedCosts, transport: Number(e.target.value) })}
+                  value={tempFixedCosts.transport === 0 ? '' : tempFixedCosts.transport}
+                  placeholder="0"
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => setTempFixedCosts({ ...tempFixedCosts, transport: e.target.value === '' ? 0 : Number(e.target.value) })}
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900"
                 />
               </div>
@@ -1441,8 +1449,10 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                 <label className="font-semibold text-slate-700 block mb-1">📢 Marketing & Publicidad (Google/Meta Ads)</label>
                 <input
                   type="number"
-                  value={tempFixedCosts.marketing}
-                  onChange={(e) => setTempFixedCosts({ ...tempFixedCosts, marketing: Number(e.target.value) })}
+                  value={tempFixedCosts.marketing === 0 ? '' : tempFixedCosts.marketing}
+                  placeholder="0"
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => setTempFixedCosts({ ...tempFixedCosts, marketing: e.target.value === '' ? 0 : Number(e.target.value) })}
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900"
                 />
               </div>
@@ -1451,8 +1461,10 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                 <label className="font-semibold text-slate-700 block mb-1">⚡ Servicios Básicos (Luz trifásica, Agua, Internet)</label>
                 <input
                   type="number"
-                  value={tempFixedCosts.services}
-                  onChange={(e) => setTempFixedCosts({ ...tempFixedCosts, services: Number(e.target.value) })}
+                  value={tempFixedCosts.services === 0 ? '' : tempFixedCosts.services}
+                  placeholder="0"
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => setTempFixedCosts({ ...tempFixedCosts, services: e.target.value === '' ? 0 : Number(e.target.value) })}
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900"
                 />
               </div>
@@ -1461,8 +1473,10 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                 <label className="font-semibold text-slate-700 block mb-1">💻 Software, Hosting & Telefonía</label>
                 <input
                   type="number"
-                  value={tempFixedCosts.software}
-                  onChange={(e) => setTempFixedCosts({ ...tempFixedCosts, software: Number(e.target.value) })}
+                  value={tempFixedCosts.software === 0 ? '' : tempFixedCosts.software}
+                  placeholder="0"
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => setTempFixedCosts({ ...tempFixedCosts, software: e.target.value === '' ? 0 : Number(e.target.value) })}
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900"
                 />
               </div>
@@ -1471,8 +1485,10 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                 <label className="font-semibold text-slate-700 block mb-1">📦 Otros Costos Fijos Imprevistos</label>
                 <input
                   type="number"
-                  value={tempFixedCosts.other}
-                  onChange={(e) => setTempFixedCosts({ ...tempFixedCosts, other: Number(e.target.value) })}
+                  value={tempFixedCosts.other === 0 ? '' : tempFixedCosts.other}
+                  placeholder="0"
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => setTempFixedCosts({ ...tempFixedCosts, other: e.target.value === '' ? 0 : Number(e.target.value) })}
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900"
                 />
               </div>
@@ -1583,8 +1599,10 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                   <label className="font-semibold text-slate-700 block mb-1">Monto ({settings.currency_symbol || '$'}) *</label>
                   <input
                     type="number"
-                    value={expAmount}
-                    onChange={(e) => setExpAmount(Number(e.target.value))}
+                    value={expAmount === 0 ? '' : expAmount}
+                    placeholder="0"
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => setExpAmount(e.target.value === '' ? 0 : Number(e.target.value))}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold"
                     min="1"
                     required
