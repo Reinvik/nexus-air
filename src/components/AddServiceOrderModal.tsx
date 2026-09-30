@@ -1,6 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Customer, AirEquipment, Technician, ServiceOrder, ServiceType, AirSettings } from '../types';
-import { X, Plus, Calendar, Clock, User, Wrench, UserCheck, Users, Percent, DollarSign, AlertTriangle, UserPlus } from 'lucide-react';
+import { 
+  Customer, 
+  AirEquipment, 
+  Technician, 
+  ServiceOrder, 
+  ServiceType, 
+  AirSettings,
+  CALENDAR_COLOR_OPTIONS,
+  SERVICE_TYPE_DEFAULT_COLORS,
+  formatServiceType
+} from '../types';
+import { X, Plus, Calendar, Clock, User, Wrench, UserCheck, Users, Percent, DollarSign, AlertTriangle, UserPlus, Palette, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import { QuickCreateCustomerModal } from './QuickCreateCustomerModal';
@@ -51,6 +61,9 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
   const [customerId, setCustomerId] = useState(customers[0]?.id || '');
   const [equipmentId, setEquipmentId] = useState('');
   const [serviceType, setServiceType] = useState<ServiceType>('mantencion_preventiva');
+  const [calendarColor, setCalendarColor] = useState<string>(() => 
+    settings?.service_type_colors?.['mantencion_preventiva'] || SERVICE_TYPE_DEFAULT_COLORS['mantencion_preventiva'] || '#0284c7'
+  );
   const [scheduledDate, setScheduledDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [scheduledSlot, setScheduledSlot] = useState('09:30 - 11:30');
   const [technicianId, setTechnicianId] = useState(
@@ -207,6 +220,7 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
       tax_mode: applyTax ? taxMode : 'exempt',
       is_recurring_confirmed: isRecurringConfirmed,
       recurring_frequency_months: isRecurringConfirmed ? recurringFrequencyMonths : undefined,
+      calendar_color: calendarColor,
       payment_status: 'pendiente',
     });
 
@@ -349,6 +363,8 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                         if (val === 'instalacion') setBasePrice(130000);
                         if (val === 'visita_tecnica') setBasePrice(30000);
                         if (val === 'recarga_gas') setBasePrice(65000);
+                        const suggestedCol = settings?.service_type_colors?.[val] || SERVICE_TYPE_DEFAULT_COLORS[val] || '#0284c7';
+                        setCalendarColor(suggestedCol);
                       }}
                       className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:border-cyan-500 focus:outline-none transition-colors font-medium"
                     >
@@ -358,6 +374,89 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                       <option value="visita_tecnica">Visita Técnica de Diagnóstico</option>
                       <option value="recarga_gas">Recarga Gas Refrigerante R410A/R32</option>
                     </select>
+                  </div>
+
+                  {/* NK-061: Clasificación cromática en agendamiento */}
+                  <div className="pt-2 border-t border-slate-200/70 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="font-semibold text-slate-700 flex items-center gap-1.5 text-xs">
+                        <Palette className="w-3.5 h-3.5 text-cyan-600" />
+                        <span>Color en Agenda / Calendario</span>
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <span 
+                          className="w-3.5 h-3.5 rounded-full border border-slate-300 shadow-2xs" 
+                          style={{ backgroundColor: calendarColor }}
+                        />
+                        <span className="text-[11px] font-mono font-bold text-slate-600">
+                          {calendarColor}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {CALENDAR_COLOR_OPTIONS.map(c => {
+                        const isSelected = calendarColor.toLowerCase() === c.value.toLowerCase();
+                        return (
+                          <button
+                            key={c.value}
+                            type="button"
+                            onClick={() => setCalendarColor(c.value)}
+                            title={c.name}
+                            className={`w-7 h-7 rounded-lg transition-all flex items-center justify-center cursor-pointer shadow-2xs relative ${
+                              isSelected 
+                                ? 'ring-2 ring-offset-2 ring-slate-900 scale-110' 
+                                : 'hover:scale-105 opacity-85 hover:opacity-100'
+                            }`}
+                            style={{ backgroundColor: c.value }}
+                          >
+                            {isSelected && <Check className="w-4 h-4 text-white stroke-[3] drop-shadow-xs" />}
+                          </button>
+                        );
+                      })}
+
+                      {/* Selector de color personalizado nativo */}
+                      <label 
+                        className="relative h-7 px-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 cursor-pointer shadow-2xs transition-colors"
+                        title="Elegir otro color personalizado"
+                      >
+                        <span className="w-2.5 h-2.5 rounded-full border border-slate-400" style={{ backgroundColor: calendarColor }} />
+                        <span>Personalizado</span>
+                        <input
+                          type="color"
+                          value={calendarColor}
+                          onChange={(e) => setCalendarColor(e.target.value)}
+                          className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
+                        />
+                      </label>
+                    </div>
+
+                    {/* Previsualización en vivo de la tarjeta en el calendario */}
+                    <div 
+                      className="mt-2 p-2.5 rounded-xl border transition-all text-xs"
+                      style={{
+                        borderLeftWidth: '4px',
+                        borderLeftColor: calendarColor,
+                        backgroundColor: `${calendarColor}12`,
+                        borderColor: `${calendarColor}35`
+                      }}
+                    >
+                      <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700">
+                        <span className="font-mono font-bold" style={{ color: calendarColor }}>
+                          AIR-2026-NUEVA
+                        </span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-bold" style={{ backgroundColor: `${calendarColor}25`, color: calendarColor }}>
+                          {formatServiceType(serviceType)}
+                        </span>
+                      </div>
+                      <div className="font-extrabold text-slate-900 text-xs mt-1">
+                        {customers.find(c => c.id === customerId)?.name || 'Nombre del Cliente'}
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-slate-400" />
+                        <span>{scheduledSlot}</span>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200/70">

@@ -49,6 +49,48 @@ export function formatServiceType(type?: string): string {
   }
 }
 
+// NK-061: Clasificación cromática en agendamiento
+export const SERVICE_TYPE_DEFAULT_COLORS: Record<string, string> = {
+  mantencion_preventiva: '#0284c7', // Azul cielo
+  mantenimiento_preventivo: '#0284c7',
+  mantencion_correctiva: '#ea580c', // Naranja
+  mantenimiento_correctivo: '#ea580c',
+  instalacion: '#dc2626', // Rojo
+  visita_tecnica: '#d97706', // Ámbar / Dorado
+  recarga_gas: '#0891b2', // Cian
+  reparacion: '#7c3aed', // Púrpura / Violeta
+  recaptacion: '#16a34a', // Verde
+  pruebas_qa: '#9333ea', // Magenta
+};
+
+export const CALENDAR_COLOR_OPTIONS = [
+  { name: 'Azul (Mantenimiento)', value: '#0284c7' },
+  { name: 'Rojo (Instalación)', value: '#dc2626' },
+  { name: 'Naranja (Correctivo)', value: '#ea580c' },
+  { name: 'Ámbar (Visita Técnica)', value: '#d97706' },
+  { name: 'Cian (Recarga Gas)', value: '#0891b2' },
+  { name: 'Violeta (Reparación)', value: '#7c3aed' },
+  { name: 'Verde (Recaptación)', value: '#16a34a' },
+  { name: 'Esmeralda', value: '#059669' },
+  { name: 'Rosa Fucsia', value: '#db2777' },
+  { name: 'Gris Pizarra', value: '#4b5563' },
+];
+
+export function getOrderCalendarColor(
+  order: { calendar_color?: string; service_type?: string; checklist?: any },
+  serviceTypeColors?: Record<string, string>
+): string {
+  if (order.calendar_color) return order.calendar_color;
+  if (order.checklist && typeof order.checklist === 'object' && (order.checklist as any).calendar_color) {
+    return (order.checklist as any).calendar_color;
+  }
+  const sType = order.service_type || 'mantencion_preventiva';
+  if (serviceTypeColors && serviceTypeColors[sType]) {
+    return serviceTypeColors[sType];
+  }
+  return SERVICE_TYPE_DEFAULT_COLORS[sType] || '#0284c7';
+}
+
 export type OrderStatus = 
   | 'ingresado' 
   | 'en_ruta' 
@@ -236,6 +278,7 @@ export interface ServiceOrder {
   payment_notes?: string;     // NK-041: Notas de cobro
   invoice_number?: string;
   folio?: string;
+  calendar_color?: string; // NK-061: Color distintivo en agenda/calendario
   created_at: string;
   completed_at?: string;
 }
@@ -373,6 +416,7 @@ export interface AirSettings {
   sample_cities?: string[];
   coverage_communes?: string[];
   admin_pin?: string; // NK-052: Clave o PIN de administrador para anular/eliminar movimientos
+  service_type_colors?: Record<string, string>; // NK-061: Colores configurables por tipo de servicio
   landing_config?: LandingPageConfig;
 }
 

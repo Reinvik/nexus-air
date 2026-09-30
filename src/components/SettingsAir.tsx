@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { AirSettings } from '../types';
+import { 
+  AirSettings,
+  SERVICE_TYPE_DEFAULT_COLORS,
+  CALENDAR_COLOR_OPTIONS,
+  formatServiceType
+} from '../types';
 import { 
   Settings, 
   Save, 
@@ -17,7 +22,8 @@ import {
   Image as ImageIcon,
   CreditCard,
   Lock,
-  Loader2
+  Loader2,
+  Palette
 } from 'lucide-react';
 import { LATIN_AMERICAN_COUNTRIES, findCountry, LatinCountry } from '../lib/countries';
 import { toast } from 'react-hot-toast';
@@ -61,6 +67,7 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
     bank_account_email: settings.bank_account_email || '',
     whatsapp_template_cobro: settings.whatsapp_template_cobro || '',
     admin_pin: settings.admin_pin || '1234',
+    service_type_colors: settings.service_type_colors || SERVICE_TYPE_DEFAULT_COLORS,
   });
 
   useEffect(() => {
@@ -91,6 +98,7 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
       bank_account_email: settings.bank_account_email || '',
       whatsapp_template_cobro: settings.whatsapp_template_cobro || '',
       admin_pin: settings.admin_pin || '1234',
+      service_type_colors: settings.service_type_colors || SERVICE_TYPE_DEFAULT_COLORS,
     });
   }, [settings]);
 
@@ -703,6 +711,139 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
                 </span>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* SECCIÓN: CLASIFICACIÓN CROMÁTICA EN AGENDAMIENTO (NK-061) */}
+        <div className="p-6 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100">
+            <div>
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <Palette className="w-4 h-4 text-cyan-600" />
+                Clasificación Cromática en Agenda y Calendario (NK-061)
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Define el color distintivo de cada tipo de trabajo para identificarlo al instante en las vistas de Día, Semana y Mes.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setFormData(prev => ({
+                  ...prev,
+                  service_type_colors: { ...SERVICE_TYPE_DEFAULT_COLORS }
+                }));
+                toast.success('Colores restablecidos a los valores predeterminados');
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 text-xs font-bold transition-colors cursor-pointer self-start sm:self-auto"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+              <span>Restablecer Predeterminados</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[
+              { key: 'mantencion_preventiva', label: 'Mantenimiento Preventivo (6M)', desc: 'Revisión semestral periódica' },
+              { key: 'instalacion', label: 'Instalación de Equipo', desc: 'Montaje de unidades y cañerías' },
+              { key: 'mantencion_correctiva', label: 'Mantenimiento Correctivo / Fuga', desc: 'Atención de fallas o fugas críticas' },
+              { key: 'visita_tecnica', label: 'Visita Técnica de Diagnóstico', desc: 'Evaluación y presupuesto en terreno' },
+              { key: 'recarga_gas', label: 'Recarga de Gas Refrigerante', desc: 'Carga de R410A / R32 / R22' },
+              { key: 'reparacion', label: 'Reparación General', desc: 'Cambio de piezas o compresores' },
+              { key: 'recaptacion', label: 'Recaptación de Mantenimiento', desc: 'Contacto proactivo a clientes' },
+              { key: 'pruebas_qa', label: 'Pruebas de Calidad / QA', desc: 'Medición de salto térmico y presiones' },
+            ].map(item => {
+              const currentColor = formData.service_type_colors?.[item.key] || SERVICE_TYPE_DEFAULT_COLORS[item.key] || '#0284c7';
+              return (
+                <div 
+                  key={item.key}
+                  className="p-3.5 rounded-xl border transition-all space-y-2.5"
+                  style={{
+                    borderLeftWidth: '4px',
+                    borderLeftColor: currentColor,
+                    backgroundColor: `${currentColor}08`,
+                    borderColor: `${currentColor}30`
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-extrabold text-slate-900 text-xs flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: currentColor }} />
+                        <span>{item.label}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 block mt-0.5">
+                        {item.desc}
+                      </span>
+                    </div>
+                    <span 
+                      className="font-mono font-bold text-[10px] px-2 py-0.5 rounded-full border shadow-2xs"
+                      style={{ 
+                        backgroundColor: `${currentColor}15`, 
+                        color: currentColor,
+                        borderColor: `${currentColor}40`
+                      }}
+                    >
+                      {currentColor}
+                    </span>
+                  </div>
+
+                  {/* Selector interactivo de colores */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    {CALENDAR_COLOR_OPTIONS.slice(0, 8).map(opt => {
+                      const isSelected = currentColor.toLowerCase() === opt.value.toLowerCase();
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => {
+                            setFormData(prev => ({
+                              ...prev,
+                              service_type_colors: {
+                                ...(prev.service_type_colors || SERVICE_TYPE_DEFAULT_COLORS),
+                                [item.key]: opt.value,
+                                ...(item.key === 'mantencion_preventiva' ? { mantenimiento_preventivo: opt.value } : {}),
+                                ...(item.key === 'mantencion_correctiva' ? { mantenimiento_correctivo: opt.value } : {})
+                              }
+                            }));
+                          }}
+                          title={opt.name}
+                          className={`w-6 h-6 rounded-md transition-all flex items-center justify-center cursor-pointer relative shadow-2xs ${
+                            isSelected ? 'ring-2 ring-offset-1 ring-slate-900 scale-110' : 'hover:scale-105 opacity-80 hover:opacity-100'
+                          }`}
+                          style={{ backgroundColor: opt.value }}
+                        >
+                          {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
+                        </button>
+                      );
+                    })}
+
+                    <label 
+                      className="relative h-6 px-2 rounded-md border border-slate-300 bg-white hover:bg-slate-50 flex items-center gap-1 text-[10px] font-semibold text-slate-700 cursor-pointer shadow-2xs"
+                      title="Elegir tono personalizado"
+                    >
+                      <span>Custom</span>
+                      <input
+                        type="color"
+                        value={currentColor}
+                        onChange={(e) => {
+                          const newCol = e.target.value;
+                          setFormData(prev => ({
+                            ...prev,
+                            service_type_colors: {
+                              ...(prev.service_type_colors || SERVICE_TYPE_DEFAULT_COLORS),
+                              [item.key]: newCol,
+                              ...(item.key === 'mantencion_preventiva' ? { mantenimiento_preventivo: newCol } : {}),
+                              ...(item.key === 'mantencion_correctiva' ? { mantenimiento_correctivo: newCol } : {})
+                            }
+                          }));
+                        }}
+                        className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
+                      />
+                    </label>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 

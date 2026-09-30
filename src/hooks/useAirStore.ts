@@ -14,7 +14,8 @@ import {
   FixedCosts,
   Expense,
   FinanceSettings,
-  RecurringMaintenanceSchedule
+  RecurringMaintenanceSchedule,
+  SERVICE_TYPE_DEFAULT_COLORS
 } from '../types';
 import { 
   INITIAL_SETTINGS, 
@@ -563,6 +564,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
             bank_account_email: dbSettings.bank_account_email || localSaved?.bank_account_email || prev.bank_account_email || '',
             whatsapp_template_cobro: dbSettings.whatsapp_template_cobro || localSaved?.whatsapp_template_cobro || prev.whatsapp_template_cobro || '',
             admin_pin: dbSettings.admin_pin || localSaved?.admin_pin || prev.admin_pin || '1234',
+            service_type_colors: dbSettings.finance_settings?.service_type_colors || localSaved?.service_type_colors || prev.service_type_colors || SERVICE_TYPE_DEFAULT_COLORS,
           };
 
           try {
@@ -888,7 +890,8 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
             payment_date: o.payment_date,
             payment_notes: o.payment_notes,
             invoice_number: o.invoice_number,
-            folio: o.folio
+            folio: o.folio,
+            calendar_color: o.calendar_color || (o.checklist && typeof o.checklist === 'object' && o.checklist.calendar_color) || undefined,
           };
         });
         setOrders(mappedOrders);
@@ -1228,6 +1231,11 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       if (updates.items !== undefined) dbUpdates.items = updates.items;
       if (updates.completed_at !== undefined) dbUpdates.completed_at = updates.completed_at;
       if (updates.checklist !== undefined) dbUpdates.checklist = updates.checklist;
+      if (updates.calendar_color !== undefined) {
+        const curOrder = orders.find(o => o.id === orderId);
+        const baseCl = dbUpdates.checklist || curOrder?.checklist || {};
+        dbUpdates.checklist = { ...baseCl, calendar_color: updates.calendar_color };
+      }
       if (updates.apply_tax !== undefined) dbUpdates.apply_tax = updates.apply_tax;
       if (updates.payment_reference !== undefined) dbUpdates.payment_reference = updates.payment_reference;
       if (updates.payment_proof_url !== undefined) dbUpdates.payment_proof_url = updates.payment_proof_url;
@@ -1357,6 +1365,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       is_recurring_confirmed: orderData.is_recurring_confirmed || false,
       recurring_frequency_months: orderData.recurring_frequency_months,
       recurring_schedule_id: orderData.recurring_schedule_id,
+      calendar_color: orderData.calendar_color,
       payment_status: orderData.payment_status || 'pendiente',
       payment_method: orderData.payment_method || 'efectivo',
       technician_location: orderData.technician_location,
@@ -1428,7 +1437,10 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         payment_status: newOrder.payment_status,
         payment_method: newOrder.payment_method,
         technician_location: newOrder.technician_location || null,
-        checklist: newOrder.checklist,
+        checklist: {
+          ...(newOrder.checklist || {}),
+          calendar_color: orderData.calendar_color || undefined,
+        },
         completed_at: newOrder.completed_at ? new Date().toISOString() : null,
         apply_tax: (orderData as any).apply_tax ?? true,
         payment_reference: (orderData as any).payment_reference || null,
@@ -2068,6 +2080,12 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       if (updates.bank_account_email !== undefined) dbUpdates.bank_account_email = updates.bank_account_email;
       if (updates.whatsapp_template_cobro !== undefined) dbUpdates.whatsapp_template_cobro = updates.whatsapp_template_cobro;
       if (updates.admin_pin !== undefined) dbUpdates.admin_pin = updates.admin_pin;
+      if (updates.service_type_colors !== undefined) {
+        dbUpdates.finance_settings = {
+          ...(settings.finance_settings || {}),
+          service_type_colors: updates.service_type_colors,
+        };
+      }
 
       // 1. Intentar actualizar directamente la fila existente en air.settings
       const { data: updatedRows, error: updateErr } = await supabaseAir

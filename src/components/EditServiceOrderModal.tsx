@@ -1,5 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ServiceOrder, Technician, OrderStatus, ServiceType, AirSettings, Customer, AirEquipment } from '../types';
+import { 
+  ServiceOrder, 
+  Technician, 
+  OrderStatus, 
+  ServiceType, 
+  AirSettings, 
+  Customer, 
+  AirEquipment,
+  CALENDAR_COLOR_OPTIONS,
+  SERVICE_TYPE_DEFAULT_COLORS,
+  getOrderCalendarColor,
+  formatServiceType
+} from '../types';
 import { 
   X, 
   Save, 
@@ -26,7 +38,8 @@ import {
   CreditCard,
   Hash,
   Sparkles,
-  Info
+  Info,
+  Palette
 } from 'lucide-react';
 import { calculateLiveRouteETA, getCustomerCoordinates, RouteETA } from '../lib/routingService';
 import { QuickCreateCustomerModal } from './QuickCreateCustomerModal';
@@ -88,6 +101,9 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
 
   // Core Order State
   const [serviceType, setServiceType] = useState<ServiceType>(order?.service_type || 'mantencion_preventiva');
+  const [calendarColor, setCalendarColor] = useState<string>(() => 
+    order ? getOrderCalendarColor(order, settings?.service_type_colors) : '#0284c7'
+  );
   const [status, setStatus] = useState<OrderStatus>(order?.status || 'ingresado');
   const [customerId, setCustomerId] = useState(order?.customer_id || '');
   const [equipmentId, setEquipmentId] = useState(order?.equipment_id || '');
@@ -149,6 +165,7 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
   useEffect(() => {
     if (order) {
       setServiceType(order.service_type || 'mantencion_preventiva');
+      setCalendarColor(getOrderCalendarColor(order, settings?.service_type_colors));
       setCustomerId(order.customer_id || '');
       setEquipmentId(order.equipment_id || '');
       setStatus(order.status);
@@ -342,6 +359,7 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
       payment_reference: paymentReference,
       paid_amount: paidAmount,
       payment_notes: paymentNotes,
+      calendar_color: calendarColor,
       subtotal,
       tax,
       total,
@@ -722,6 +740,61 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                         placeholder="Ej: 09:30 - 11:30"
                         className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:border-cyan-500 focus:outline-none"
                       />
+                    </div>
+
+                    {/* NK-061: Clasificación cromática en agendamiento */}
+                    <div className="col-span-1 sm:col-span-2 lg:col-span-4 pt-3 border-t border-slate-200/80 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="font-semibold text-slate-700 flex items-center gap-1.5 text-xs">
+                          <Palette className="w-3.5 h-3.5 text-cyan-600" />
+                          <span>Color en Agenda / Calendario</span>
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          <span 
+                            className="w-3.5 h-3.5 rounded-full border border-slate-300 shadow-2xs" 
+                            style={{ backgroundColor: calendarColor }}
+                          />
+                          <span className="text-[11px] font-mono font-bold text-slate-600">
+                            {calendarColor}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {CALENDAR_COLOR_OPTIONS.map(c => {
+                          const isSelected = calendarColor.toLowerCase() === c.value.toLowerCase();
+                          return (
+                            <button
+                              key={c.value}
+                              type="button"
+                              onClick={() => setCalendarColor(c.value)}
+                              title={c.name}
+                              className={`w-7 h-7 rounded-lg transition-all flex items-center justify-center cursor-pointer shadow-2xs relative ${
+                                isSelected 
+                                  ? 'ring-2 ring-offset-2 ring-slate-900 scale-110' 
+                                  : 'hover:scale-105 opacity-85 hover:opacity-100'
+                              }`}
+                              style={{ backgroundColor: c.value }}
+                            >
+                              {isSelected && <Check className="w-4 h-4 text-white stroke-[3] drop-shadow-xs" />}
+                            </button>
+                          );
+                        })}
+
+                        <label 
+                          className="relative h-7 px-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 cursor-pointer shadow-2xs transition-colors"
+                          title="Elegir otro color personalizado"
+                        >
+                          <span className="w-2.5 h-2.5 rounded-full border border-slate-400" style={{ backgroundColor: calendarColor }} />
+                          <span>Personalizado</span>
+                          <input
+                            type="color"
+                            value={calendarColor}
+                            onChange={(e) => setCalendarColor(e.target.value)}
+                            className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
+                          />
+                        </label>
+                      </div>
                     </div>
                   </div>
                 </div>

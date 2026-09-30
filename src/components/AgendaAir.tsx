@@ -5,7 +5,10 @@ import {
   Customer, 
   AirEquipment, 
   AirSettings, 
-  RecurringMaintenanceSchedule 
+  RecurringMaintenanceSchedule,
+  getOrderCalendarColor,
+  SERVICE_TYPE_DEFAULT_COLORS,
+  formatServiceType
 } from '../types';
 import { 
   Calendar as CalendarIcon, 
@@ -31,7 +34,8 @@ import {
   Flame,
   ShieldCheck,
   Phone,
-  UserCheck
+  UserCheck,
+  Palette
 } from 'lucide-react';
 import { 
   format, 
@@ -104,6 +108,7 @@ export const AgendaAir: React.FC<AgendaAirProps> = ({
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<CalendarViewMode>('week');
   const [selectedTechFilter, setSelectedTechFilter] = useState<string>('all');
+  const [showColorLegend, setShowColorLegend] = useState(false);
 
   // NK-053: Estados para Mantenimientos Periódicos Acordados
   const [recurringFilter, setRecurringFilter] = useState<'all' | 'por_confirmar' | 'confirmado_agendado' | 'programado'>('all');
@@ -482,6 +487,23 @@ export const AgendaAir: React.FC<AgendaAirProps> = ({
             </div>
           )}
 
+          {/* Botón Leyenda de Colores (NK-061) */}
+          {viewMode !== 'recurring' && (
+            <button
+              type="button"
+              onClick={() => setShowColorLegend(!showColorLegend)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                showColorLegend 
+                  ? 'bg-cyan-50 border-cyan-300 text-cyan-800 shadow-2xs' 
+                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+              }`}
+              title="Mostrar u ocultar clasificación por colores de tipos de trabajo"
+            >
+              <Palette className="w-3.5 h-3.5 text-cyan-600" />
+              <span className="hidden sm:inline">Colores</span>
+            </button>
+          )}
+
           {/* Botón de Acción Principal */}
           {viewMode === 'recurring' ? (
             <button
@@ -502,6 +524,46 @@ export const AgendaAir: React.FC<AgendaAirProps> = ({
           )}
         </div>
       </div>
+
+      {/* Barra de Leyenda de Colores (NK-061) */}
+      {viewMode !== 'recurring' && showColorLegend && (
+        <div className="p-3.5 rounded-2xl bg-white border border-slate-200/90 shadow-xs animate-fade-in flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2">
+            <Palette className="w-4 h-4 text-cyan-600 shrink-0" />
+            <span className="font-extrabold text-slate-800">Clasificación Cromática:</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              { type: 'mantencion_preventiva', label: 'Mantenimiento (6M)' },
+              { type: 'instalacion', label: 'Instalación' },
+              { type: 'mantencion_correctiva', label: 'Correctivo / Fuga' },
+              { type: 'visita_tecnica', label: 'Visita Técnica' },
+              { type: 'recarga_gas', label: 'Recarga Gas' },
+              { type: 'reparacion', label: 'Reparación' },
+              { type: 'recaptacion', label: 'Recaptación' },
+              { type: 'pruebas_qa', label: 'Pruebas QA' },
+            ].map(item => {
+              const col = settings?.service_type_colors?.[item.type] || SERVICE_TYPE_DEFAULT_COLORS[item.type] || '#0284c7';
+              return (
+                <div 
+                  key={item.type}
+                  className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg border text-[11px] font-semibold"
+                  style={{
+                    borderLeftWidth: '3px',
+                    borderLeftColor: col,
+                    backgroundColor: `${col}12`,
+                    borderColor: `${col}30`,
+                    color: '#1e293b'
+                  }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: col }} />
+                  <span>{item.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Banner de aviso para mantenimientos periódicos por confirmar (NK-053) */}
       {viewMode !== 'recurring' && pendingConfirmCount > 0 && (
@@ -601,14 +663,24 @@ export const AgendaAir: React.FC<AgendaAirProps> = ({
                   ) : (
                     dayOrders.map((ord) => {
                       const badge = getStatusBadge(ord.status);
+                      const orderColor = getOrderCalendarColor(ord, settings?.service_type_colors);
                       return (
                         <div
                           key={ord.id}
                           onClick={() => onSelectOrder(ord)}
-                          className="p-2.5 rounded-xl bg-white border border-slate-200 hover:border-cyan-400 hover:shadow-md transition-all cursor-pointer space-y-1.5 group text-left"
+                          className="p-2.5 rounded-xl border hover:shadow-md transition-all cursor-pointer space-y-1.5 group text-left relative overflow-hidden"
+                          style={{
+                            borderLeftWidth: '4px',
+                            borderLeftColor: orderColor,
+                            backgroundColor: `${orderColor}10`,
+                            borderColor: `${orderColor}35`
+                          }}
                         >
                           <div className="flex items-center justify-between gap-1">
-                            <span className="text-[10px] font-mono font-bold text-cyan-700 truncate">
+                            <span 
+                              className="text-[10px] font-mono font-bold truncate"
+                              style={{ color: orderColor }}
+                            >
                               {ord.ticket_number}
                             </span>
                             <div className="flex items-center gap-1">
@@ -627,12 +699,25 @@ export const AgendaAir: React.FC<AgendaAirProps> = ({
                             {ord.customer?.name}
                           </div>
 
+                          <div className="flex items-center gap-1">
+                            <span 
+                              className="text-[9px] font-bold px-1.5 py-0.5 rounded truncate max-w-full"
+                              style={{
+                                backgroundColor: `${orderColor}22`,
+                                color: orderColor
+                              }}
+                              title={formatServiceType(ord.service_type)}
+                            >
+                              {formatServiceType(ord.service_type)}
+                            </span>
+                          </div>
+
                           <div className="text-[11px] text-slate-500 flex items-center gap-1 truncate">
                             <Clock className="w-3 h-3 text-slate-400 shrink-0" />
                             <span className="truncate">{ord.scheduled_time_slot.split(' - ')[0]}</span>
                           </div>
 
-                          <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                          <div className="pt-1.5 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
                             <span className="text-slate-600 truncate font-medium max-w-[90px]">
                               {ord.assigned_technician?.name ? ord.assigned_technician.name.split(' ')[0] : 'Sin asignar'}
                             </span>
@@ -703,29 +788,36 @@ export const AgendaAir: React.FC<AgendaAirProps> = ({
                     )}
                   </div>
 
-                  {/* Chips de Órdenes */}
-                  <div className="space-y-1 overflow-hidden flex-1">
-                    {dayOrders.slice(0, 2).map((ord) => {
-                      const badge = getStatusBadge(ord.status);
-                      return (
-                        <div
-                          key={ord.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSelectOrder(ord);
-                          }}
-                          className="px-1.5 py-1 rounded-md text-[10px] font-semibold border truncate transition-all hover:scale-[1.02] shadow-2xs flex items-center justify-between gap-1 bg-slate-50 border-slate-200"
-                        >
-                          <span className="truncate text-slate-800">
-                            {ord.customer?.name || ord.ticket_number}
-                          </span>
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${
-                            ord.status === 'completado' ? 'bg-emerald-500' :
-                            ord.status === 'en_ruta' ? 'bg-amber-500' : 'bg-cyan-500'
-                          }`} />
-                        </div>
-                      );
-                    })}
+                    {/* Chips de Órdenes */}
+                    <div className="space-y-1 overflow-hidden flex-1">
+                      {dayOrders.slice(0, 2).map((ord) => {
+                        const orderColor = getOrderCalendarColor(ord, settings?.service_type_colors);
+                        return (
+                          <div
+                            key={ord.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectOrder(ord);
+                            }}
+                            className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold border truncate transition-all hover:scale-[1.02] shadow-2xs flex items-center justify-between gap-1"
+                            style={{
+                              borderLeftWidth: '3px',
+                              borderLeftColor: orderColor,
+                              backgroundColor: `${orderColor}14`,
+                              borderColor: `${orderColor}35`
+                            }}
+                            title={`${ord.ticket_number} - ${formatServiceType(ord.service_type)}: ${ord.customer?.name}`}
+                          >
+                            <span className="truncate text-slate-900 font-medium">
+                              {ord.customer?.name || ord.ticket_number}
+                            </span>
+                            <span 
+                              className="w-1.5 h-1.5 rounded-full shrink-0 shadow-2xs" 
+                              style={{ backgroundColor: orderColor }}
+                            />
+                          </div>
+                        );
+                      })}
 
                     {dayOrders.length > 2 && (
                       <button
@@ -784,16 +876,31 @@ export const AgendaAir: React.FC<AgendaAirProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {slotOrders.map((ord) => {
                         const badge = getStatusBadge(ord.status);
+                        const orderColor = getOrderCalendarColor(ord, settings?.service_type_colors);
                         return (
                           <div
                             key={ord.id}
                             onClick={() => onSelectOrder(ord)}
-                            className="p-4 rounded-xl bg-slate-50 border border-slate-200 hover:border-cyan-400 transition-all cursor-pointer space-y-2 group shadow-xs"
+                            className="p-4 rounded-xl border hover:shadow-md transition-all cursor-pointer space-y-2 group shadow-xs"
+                            style={{
+                              borderLeftWidth: '5px',
+                              borderLeftColor: orderColor,
+                              backgroundColor: `${orderColor}0e`,
+                              borderColor: `${orderColor}35`
+                            }}
                           >
                             <div className="flex items-start justify-between gap-2">
-                              <span className="text-[11px] font-mono font-bold text-cyan-700">
-                                {ord.ticket_number}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-mono font-bold" style={{ color: orderColor }}>
+                                  {ord.ticket_number}
+                                </span>
+                                <span 
+                                  className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                                  style={{ backgroundColor: `${orderColor}20`, color: orderColor }}
+                                >
+                                  {formatServiceType(ord.service_type)}
+                                </span>
+                              </div>
                               <div className="flex items-center gap-1">
                                 {ord.is_recurring_confirmed && (
                                   <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300">
@@ -815,7 +922,7 @@ export const AgendaAir: React.FC<AgendaAirProps> = ({
                               <span className="truncate">{ord.customer?.address}, {ord.customer?.commune}</span>
                             </div>
 
-                            <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs">
+                            <div className="pt-2 border-t border-slate-200/70 flex items-center justify-between text-xs">
                               <div className="flex items-center gap-1 text-slate-700 font-medium">
                                 <Wrench className="w-3 h-3 text-cyan-600" />
                                 <span className="text-[11px]">{ord.assigned_technician?.name || 'Sin asignar'}</span>

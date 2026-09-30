@@ -8,7 +8,8 @@ import {
   FixedCosts,
   Expense,
   FinanceSettings,
-  RecurringMaintenanceSchedule
+  RecurringMaintenanceSchedule,
+  SERVICE_TYPE_DEFAULT_COLORS
 } from '../types';
 import { subMonths, subDays, addDays, format } from 'date-fns';
 
@@ -17,6 +18,7 @@ const today = new Date();
 export const INITIAL_SETTINGS: AirSettings = {
   company_name: 'Nexus Air Climatización SpA',
   fantasy_name: 'Nexus Air',
+  service_type_colors: SERVICE_TYPE_DEFAULT_COLORS,
   country: 'Chile',
   country_code: 'CL',
   currency_symbol: '$',
