@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ServiceType, AirSettings, ServiceOrder, Customer, AirEquipment, formatServiceType } from '../types';
 import { X, Calendar, Clock, MapPin, Phone, User, CheckCircle2, Wind, Sparkles, ShieldCheck, Search } from 'lucide-react';
 import { format, addDays } from 'date-fns';
+import { TimeSlotPicker } from './TimeSlotPicker';
 
 export interface BookingPrefill {
   customer?: Customer;
@@ -364,21 +365,12 @@ export const PublicBookingModal: React.FC<PublicBookingModalProps> = ({
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-700 flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-cyan-600" />
-                  Bloque Horario
-                </label>
-                <select
+              <div>
+                <TimeSlotPicker
                   value={scheduledSlot}
-                  onChange={(e) => setScheduledSlot(e.target.value)}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-colors"
-                >
-                  <option value="09:00 - 11:00">09:00 - 11:00 (Mañana)</option>
-                  <option value="11:30 - 13:30">11:30 - 13:30 (Mediodía)</option>
-                  <option value="14:30 - 16:30">14:30 - 16:30 (Tarde)</option>
-                  <option value="17:00 - 19:00">17:00 - 19:00 (Tarde/Noche)</option>
-                </select>
+                  onChange={setScheduledSlot}
+                  label="Horario Deseado"
+                />
               </div>
             </div>
 

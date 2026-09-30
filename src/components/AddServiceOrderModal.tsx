@@ -14,6 +14,7 @@ import { X, Plus, Calendar, Clock, User, Wrench, UserCheck, Users, Percent, Doll
 import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import { QuickCreateCustomerModal } from './QuickCreateCustomerModal';
+import { TimeSlotPicker } from './TimeSlotPicker';
 
 interface AddServiceOrderModalProps {
   isOpen: boolean;
@@ -474,21 +475,13 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                       />
                     </div>
 
-                    <div className="space-y-1.5">
-                      <label className="font-semibold text-slate-700 flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-cyan-600" />
-                        Bloque Horario
-                      </label>
-                      <select
+                    {/* Selector de Horario Flexible con Intervalos de 15 Minutos (NK-066) */}
+                    <div>
+                      <TimeSlotPicker
                         value={scheduledSlot}
-                        onChange={(e) => setScheduledSlot(e.target.value)}
-                        className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:border-cyan-500 focus:outline-none transition-colors"
-                      >
-                        <option value="09:00 - 11:00">09:00 - 11:00 (Mañana 1)</option>
-                        <option value="11:30 - 13:30">11:30 - 13:30 (Mañana 2)</option>
-                        <option value="14:30 - 16:30">14:30 - 16:30 (Tarde 1)</option>
-                        <option value="17:00 - 19:00">17:00 - 19:00 (Tarde 2)</option>
-                      </select>
+                        onChange={setScheduledSlot}
+                        label="Horario del Servicio"
+                      />
                     </div>
                   </div>
                 </div>

@@ -45,6 +45,7 @@ import { calculateLiveRouteETA, getCustomerCoordinates, RouteETA } from '../lib/
 import { QuickCreateCustomerModal } from './QuickCreateCustomerModal';
 import { WhatsAppIcon, getWhatsAppUrl } from './KanbanCardAir';
 import { toast } from 'react-hot-toast';
+import { TimeSlotPicker } from './TimeSlotPicker';
 
 interface EditServiceOrderModalProps {
   isOpen: boolean;
@@ -728,17 +729,12 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                       />
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="font-semibold text-slate-700 text-xs flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-cyan-600" />
-                        Bloque Horario
-                      </label>
-                      <input
-                        type="text"
+                    {/* Selector de Horario Flexible con Intervalos de 15 Minutos (NK-066) */}
+                    <div className="col-span-1 sm:col-span-2">
+                      <TimeSlotPicker
                         value={scheduledSlot}
-                        onChange={(e) => setScheduledSlot(e.target.value)}
-                        placeholder="Ej: 09:30 - 11:30"
-                        className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:border-cyan-500 focus:outline-none"
+                        onChange={setScheduledSlot}
+                        label="Horario del Servicio"
                       />
                     </div>
 
