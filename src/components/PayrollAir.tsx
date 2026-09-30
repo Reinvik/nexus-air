@@ -260,9 +260,14 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
     return map;
   }, [technicians, orders, selectedMonth]);
 
-  // Helper para buscar liquidación existente en el mes
+  // Helper para buscar pagos de nómina existentes en el mes (NK-062 & NK-065)
+  const getStaffPayouts = (techId: string, month: string): TechnicianPayout[] => {
+    return (technicianPayouts || []).filter(p => p.technician_id === techId && p.period_month === month);
+  };
+
   const getExistingPayout = (techId: string, month: string): TechnicianPayout | undefined => {
-    return (technicianPayouts || []).find(p => p.technician_id === techId && p.period_month === month);
+    const list = getStaffPayouts(techId, month);
+    return list.find(p => p.payout_type !== 'adelanto') || list[list.length - 1];
   };
 
   // Cálculo individual para cada colaborador en el mes actual
@@ -270,6 +275,10 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
     return technicians.map(tech => {
       const commData = techCommissionsMap.get(tech.id) || { completedCount: 0, totalCommission: 0, services: [] };
       const existing = getExistingPayout(tech.id, selectedMonth);
+      const allPayouts = getStaffPayouts(tech.id, selectedMonth);
+      const adelantosPrevios = allPayouts
+        .filter(p => p.payout_type === 'adelanto')
+        .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
       const mode: SalaryMode = existing?.salary_mode || tech.salary_mode || ((tech.role === 'ayudante' || tech.role === 'administracion') ? 'fixed' : 'commission');
       
@@ -281,12 +290,12 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
       let netPayable = 0;
       let isPaid = false;
 
-      if (existing) {
+      if (existing && existing.payout_type !== 'adelanto') {
         isPaid = true;
         baseSalary = existing.base_salary !== undefined ? existing.base_salary : (mode === 'commission' ? 0 : (tech.base_salary || 0));
         commissionAmount = existing.commission_amount !== undefined ? existing.commission_amount : (mode === 'fixed' ? 0 : commData.totalCommission);
         bonusAmount = existing.bonus_amount || 0;
-        deductionAmount = existing.deduction_amount || 0;
+        deductionAmount = (existing.deduction_amount !== undefined ? existing.deduction_amount : 0) + adelantosPrevios;
         workingDays = existing.working_days || workingDays;
         netPayable = existing.amount;
       } else {
@@ -294,7 +303,7 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
         baseSalary = mode === 'commission' ? 0 : (tech.base_salary || 0);
         commissionAmount = mode === 'fixed' ? 0 : commData.totalCommission;
         bonusAmount = 0;
-        deductionAmount = 0;
+        deductionAmount = adelantosPrevios;
         netPayable = Math.max(0, (baseSalary + commissionAmount + bonusAmount) - deductionAmount);
       }
 

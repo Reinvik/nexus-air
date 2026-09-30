@@ -952,6 +952,8 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
             technician_name: p.technician_name,
             technician_role: p.technician_role,
             salary_mode: p.salary_mode || local.salary_mode || parsedMeta.salary_mode,
+            payout_type: p.payout_type || local.payout_type || parsedMeta.payout_type || 'liquidacion',
+            payment_proof_url: p.payment_proof_url || local.payment_proof_url || parsedMeta.payment_proof_url || undefined,
             base_salary: p.base_salary !== undefined ? Number(p.base_salary) : (local.base_salary !== undefined ? Number(local.base_salary) : parsedMeta.base_salary),
             commission_amount: p.commission_amount !== undefined ? Number(p.commission_amount) : (local.commission_amount !== undefined ? Number(local.commission_amount) : parsedMeta.commission_amount),
             bonus_amount: p.bonus_amount !== undefined ? Number(p.bonus_amount) : (local.bonus_amount !== undefined ? Number(local.bonus_amount) : parsedMeta.bonus_amount),
@@ -2202,20 +2204,26 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     };
 
     setTechnicianPayouts(prev => {
-      // Si ya existía liquidación para el mismo colaborador en el mismo mes, reemplazarla
-      const filtered = prev.filter(p => !(p.technician_id === newPayout.technician_id && p.period_month === newPayout.period_month));
-      const updated = [newPayout, ...filtered];
+      // Si se está editando uno existente por id se actualiza, si no se agrega acumulativamente sin borrar pagos previos del mes (NK-065)
+      const exists = prev.some(p => p.id === newPayout.id);
+      const updated = exists 
+        ? prev.map(p => p.id === newPayout.id ? newPayout : p)
+        : [newPayout, ...prev];
       try {
         localStorage.setItem(`nexus_air_technician_payouts_${activeId}`, JSON.stringify(updated));
       } catch {}
       return updated;
     });
-    toast.success('Liquidación de sueldo / honorarios registrada exitosamente');
+
+    const isAdelanto = newPayout.payout_type === 'adelanto';
+    toast.success(isAdelanto ? 'Adelanto / Préstamo registrado exitosamente' : 'Liquidación / Pago registrado exitosamente');
 
     try {
-      // Guardar metadata extendida de nómina en notes como JSON para asegurar compatibilidad de esquema
+      // Guardar metadata extendida de nómina y comprobante en notes como JSON para compatibilidad total (NK-065)
       const notesPayload = JSON.stringify({
         user_notes: newPayout.notes || '',
+        payout_type: newPayout.payout_type || 'liquidacion',
+        payment_proof_url: newPayout.payment_proof_url || null,
         salary_mode: newPayout.salary_mode,
         base_salary: newPayout.base_salary,
         commission_amount: newPayout.commission_amount,

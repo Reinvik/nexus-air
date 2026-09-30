@@ -207,13 +207,15 @@ export interface TechnicianPayout {
   technician_name: string;
   technician_role: StaffRole | string;
   salary_mode?: SalaryMode; // NK-062: Modalidad bajo la cual se liquidó
+  payout_type?: 'liquidacion' | 'adelanto' | 'abono' | 'parcial'; // NK-065: Tipo de transacción
+  payment_proof_url?: string; // NK-065: Voucher o comprobante de transferencia bancaria adjunto
   base_salary?: number;     // NK-062: Sueldo base en el período
   commission_amount?: number; // NK-062: Comisiones sumadas en el período
   bonus_amount?: number;    // NK-062: Bonos o haberes adicionales
   deduction_amount?: number;// NK-062: Anticipos o descuentos aplicados
   working_days?: number;    // NK-062: Días trabajados en el período
   period_month: string; // ej: "2026-09"
-  amount: number;       // Líquido total pagado
+  amount: number;       // Líquido pagado en esta transacción
   payment_date: string; // YYYY-MM-DD
   payment_method: 'transferencia' | 'efectivo' | 'cheque' | 'otro';
   payment_reference?: string;

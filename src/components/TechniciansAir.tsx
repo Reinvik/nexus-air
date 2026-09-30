@@ -24,7 +24,13 @@ import {
   Sparkles,
   CreditCard,
   Receipt,
-  Banknote
+  Banknote,
+  Upload,
+  Image as ImageIcon,
+  Paperclip,
+  MinusCircle,
+  Eye,
+  Check
 } from 'lucide-react';
 import { formatAirPrice } from '../lib/countries';
 import { format } from 'date-fns';
@@ -61,13 +67,17 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
   const [editingTech, setEditingTech] = useState<Technician | null>(null);
   const [selectedTechForSettlement, setSelectedTechForSettlement] = useState<Technician | null>(null);
   const [liquidatingTech, setLiquidatingTech] = useState<Technician | null>(null);
+  const [viewingProofUrl, setViewingProofUrl] = useState<string | null>(null); // NK-065: Visor de comprobante adjunto
 
-  // Form State para Liquidar Pago (NK-043)
+  // Form State para Liquidar Pago o Adelanto (NK-043 & NK-065)
+  const [payoutType, setPayoutType] = useState<'liquidacion' | 'adelanto'>('liquidacion');
   const [payoutAmount, setPayoutAmount] = useState<number>(0);
   const [payoutDate, setPayoutDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [payoutMethod, setPayoutMethod] = useState<'transferencia' | 'efectivo' | 'cheque' | 'otro'>('transferencia');
   const [payoutReference, setPayoutReference] = useState<string>('');
   const [payoutNotes, setPayoutNotes] = useState<string>('');
+  const [paymentProofUrl, setPaymentProofUrl] = useState<string>(''); // NK-065: Comprobante en base64/url
+
 
   // Form State para Agregar
   const [name, setName] = useState('');
@@ -244,12 +254,19 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
     return map;
   }, [technicians, orders, selectedMonth]);
 
-  // Helpers para Liquidación de Honorarios (NK-043)
-  const getExistingPayout = (techId: string, month: string) => {
-    return (technicianPayouts || []).find(p => p.technician_id === techId && p.period_month === month);
+  // Helpers para Liquidación de Honorarios y Múltiples Pagos / Adelantos (NK-043 & NK-065)
+  const getTechPayouts = (techId: string, month: string) => {
+    return (technicianPayouts || [])
+      .filter(p => p.technician_id === techId && p.period_month === month)
+      .sort((a, b) => new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime());
   };
 
-  // Totales globales del mes con cálculo exacto de saldo pendiente vs liquidado (NK-043 fix)
+  const getExistingPayout = (techId: string, month: string) => {
+    const list = getTechPayouts(techId, month);
+    return list.length > 0 ? list[list.length - 1] : undefined;
+  };
+
+  // Totales globales del mes con cálculo exacto de saldo pendiente vs liquidado (NK-043 & NK-065 fix)
   const monthGlobalStats = useMemo(() => {
     let totalCommissions = 0;
     let totalOrders = 0;
@@ -264,16 +281,18 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
       totalOrders += val.completedCount;
       if (val.completedCount > 0) activeWorkers += 1;
 
-      const existing = getExistingPayout(techId, selectedMonth);
-      if (existing) {
-        totalLiquidated += existing.amount;
+      const techPaid = (technicianPayouts || [])
+        .filter(p => p.technician_id === techId && p.period_month === selectedMonth)
+        .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+      totalLiquidated += techPaid;
+      const remaining = Math.max(0, val.totalCommission - techPaid);
+      totalPending += remaining;
+
+      if (remaining > 0) {
+        pendingWorkers += 1;
+      } else if (val.totalCommission > 0 && techPaid >= val.totalCommission) {
         liquidatedWorkers += 1;
-        const remaining = Math.max(0, val.totalCommission - existing.amount);
-        totalPending += remaining;
-        if (remaining > 0) pendingWorkers += 1;
-      } else {
-        totalPending += val.totalCommission;
-        if (val.totalCommission > 0) pendingWorkers += 1;
       }
     });
 
@@ -288,16 +307,42 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
     };
   }, [techSettlementMap, technicianPayouts, selectedMonth]);
 
-  const handleOpenLiquidation = (tech: Technician) => {
+  const handleOpenLiquidation = (tech: Technician, mode: 'liquidacion' | 'adelanto' = 'liquidacion') => {
     const settlement = techSettlementMap.get(tech.id) || { completedCount: 0, totalCommission: 0, services: [] };
-    const existing = getExistingPayout(tech.id, selectedMonth);
-    
+    const payouts = getTechPayouts(tech.id, selectedMonth);
+    const totalPaid = payouts.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const pendingBalance = Math.max(0, settlement.totalCommission - totalPaid);
+
     setLiquidatingTech(tech);
-    setPayoutAmount(existing ? existing.amount : settlement.totalCommission);
-    setPayoutDate(existing ? existing.payment_date : format(new Date(), 'yyyy-MM-dd'));
-    setPayoutMethod((existing?.payment_method as any) || 'transferencia');
-    setPayoutReference(existing?.payment_reference || '');
-    setPayoutNotes(existing?.notes || `Liquidación de honorarios correspondiente al período ${selectedMonth}. ${settlement.completedCount} servicios realizados.`);
+    setPayoutType(mode);
+    setPayoutAmount(mode === 'liquidacion' ? (pendingBalance > 0 ? pendingBalance : settlement.totalCommission) : 0);
+    setPayoutDate(format(new Date(), 'yyyy-MM-dd'));
+    setPayoutMethod('transferencia');
+    setPayoutReference('');
+    setPaymentProofUrl('');
+    setPayoutNotes(
+      mode === 'liquidacion'
+        ? `Liquidación de honorarios correspondiente al período ${selectedMonth}.`
+        : `Adelanto / Préstamo solicitado a cuenta de honorarios período ${selectedMonth}.`
+    );
+  };
+
+  const handleProofFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 8 * 1024 * 1024) {
+      alert('El comprobante no debe superar los 8MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setPaymentProofUrl(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleConfirmLiquidation = async (e: React.FormEvent) => {
@@ -310,15 +355,18 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
       technician_name: liquidatingTech.name,
       technician_role: liquidatingTech.role || 'tecnico',
       period_month: selectedMonth,
+      payout_type: payoutType,
       amount: Number(payoutAmount) || 0,
       payment_date: payoutDate,
       payment_method: payoutMethod,
       payment_reference: payoutReference.trim(),
+      payment_proof_url: paymentProofUrl || undefined,
       notes: payoutNotes.trim(),
       order_ids: settlement.services.map(s => s.order.id)
     });
 
     setLiquidatingTech(null);
+    setPaymentProofUrl('');
   };
 
   // Abrir Modal de Edición
@@ -405,19 +453,40 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
     }
   };
 
-  // Generar WhatsApp de liquidación (SIN MOSTRAR EL TOTAL FACTURADO AL CLIENTE - NK-012)
+  // Generar WhatsApp de liquidación con desglose de servicios (+), pagos previos (-) y saldo pendiente (NK-065)
   const handleSendWhatsAppSettlement = (t: Technician) => {
     const settlement = techSettlementMap.get(t.id);
     if (!settlement) return;
 
-    const message = `*LIQUIDACIÓN DE PAGO DE SERVICIOS HVAC* ❄️\n` +
+    const payouts = getTechPayouts(t.id, selectedMonth);
+    const totalPaid = payouts.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const pendingBalance = Math.max(0, settlement.totalCommission - totalPaid);
+
+    let message = `*LIQUIDACIÓN DE PAGO DE SERVICIOS HVAC* ❄️\n` +
       `👤 Colaborador: *${t.name}* (${t.role === 'ayudante' ? 'Ayudante' : 'Técnico Líder'})\n` +
       `📅 Período: *${selectedMonth}*\n` +
       `🔧 Servicios Realizados: *${settlement.completedCount}*\n` +
-      `💵 *TOTAL LIQUIDACIÓN A PAGAR: ${formatAirPrice(settlement.totalCommission, currencySymbol, countryCode)}*\n\n` +
-      `*Detalle de Trabajos Realizados:*\n` +
-      settlement.services.map((s, i) => `${i + 1}. #${s.order.ticket_number} • ${s.serviceName}\n   Cliente: ${s.order.customer?.name || 'Cliente Particular'}\n   Pago Asignado: *${formatAirPrice(s.commissionEarned, currencySymbol, countryCode)}*`).join('\n\n') +
-      `\n\n_Generado por ${settings?.company_name || 'Nexus Air'}_`;
+      `📈 *Comisiones Generadas:* ${formatAirPrice(settlement.totalCommission, currencySymbol, countryCode)}\n`;
+
+    if (totalPaid > 0) {
+      message += `💸 *Total Ya Pagado / Liquidado:* -${formatAirPrice(totalPaid, currencySymbol, countryCode)}\n`;
+    }
+
+    message += `💰 *SALDO PENDIENTE A LIQUIDAR:* *${formatAirPrice(pendingBalance, currencySymbol, countryCode)}*\n\n`;
+
+    if (settlement.services.length > 0) {
+      message += `*📋 Detalle de Trabajos Realizados (+):*\n` +
+        settlement.services.map((s, i) => `${i + 1}. #${s.order.ticket_number} • ${s.serviceName}\n   Cliente: ${s.order.customer?.name || 'Cliente Particular'}\n   Pago: *+${formatAirPrice(s.commissionEarned, currencySymbol, countryCode)}*`).join('\n\n') +
+        `\n\n`;
+    }
+
+    if (payouts.length > 0) {
+      message += `*🧾 Pagos y Adelantos Realizados (-):*\n` +
+        payouts.map((p, i) => `${i + 1}. [${p.payment_date}] ${p.payout_type === 'adelanto' ? 'Adelanto / Préstamo' : 'Liquidación'}: *-${formatAirPrice(p.amount, currencySymbol, countryCode)}* ${p.payment_reference ? `(Ref: ${p.payment_reference})` : ''}`).join('\n') +
+        `\n\n`;
+    }
+
+    message += `_Generado automáticamente por ${settings?.company_name || 'Nexus Air'}_`;
 
     const cleanPhone = t.phone.replace(/[^0-9]/g, '');
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
@@ -707,84 +776,150 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                 </div>
               </div>
 
-              {/* Resumen de Liquidación del Mes (NK-012 & NK-043) */}
+              {/* Resumen de Liquidación del Mes (NK-012, NK-043 & NK-065) */}
               {(() => {
-                const existingPayout = getExistingPayout(t.id, selectedMonth);
+                const payoutsThisMonth = getTechPayouts(t.id, selectedMonth);
+                const totalPaid = payoutsThisMonth.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+                const pendingBalance = Math.max(0, settlement.totalCommission - totalPaid);
+                const isSettled = settlement.totalCommission > 0 && pendingBalance === 0;
+                const isPartial = totalPaid > 0 && pendingBalance > 0;
+
                 return (
-                  <div className={`p-3 rounded-xl border space-y-2 ${
-                    existingPayout 
-                      ? 'bg-gradient-to-br from-emerald-50/70 to-teal-50/40 border-emerald-200' 
-                      : 'bg-gradient-to-br from-cyan-50/50 to-blue-50/30 border-cyan-200/80'
+                  <div className={`p-3.5 rounded-xl border space-y-2.5 ${
+                    isSettled 
+                      ? 'bg-gradient-to-br from-emerald-50/70 to-teal-50/40 border-emerald-300' 
+                      : isPartial
+                        ? 'bg-gradient-to-br from-amber-50/60 to-orange-50/30 border-amber-300'
+                        : 'bg-gradient-to-br from-cyan-50/50 to-blue-50/30 border-cyan-200/80'
                   }`}>
                     <div className="flex items-center justify-between text-xs">
-                      <span className={existingPayout ? 'text-emerald-800 font-bold' : 'text-cyan-800 font-bold'}>
+                      <span className={`font-bold ${isSettled ? 'text-emerald-800' : isPartial ? 'text-amber-900' : 'text-cyan-800'}`}>
                         Liquidación ({selectedMonth}):
                       </span>
-                      <span className="text-[11px] text-slate-500">{settlement.completedCount} servicios</span>
+                      <span className="text-[11px] text-slate-500 font-medium">{settlement.completedCount} servicios</span>
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-slate-600">
-                        {existingPayout ? 'Monto Liquidado:' : 'Total a Pagar:'}
-                      </span>
-                      <span className={`font-mono font-black text-sm ${existingPayout ? 'text-emerald-900' : 'text-cyan-900'}`}>
-                        {formatAirPrice(existingPayout ? existingPayout.amount : settlement.totalCommission, currencySymbol, countryCode)}
-                      </span>
-                    </div>
-
-                    {existingPayout && (
-                      <div className="p-1.5 rounded-lg bg-emerald-100/70 border border-emerald-300 text-[10px] text-emerald-900 flex items-center justify-between">
-                        <span className="font-bold flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                          Pagado el {existingPayout.payment_date}
+                    {/* Desglose resumido de montos */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500">Comisiones generadas:</span>
+                        <span className="font-mono font-bold text-slate-800">
+                          {formatAirPrice(settlement.totalCommission, currencySymbol, countryCode)}
                         </span>
-                        {existingPayout.payment_reference && (
-                          <span className="font-mono text-emerald-800 truncate max-w-[120px]" title={existingPayout.payment_reference}>
-                            {existingPayout.payment_reference}
+                      </div>
+
+                      {totalPaid > 0 && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-emerald-700 font-medium">Ya Liquidado / Pagado:</span>
+                          <span className="font-mono font-bold text-emerald-700">
+                            -{formatAirPrice(totalPaid, currencySymbol, countryCode)}
                           </span>
-                        )}
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
+                        <span className="text-xs font-bold text-slate-700">
+                          {isSettled ? 'Estado:' : 'Saldo Pendiente:'}
+                        </span>
+                        <span className={`font-mono font-black text-sm ${
+                          isSettled 
+                            ? 'text-emerald-700' 
+                            : isPartial 
+                              ? 'text-amber-600' 
+                              : 'text-cyan-900'
+                        }`}>
+                          {isSettled ? 'Al Día' : formatAirPrice(pendingBalance, currencySymbol, countryCode)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Historial de pagos y adelantos realizados */}
+                    {payoutsThisMonth.length > 0 && (
+                      <div className="space-y-1 pt-1">
+                        {payoutsThisMonth.map((p, pIdx) => (
+                          <div key={p.id || pIdx} className="p-1.5 rounded-lg bg-white/90 border border-slate-200 text-[10px] flex items-center justify-between shadow-2xs">
+                            <span className="font-medium flex items-center gap-1 text-slate-700">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                              {p.payout_type === 'adelanto' ? 'Adelanto' : 'Pagado'} {p.payment_date}:
+                              <strong className="font-mono font-bold text-slate-900">
+                                {formatAirPrice(p.amount, currencySymbol, countryCode)}
+                              </strong>
+                            </span>
+                            <div className="flex items-center gap-1">
+                              {p.payment_proof_url && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setViewingProofUrl(p.payment_proof_url!);
+                                  }}
+                                  className="px-1.5 py-0.5 rounded bg-cyan-100 hover:bg-cyan-200 text-cyan-800 font-bold text-[9px] flex items-center gap-0.5 cursor-pointer"
+                                  title="Ver comprobante de transferencia"
+                                >
+                                  <Paperclip className="w-2.5 h-2.5" />
+                                  <span>Voucher</span>
+                                </button>
+                              )}
+                              {p.payment_reference && (
+                                <span className="font-mono text-slate-400 text-[9px] truncate max-w-[70px]" title={p.payment_reference}>
+                                  {p.payment_reference}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
 
-                    <div className="pt-1 flex items-center gap-1.5">
+                    {/* Botonera de la tarjeta */}
+                    <div className="pt-1.5 flex items-center gap-1.5 flex-wrap">
                       <button
                         type="button"
                         onClick={() => setSelectedTechForSettlement(t)}
-                        className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-800 font-bold text-[11px] border border-slate-200 transition-colors cursor-pointer shadow-2xs"
+                        className="flex-1 min-w-[65px] flex items-center justify-center gap-1 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-800 font-bold text-[11px] border border-slate-200 transition-colors cursor-pointer shadow-2xs"
                       >
                         <FileText className="w-3.5 h-3.5 text-cyan-600" />
                         <span>Detalle</span>
                       </button>
 
-                      {existingPayout ? (
+                      {pendingBalance > 0 ? (
                         <button
                           type="button"
-                          onClick={() => handleOpenLiquidation(t)}
-                          className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition-colors cursor-pointer shadow-2xs"
-                          title={`Honorarios liquidados el ${existingPayout.payment_date}. Clic para ver o ajustar.`}
+                          onClick={() => handleOpenLiquidation(t, 'liquidacion')}
+                          className="flex-1 min-w-[75px] flex items-center justify-center gap-1 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-[11px] transition-colors cursor-pointer shadow-2xs"
+                          title="Liquidar saldo pendiente de comisiones"
                         >
-                          <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-                          <span>Liquidado</span>
+                          <CreditCard className="w-3.5 h-3.5 text-white" />
+                          <span>Liquidar</span>
                         </button>
                       ) : (
                         <button
                           type="button"
-                          onClick={() => handleOpenLiquidation(t)}
-                          disabled={settlement.completedCount === 0}
-                          className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-700 disabled:opacity-40 text-white font-bold text-[11px] transition-colors cursor-pointer shadow-2xs"
-                          title="Liquidar pago de honorarios y registrar egreso en finanzas"
+                          onClick={() => setSelectedTechForSettlement(t)}
+                          className="flex-1 min-w-[75px] flex items-center justify-center gap-1 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition-colors cursor-pointer shadow-2xs"
+                          title="Comisiones al día. Clic para ver comprobante."
                         >
-                          <CreditCard className="w-3.5 h-3.5 text-white" />
-                          <span>Liquidar</span>
+                          <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                          <span>Liquidado</span>
                         </button>
                       )}
 
                       <button
                         type="button"
+                        onClick={() => handleOpenLiquidation(t, 'adelanto')}
+                        className="px-2 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold text-[11px] transition-colors cursor-pointer shadow-2xs flex items-center gap-1"
+                        title="Registrar un adelanto o préstamo para este colaborador"
+                      >
+                        <Plus className="w-3 h-3 text-amber-700" />
+                        <span>Adelanto</span>
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={() => handleSendWhatsAppSettlement(t)}
-                        disabled={settlement.completedCount === 0}
+                        disabled={settlement.completedCount === 0 && payoutsThisMonth.length === 0}
                         className="p-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white transition-colors cursor-pointer shadow-2xs"
-                        title="Enviar liquidación al colaborador por WhatsApp"
+                        title="Enviar estado de liquidación por WhatsApp"
                       >
                         <Share2 className="w-3.5 h-3.5" />
                       </button>
@@ -1258,64 +1393,74 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
               {(() => {
                 const s = techSettlementMap.get(selectedTechForSettlement.id) || { completedCount: 0, totalCommission: 0, services: [] };
                 const avgPerService = s.completedCount > 0 ? Math.round(s.totalCommission / s.completedCount) : 0;
+                const payoutsThisMonth = getTechPayouts(selectedTechForSettlement.id, selectedMonth);
+                const totalPaid = payoutsThisMonth.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+                const pendingBalance = Math.max(0, s.totalCommission - totalPaid);
 
                 return (
                   <>
-                    <div className="grid grid-cols-3 gap-3 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-xl bg-slate-50 border border-slate-200">
                       <div>
                         <span className="text-slate-500 font-medium block">Servicios Realizados</span>
                         <strong className="text-lg text-slate-900 font-mono">{s.completedCount} órdenes</strong>
                       </div>
                       <div>
-                        <span className="text-slate-500 font-medium block">Promedio por Servicio</span>
+                        <span className="text-slate-500 font-medium block">Comisiones Ganadas</span>
                         <strong className="text-lg text-slate-900 font-mono">
-                          {formatAirPrice(avgPerService, currencySymbol, countryCode)}
+                          {formatAirPrice(s.totalCommission, currencySymbol, countryCode)}
                         </strong>
                       </div>
-                      <div className="bg-cyan-100/70 p-2.5 rounded-xl border border-cyan-200">
-                        <span className="text-cyan-950 font-bold block text-[11px]">Total a Liquidar</span>
-                        <strong className="text-xl text-cyan-950 font-mono font-black">
-                          {formatAirPrice(s.totalCommission, currencySymbol, countryCode)}
+                      <div className={`p-2.5 rounded-xl border ${
+                        pendingBalance > 0 
+                          ? 'bg-amber-50/80 border-amber-300 text-amber-950' 
+                          : 'bg-emerald-50/80 border-emerald-300 text-emerald-950'
+                      }`}>
+                        <span className="font-bold block text-[11px]">
+                          {pendingBalance > 0 ? 'Saldo Pendiente a Liquidar' : 'Totalmente Liquidado (Al Día)'}
+                        </span>
+                        <strong className={`text-xl font-mono font-black ${
+                          pendingBalance > 0 ? 'text-amber-700' : 'text-emerald-700'
+                        }`}>
+                          {formatAirPrice(pendingBalance > 0 ? pendingBalance : totalPaid, currencySymbol, countryCode)}
                         </strong>
                       </div>
                     </div>
 
-                    {/* Tabla de Servicios (Solo muestra datos técnicos y pago del colaborador, NUNCA el cobro al cliente) */}
-                    <div className="space-y-2">
+                    {/* Tabla de Servicios & Pagos */}
+                    <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <h4 className="font-bold text-slate-800 text-sm">Desglose de Servicios & Pagos</h4>
-                        <span className="text-[11px] text-slate-500">Comisiones aprobadas</span>
+                        <span className="text-[11px] text-slate-500">Historial período {selectedMonth}</span>
                       </div>
 
-                      {s.services.length === 0 ? (
+                      {s.services.length === 0 && payoutsThisMonth.length === 0 ? (
                         <div className="p-6 text-center text-slate-400 bg-slate-50 rounded-xl border border-slate-200">
-                          No hay órdenes completadas para este colaborador en el mes {selectedMonth}.
+                          No hay órdenes completadas ni pagos registrados para este colaborador en el mes {selectedMonth}.
                         </div>
                       ) : (
                         <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
                           <table className="w-full text-left border-collapse text-xs">
                             <thead>
                               <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 text-[11px]">
-                                <th className="p-2.5">Ticket</th>
+                                <th className="p-2.5">Ticket / Tipo</th>
                                 <th className="p-2.5">Fecha</th>
-                                <th className="p-2.5">Cliente</th>
-                                <th className="p-2.5">Servicio Realizado</th>
-                                <th className="p-2.5">Rol</th>
-                                <th className="p-2.5 text-right">Pago Asignado</th>
+                                <th className="p-2.5">Detalle / Referencia</th>
+                                <th className="p-2.5">Rol / Comprobante</th>
+                                <th className="p-2.5 text-center">Acción</th>
+                                <th className="p-2.5 text-right">Monto</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
+                              {/* 1. Servicios Realizados en positivo (+) */}
                               {s.services.map((item, idx) => (
-                                <tr key={idx} className="hover:bg-slate-50">
+                                <tr key={`srv-${idx}`} className="hover:bg-slate-50">
                                   <td className="p-2.5 font-mono font-bold text-cyan-800">{item.order.ticket_number}</td>
                                   <td className="p-2.5 font-mono text-slate-600">
                                     {item.order.completed_at?.split('T')[0] || item.order.scheduled_date}
                                   </td>
                                   <td className="p-2.5 text-slate-800 font-medium">
-                                    {item.order.customer?.name || 'Cliente Particular'}
-                                  </td>
-                                  <td className="p-2.5 text-slate-700 font-medium">
                                     {item.serviceName}
+                                    <span className="block text-[10px] text-slate-400">Cliente: {item.order.customer?.name || 'Cliente Particular'}</span>
                                   </td>
                                   <td className="p-2.5">
                                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
@@ -1326,19 +1471,106 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                                       {item.roleInService}
                                     </span>
                                   </td>
+                                  <td className="p-2.5 text-center text-slate-400 text-[10px]">
+                                    Completado
+                                  </td>
                                   <td className="p-2.5 text-right font-mono font-black text-emerald-700 text-sm">
                                     +{formatAirPrice(item.commissionEarned, currencySymbol, countryCode)}
                                   </td>
                                 </tr>
                               ))}
+
+                              {/* Subtotal Servicios Ganados si hay servicios */}
+                              {s.services.length > 0 && (
+                                <tr className="bg-slate-50 font-bold border-t border-b border-slate-200 text-slate-700">
+                                  <td colSpan={5} className="p-2.5 text-right uppercase tracking-wider text-[11px]">
+                                    Subtotal Comisiones Ganadas (+):
+                                  </td>
+                                  <td className="p-2.5 text-right font-mono text-emerald-700 font-black">
+                                    +{formatAirPrice(s.totalCommission, currencySymbol, countryCode)}
+                                  </td>
+                                </tr>
+                              )}
+
+                              {/* 2. DEDUCCIONES: Liquidaciones Previas y Adelantos en NEGATIVO (NK-065) */}
+                              {payoutsThisMonth.map((p, idx) => {
+                                const isAdelanto = p.payout_type === 'adelanto';
+                                return (
+                                  <tr key={`payout-${p.id || idx}`} className="bg-rose-50/50 hover:bg-rose-50/80 text-slate-800">
+                                    <td className="p-2.5 font-mono font-bold text-rose-700">
+                                      <div className="flex items-center gap-1.5">
+                                        <MinusCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                                        <span>{p.payout_number || (isAdelanto ? 'ADELANTO' : 'PAGO')}</span>
+                                      </div>
+                                    </td>
+                                    <td className="p-2.5 font-mono text-slate-700 font-medium">
+                                      {p.payment_date}
+                                    </td>
+                                    <td className="p-2.5">
+                                      <div className="font-semibold text-slate-900">
+                                        {isAdelanto ? '(-) Adelanto / Préstamo a Colaborador' : '(-) Liquidación / Pago Parcial'}
+                                      </div>
+                                      {p.payment_reference && (
+                                        <span className="text-[10px] text-slate-500 font-mono block">Ref: {p.payment_reference}</span>
+                                      )}
+                                      {p.notes && (
+                                        <span className="text-[10px] text-slate-600 italic block">{p.notes}</span>
+                                      )}
+                                    </td>
+                                    <td className="p-2.5">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                                          isAdelanto 
+                                            ? 'bg-amber-100 text-amber-800 border border-amber-300' 
+                                            : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                        }`}>
+                                          {isAdelanto ? 'Préstamo' : 'Liquidado'}
+                                        </span>
+                                        {p.payment_proof_url && (
+                                          <button
+                                            type="button"
+                                            onClick={() => setViewingProofUrl(p.payment_proof_url!)}
+                                            className="px-2 py-0.5 rounded-md bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-[10px] flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                            title="Ver comprobante de transferencia bancaria adjunto"
+                                          >
+                                            <Paperclip className="w-3 h-3" />
+                                            <span>Ver Voucher</span>
+                                          </button>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="p-2.5 text-slate-400 text-center">
+                                      {onDeleteTechnicianPayout && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            if (confirm(`¿Eliminar este registro de pago por ${formatAirPrice(p.amount, currencySymbol, countryCode)}?`)) {
+                                              onDeleteTechnicianPayout(p.id);
+                                            }
+                                          }}
+                                          className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-100 transition-colors"
+                                          title="Eliminar este pago o adelanto"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      )}
+                                    </td>
+                                    <td className="p-2.5 text-right font-mono font-black text-rose-700 text-sm">
+                                      -{formatAirPrice(p.amount, currencySymbol, countryCode)}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                             <tfoot>
-                              <tr className="bg-slate-100 font-bold border-t border-slate-200">
-                                <td colSpan={5} className="p-2.5 text-slate-800 uppercase tracking-wide">
-                                  TOTAL LIQUIDACIÓN DEL MES:
+                              <tr className="bg-slate-100 font-bold border-t-2 border-slate-300">
+                                <td colSpan={5} className="p-3 text-slate-900 uppercase tracking-wide text-xs">
+                                  {pendingBalance > 0 ? 'TOTAL SALDO PENDIENTE A LIQUIDAR:' : 'TOTAL LIQUIDADO DEL MES (AL DÍA):'}
                                 </td>
-                                <td className="p-2.5 text-right font-mono text-emerald-800 text-base font-black">
-                                  {formatAirPrice(s.totalCommission, currencySymbol, countryCode)}
+                                <td className={`p-3 text-right font-mono text-base font-black ${
+                                  pendingBalance > 0 ? 'text-amber-600' : 'text-emerald-700'
+                                }`}>
+                                  {formatAirPrice(pendingBalance > 0 ? pendingBalance : totalPaid, currencySymbol, countryCode)}
                                 </td>
                               </tr>
                             </tfoot>
@@ -1350,9 +1582,9 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                 );
               })()}
 
-              {/* Botones de Acción (NK-012 & NK-043) */}
+              {/* Botones de Acción (NK-012, NK-043 & NK-065) */}
               <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
                   <button
                     type="button"
                     onClick={() => handleSendWhatsAppSettlement(selectedTechForSettlement)}
@@ -1363,28 +1595,46 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                   </button>
 
                   {(() => {
-                    const existing = getExistingPayout(selectedTechForSettlement.id, selectedMonth);
-                    if (existing) {
-                      return (
-                        <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-100 text-emerald-900 font-bold text-xs border border-emerald-300">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                          <span>Liquidado el {existing.payment_date}</span>
-                        </div>
-                      );
-                    }
+                    const s = techSettlementMap.get(selectedTechForSettlement.id) || { completedCount: 0, totalCommission: 0, services: [] };
+                    const payouts = getTechPayouts(selectedTechForSettlement.id, selectedMonth);
+                    const totalPaid = payouts.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+                    const pending = Math.max(0, s.totalCommission - totalPaid);
+
                     return (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const techToLiquidate = selectedTechForSettlement;
-                          setSelectedTechForSettlement(null);
-                          handleOpenLiquidation(techToLiquidate);
-                        }}
-                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-bold cursor-pointer transition-all shadow-md shadow-cyan-500/20 text-xs"
-                      >
-                        <CreditCard className="w-4 h-4" />
-                        <span>Liquidar Honorarios</span>
-                      </button>
+                      <>
+                        {pending > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const tech = selectedTechForSettlement;
+                              setSelectedTechForSettlement(null);
+                              handleOpenLiquidation(tech, 'liquidacion');
+                            }}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-bold cursor-pointer transition-all shadow-md shadow-cyan-500/20 text-xs"
+                          >
+                            <CreditCard className="w-4 h-4" />
+                            <span>Liquidar Saldo ({formatAirPrice(pending, currencySymbol, countryCode)})</span>
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-100 text-emerald-900 font-bold text-xs border border-emerald-300">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <span>Liquidado Totalmente</span>
+                          </div>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const tech = selectedTechForSettlement;
+                            setSelectedTechForSettlement(null);
+                            handleOpenLiquidation(tech, 'adelanto');
+                          }}
+                          className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold cursor-pointer transition-all text-xs"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-amber-700" />
+                          <span>+ Adelanto / Préstamo</span>
+                        </button>
+                      </>
                     );
                   })()}
                 </div>
@@ -1412,11 +1662,14 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
         </div>
       )}
 
-      {/* Modal Liquidar Pago de Honorarios (NK-043) */}
+      {/* Modal Liquidar Pago de Honorarios o Registrar Adelanto (NK-043 & NK-065) */}
       {liquidatingTech && (
         <div 
           onClick={(e) => {
-            if (e.target === e.currentTarget) setLiquidatingTech(null);
+            if (e.target === e.currentTarget) {
+              setLiquidatingTech(null);
+              setPaymentProofUrl('');
+            }
           }}
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto cursor-pointer"
         >
@@ -1426,11 +1679,17 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
           >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-xl bg-cyan-50 border border-cyan-200 text-cyan-600 flex items-center justify-center">
-                  <CreditCard className="w-5 h-5" />
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                  payoutType === 'adelanto' 
+                    ? 'bg-amber-50 border border-amber-200 text-amber-600' 
+                    : 'bg-cyan-50 border border-cyan-200 text-cyan-600'
+                }`}>
+                  {payoutType === 'adelanto' ? <Banknote className="w-5 h-5" /> : <CreditCard className="w-5 h-5" />}
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 text-base">Liquidar Honorarios de Colaborador</h3>
+                  <h3 className="font-bold text-slate-900 text-base">
+                    {payoutType === 'adelanto' ? 'Registrar Adelanto / Préstamo' : 'Liquidar Honorarios de Colaborador'}
+                  </h3>
                   <p className="text-xs text-slate-400">
                     Período: <strong className="text-cyan-800 font-mono">{selectedMonth}</strong> • {liquidatingTech.name}
                   </p>
@@ -1438,15 +1697,58 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
               </div>
               <button 
                 type="button"
-                onClick={() => setLiquidatingTech(null)} 
+                onClick={() => {
+                  setLiquidatingTech(null);
+                  setPaymentProofUrl('');
+                }} 
                 className="text-slate-400 hover:text-slate-700 cursor-pointer p-1 rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
+            {/* Selector de Tipo: Liquidación vs Adelanto (NK-065) */}
+            <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => {
+                  setPayoutType('liquidacion');
+                  const settlement = techSettlementMap.get(liquidatingTech.id) || { completedCount: 0, totalCommission: 0, services: [] };
+                  const payouts = getTechPayouts(liquidatingTech.id, selectedMonth);
+                  const totalPaid = payouts.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+                  const pending = Math.max(0, settlement.totalCommission - totalPaid);
+                  setPayoutAmount(pending > 0 ? pending : settlement.totalCommission);
+                  setPayoutNotes(`Liquidación de honorarios correspondiente al período ${selectedMonth}.`);
+                }}
+                className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  payoutType === 'liquidacion'
+                    ? 'bg-white text-cyan-800 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <CreditCard className="w-3.5 h-3.5" />
+                <span>Liquidación Normal</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setPayoutType('adelanto');
+                  setPayoutNotes(`Adelanto / Préstamo a cuenta de honorarios período ${selectedMonth}.`);
+                }}
+                className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  payoutType === 'adelanto'
+                    ? 'bg-amber-500 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Banknote className="w-3.5 h-3.5" />
+                <span>Adelanto / Préstamo</span>
+              </button>
+            </div>
+
             <form onSubmit={handleConfirmLiquidation} className="space-y-4 text-xs">
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-600">Colaborador:</span>
                   <span className="font-bold text-slate-900">{liquidatingTech.name}</span>
@@ -1469,7 +1771,7 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
 
               <div>
                 <label className="text-slate-700 font-bold block mb-1">
-                  Monto a Liquidar ({currencySymbol})
+                  {payoutType === 'adelanto' ? 'Monto del Adelanto / Préstamo' : 'Monto a Transferir / Liquidar'} ({currencySymbol})
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-2.5 text-slate-400 font-bold">{currencySymbol}</span>
@@ -1478,12 +1780,14 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                     value={payoutAmount}
                     onChange={(e) => setPayoutAmount(Number(e.target.value))}
                     required
-                    min={0}
+                    min={1}
                     className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 text-sm font-mono font-black focus:bg-white focus:border-cyan-500 focus:outline-none"
                   />
                 </div>
                 <span className="text-[10px] text-slate-400 mt-1 block">
-                  💡 Este monto se registrará como egreso (-) en el balance y flujo de ventas para que todo cuadre.
+                  {payoutType === 'adelanto'
+                    ? '💡 Este monto se registrará como egreso y se descontará en negativo (-) de la liquidación del colaborador.'
+                    : '💡 Este monto se registrará como pago de comisiones ganadas y se deducirá del saldo pendiente.'}
                 </span>
               </div>
 
@@ -1527,6 +1831,57 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                 />
               </div>
 
+              {/* Carga de Comprobante / Voucher de Transferencia (NK-065) */}
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                <label className="text-slate-700 font-bold block text-xs flex items-center justify-between">
+                  <span>Comprobante de Transferencia / Voucher</span>
+                  <span className="text-[10px] text-slate-400 font-normal">Opcional (JPG, PNG, PDF)</span>
+                </label>
+
+                {paymentProofUrl ? (
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-50 border border-emerald-200">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <ImageIcon className="w-5 h-5 text-emerald-600 shrink-0" />
+                      <span className="text-emerald-900 font-medium text-xs truncate">
+                        Comprobante adjuntado correctamente
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setViewingProofUrl(paymentProofUrl)}
+                        className="px-2 py-1 rounded bg-white text-emerald-800 border border-emerald-300 font-bold text-[10px] hover:bg-emerald-100 flex items-center gap-1 cursor-pointer"
+                      >
+                        <Eye className="w-3 h-3" />
+                        <span>Ver</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentProofUrl('')}
+                        className="p-1 rounded text-rose-500 hover:bg-rose-100 cursor-pointer"
+                        title="Quitar comprobante"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="border-2 border-dashed border-slate-300 hover:border-cyan-400 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition-colors bg-white group">
+                    <Upload className="w-5 h-5 text-slate-400 group-hover:text-cyan-600 mb-1" />
+                    <span className="text-xs text-slate-600 font-medium group-hover:text-cyan-700">
+                      Haga clic para cargar foto o voucher de la transferencia
+                    </span>
+                    <span className="text-[10px] text-slate-400">Archivos de imagen hasta 8MB</span>
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={handleProofFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+              </div>
+
               <div>
                 <label className="text-slate-700 font-bold block mb-1">
                   Notas u Observaciones
@@ -1535,7 +1890,7 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
                   rows={2}
                   value={payoutNotes}
                   onChange={(e) => setPayoutNotes(e.target.value)}
-                  placeholder="Detalles sobre la liquidación..."
+                  placeholder="Detalles sobre la liquidación o adelanto..."
                   className="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
                 />
               </div>
@@ -1543,20 +1898,94 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
               <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setLiquidatingTech(null)}
+                  onClick={() => {
+                    setLiquidatingTech(null);
+                    setPaymentProofUrl('');
+                  }}
                   className="px-4 py-2 rounded-xl text-slate-500 hover:text-slate-800 font-medium cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold cursor-pointer shadow-md shadow-emerald-500/20"
+                  className={`flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-white font-bold cursor-pointer shadow-md transition-all ${
+                    payoutType === 'adelanto'
+                      ? 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-amber-500/20'
+                      : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/20'
+                  }`}
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Confirmar Liquidación</span>
+                  <span>{payoutType === 'adelanto' ? 'Confirmar Adelanto' : 'Confirmar Liquidación'}</span>
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Visor de Comprobante / Voucher (NK-065) */}
+      {viewingProofUrl && (
+        <div 
+          onClick={() => setViewingProofUrl(null)}
+          className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-xl bg-slate-900 border border-slate-700 rounded-2xl p-4 space-y-3 shadow-2xl cursor-default text-white"
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <div className="flex items-center gap-2">
+                <Paperclip className="w-4 h-4 text-cyan-400" />
+                <span className="font-bold text-sm">Comprobante de Transferencia / Voucher</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingProofUrl(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="max-h-[70vh] overflow-auto rounded-xl bg-black/40 flex items-center justify-center p-2">
+              {viewingProofUrl.startsWith('data:image') || viewingProofUrl.startsWith('http') ? (
+                <img 
+                  src={viewingProofUrl} 
+                  alt="Comprobante de transferencia" 
+                  className="max-h-[65vh] w-auto object-contain rounded-lg shadow-lg"
+                />
+              ) : (
+                <div className="p-8 text-center text-slate-300">
+                  <FileText className="w-12 h-12 mx-auto text-cyan-400 mb-2" />
+                  <p className="text-sm font-medium">Documento adjunto disponible</p>
+                  <a 
+                    href={viewingProofUrl} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="mt-3 inline-block px-4 py-2 bg-cyan-600 text-white rounded-xl text-xs font-bold"
+                  >
+                    Abrir archivo en nueva pestaña
+                  </a>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2 border-t border-slate-800">
+              <a
+                href={viewingProofUrl}
+                download="comprobante_pago.png"
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 text-xs font-bold transition-colors"
+              >
+                Descargar Comprobante
+              </a>
+              <button
+                type="button"
+                onClick={() => setViewingProofUrl(null)}
+                className="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold transition-colors cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}
