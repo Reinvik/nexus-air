@@ -371,7 +371,7 @@ export interface AirSettings {
   tax_id?: string;
   phone_prefix?: string;
   sample_cities?: string[];
-  default_country?: string;
+  coverage_communes?: string[];
   admin_pin?: string; // NK-052: Clave o PIN de administrador para anular/eliminar movimientos
   landing_config?: LandingPageConfig;
 }

@@ -345,10 +345,10 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                       onChange={(e) => {
                         const val = e.target.value as ServiceType;
                         setServiceType(val);
-                        if (val === 'mantencion_preventiva') setTotalPrice(45000);
-                        if (val === 'instalacion') setTotalPrice(130000);
-                        if (val === 'visita_tecnica') setTotalPrice(30000);
-                        if (val === 'recarga_gas') setTotalPrice(65000);
+                        if (val === 'mantencion_preventiva') setBasePrice(45000);
+                        if (val === 'instalacion') setBasePrice(130000);
+                        if (val === 'visita_tecnica') setBasePrice(30000);
+                        if (val === 'recarga_gas') setBasePrice(65000);
                       }}
                       className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:border-cyan-500 focus:outline-none transition-colors font-medium"
                     >

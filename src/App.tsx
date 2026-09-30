@@ -130,12 +130,11 @@ export default function App() {
   }, [tenantSettings, settings, isSolago]);
 
   // Wrapper para guardar ajustes sincronizando tanto el store como tenantSettings
-  const handleUpdateSettings = async (updates: Partial<AirSettings>) => {
-    const updated = await updateSettings(updates);
+  const handleUpdateSettings = async (updates: Partial<AirSettings>): Promise<void> => {
+    await updateSettings(updates);
     if (tenantSettings) {
       setTenantSettings(prev => prev ? ({ ...prev, ...updates }) : null);
     }
-    return updated;
   };
 
   useEffect(() => {

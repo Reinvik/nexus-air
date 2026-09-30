@@ -154,6 +154,8 @@ export const AgendaAir: React.FC<AgendaAirProps> = ({
     );
   };
 
+  const clientEquipments = formCustId ? equipments.filter(e => e.customer_id === formCustId) : [];
+
   // Guardar nuevo acuerdo periódico
   const handleSaveNewSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
