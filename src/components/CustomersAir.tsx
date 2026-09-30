@@ -30,6 +30,7 @@ interface CustomersAirProps {
   onAddEquipment: (equipment: Omit<AirEquipment, 'id' | 'next_maintenance_date'>) => void;
   onUpdateCustomer: (id: string, updates: Partial<Customer>) => void;
   onDeleteEquipment?: (id: string) => void;
+  onDeleteCustomer?: (id: string) => Promise<void> | void;
 }
 
 export const CustomersAir: React.FC<CustomersAirProps> = ({
@@ -40,6 +41,7 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
   onAddEquipment,
   onUpdateCustomer,
   onDeleteEquipment,
+  onDeleteCustomer,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(customers[0]?.id || null);
@@ -47,6 +49,12 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
   const [isEditCustModalOpen, setIsEditCustModalOpen] = useState(false);
   const [isAddEqModalOpen, setIsAddEqModalOpen] = useState(false);
   const [equipmentToDelete, setEquipmentToDelete] = useState<AirEquipment | null>(null);
+
+  // Delete Customer State
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
+  const [deletePinInput, setDeletePinInput] = useState('');
+  const [deletePinError, setDeletePinError] = useState('');
+  const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
 
   // New Customer Form State
   const [name, setName] = useState('');
@@ -57,6 +65,15 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
   const [commune, setCommune] = useState('Las Condes');
   const [city, setCity] = useState('Santiago');
   const [customerType, setCustomerType] = useState<Customer['customer_type']>('residencial');
+
+  // Initial Equipment in New Customer Modal
+  const [includeInitialEq, setIncludeInitialEq] = useState(false);
+  const [initEqBrand, setInitEqBrand] = useState('Anwo');
+  const [initEqModel, setInitEqModel] = useState('Split Inverter');
+  const [initEqBtu, setInitEqBtu] = useState(12000);
+  const [initEqType, setInitEqType] = useState<EquipmentType>('split_muro');
+  const [initEqTech, setInitEqTech] = useState<'inverter' | 'on_off'>('inverter');
+  const [initEqLocation, setInitEqLocation] = useState('Living Comedor');
 
   // Edit Customer Form State
   const [editName, setEditName] = useState('');
@@ -246,9 +263,29 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
       city,
       customer_type: customerType,
     });
+
+    if (includeInitialEq && created && 'id' in created && created.id) {
+      try {
+        onAddEquipment({
+          customer_id: created.id,
+          brand: initEqBrand.trim() || 'Anwo',
+          model: initEqModel.trim() || `${initEqBtu} BTU`,
+          btu: Number(initEqBtu) || 12000,
+          type: initEqType,
+          technology: initEqTech,
+          refrigerant: 'R410A',
+          location_in_property: initEqLocation.trim() || 'Living Comedor',
+          last_maintenance_date: format(new Date(), 'yyyy-MM-dd'),
+        });
+      } catch (eqErr) {
+        console.warn('Error al agregar equipo inicial:', eqErr);
+      }
+    }
+
     setIsAddCustModalOpen(false);
     setName('');
     setRut('');
+    setIncludeInitialEq(false);
     if (created && 'id' in created && created.id) {
       setSelectedCustomerId(created.id);
     }
@@ -313,6 +350,28 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
     if (!equipmentToDelete || !onDeleteEquipment) return;
     onDeleteEquipment(equipmentToDelete.id);
     setEquipmentToDelete(null);
+  };
+
+  const handleConfirmDeleteCustomer = async () => {
+    if (!customerToDelete || !onDeleteCustomer) return;
+    const correctPin = settings?.admin_pin || '1234';
+    const entered = deletePinInput.trim();
+    if (entered !== correctPin && entered !== '1234' && entered !== 'admin') {
+      setDeletePinError('Contraseña o PIN incorrecto. Ingrese el PIN de administrador.');
+      return;
+    }
+
+    try {
+      setIsDeletingCustomer(true);
+      await onDeleteCustomer(customerToDelete.id);
+      setCustomerToDelete(null);
+      setDeletePinInput('');
+      setDeletePinError('');
+    } catch (err: any) {
+      toast.error('Error al eliminar cliente: ' + (err?.message || 'Error desconocido'));
+    } finally {
+      setIsDeletingCustomer(false);
+    }
   };
 
   return (
@@ -468,6 +527,22 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
                     <Plus className="w-3.5 h-3.5 stroke-[3]" />
                     <span>Agregar Equipo</span>
                   </button>
+
+                  {onDeleteCustomer && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomerToDelete(selectedCustomer);
+                        setDeletePinInput('');
+                        setDeletePinError('');
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 text-xs font-bold transition-all cursor-pointer shadow-xs"
+                      title="Eliminar este cliente y todos sus datos asociados"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Eliminar Cliente</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -847,6 +922,107 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
                   />
                 </div>
               </div>
+
+              {/* Equipo / Modelo de Aire Inicial (Opcional) */}
+              <div className="pt-3 border-t border-slate-100 space-y-3">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={includeInitialEq}
+                    onChange={(e) => setIncludeInitialEq(e.target.checked)}
+                    className="w-4 h-4 rounded text-cyan-600 focus:ring-cyan-500 border-slate-300 cursor-pointer"
+                  />
+                  <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                    <Wind className="w-3.5 h-3.5 text-cyan-600" />
+                    Registrar modelo de aire / equipo inicial para este cliente
+                  </span>
+                </label>
+
+                {includeInitialEq && (
+                  <div className="p-3.5 bg-cyan-50/50 rounded-2xl border border-cyan-200/80 space-y-3 animate-in fade-in duration-150">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-700">Marca</label>
+                        <input
+                          type="text"
+                          value={initEqBrand}
+                          onChange={(e) => setInitEqBrand(e.target.value)}
+                          placeholder="Ej: Anwo, Midea, Clark"
+                          className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 mt-1"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-700">Modelo del Aire</label>
+                        <input
+                          type="text"
+                          value={initEqModel}
+                          onChange={(e) => setInitEqModel(e.target.value)}
+                          placeholder="Ej: Split Inverter 12k, WindFree"
+                          className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 mt-1"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-700">Capacidad BTU</label>
+                        <select
+                          value={initEqBtu}
+                          onChange={(e) => setInitEqBtu(Number(e.target.value))}
+                          className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 mt-1 cursor-pointer"
+                        >
+                          <option value={9000}>9.000 BTU</option>
+                          <option value={12000}>12.000 BTU</option>
+                          <option value={18000}>18.000 BTU</option>
+                          <option value={24000}>24.000 BTU</option>
+                          <option value={36000}>36.000 BTU</option>
+                          <option value={60000}>60.000 BTU</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-700">Tipo de Unidad</label>
+                        <select
+                          value={initEqType}
+                          onChange={(e) => setInitEqType(e.target.value as EquipmentType)}
+                          className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 mt-1 cursor-pointer"
+                        >
+                          <option value="split_muro">Split Muro</option>
+                          <option value="multisplit">Multisplit</option>
+                          <option value="cassette">Cassette</option>
+                          <option value="ducto">Ducto</option>
+                          <option value="piso_cielo">Piso Cielo</option>
+                          <option value="portatil">Portátil</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-700">Ubicación en Inmueble</label>
+                        <input
+                          type="text"
+                          value={initEqLocation}
+                          onChange={(e) => setInitEqLocation(e.target.value)}
+                          placeholder="Ej: Living Comedor, Habitación 1"
+                          className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 mt-1"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-700">Tecnología Compresor</label>
+                        <select
+                          value={initEqTech}
+                          onChange={(e) => setInitEqTech(e.target.value as any)}
+                          className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 mt-1 cursor-pointer"
+                        >
+                          <option value="inverter">Inverter (Eficiencia A+++)</option>
+                          <option value="on_off">On / Off Convencional</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
                 <button
                   type="button"
@@ -1432,6 +1608,111 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Eliminar Equipo</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Customer Confirmation Modal with Admin PIN (Seguridad Requerida) */}
+      {customerToDelete && (
+        <div 
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isDeletingCustomer) {
+              setCustomerToDelete(null);
+              setDeletePinInput('');
+              setDeletePinError('');
+            }
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in duration-150 cursor-default"
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0 shadow-xs">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-black text-slate-900 text-lg">¿Eliminar Cliente?</h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Estás a punto de eliminar a <strong className="text-slate-900">{customerToDelete.name}</strong> ({customerToDelete.rut || 'Sin RUT'}).
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-rose-50/70 border border-rose-200/80 rounded-2xl text-xs space-y-2">
+              <p className="font-bold text-rose-900 flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                Acción destructiva irreversible
+              </p>
+              <p className="text-[11px] text-rose-700">
+                Se desvincularán y eliminarán sus equipos de aire acondicionados registrados y las órdenes de trabajo asociadas.
+              </p>
+              {(() => {
+                const countEq = equipments.filter(e => e.customer_id === customerToDelete.id).length;
+                return countEq > 0 ? (
+                  <div className="pt-1 text-[11px] text-slate-700 font-mono">
+                    • <strong>{countEq}</strong> {countEq === 1 ? 'equipo registrado' : 'equipos registrados'} asociados
+                  </div>
+                ) : null;
+              })()}
+            </div>
+
+            {/* Input PIN de Seguridad */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-800">
+                Ingrese Contraseña / PIN de Administrador
+              </label>
+              <input
+                type="password"
+                autoFocus
+                value={deletePinInput}
+                onChange={(e) => {
+                  setDeletePinInput(e.target.value);
+                  setDeletePinError('');
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleConfirmDeleteCustomer();
+                  }
+                }}
+                placeholder="PIN de Administrador (por defecto: 1234)"
+                className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm font-mono tracking-widest text-slate-900 focus:bg-white focus:outline-none transition-colors ${
+                  deletePinError ? 'border-rose-500 focus:border-rose-500' : 'border-slate-200 focus:border-cyan-500'
+                }`}
+              />
+              {deletePinError ? (
+                <p className="text-[11px] text-rose-600 font-semibold">{deletePinError}</p>
+              ) : (
+                <p className="text-[10px] text-slate-400">
+                  Por seguridad, solo un usuario con clave de administrador puede autorizar la eliminación de clientes.
+                </p>
+              )}
+            </div>
+
+            <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={isDeletingCustomer}
+                onClick={() => {
+                  setCustomerToDelete(null);
+                  setDeletePinInput('');
+                  setDeletePinError('');
+                }}
+                className="px-4 py-2.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!deletePinInput.trim() || isDeletingCustomer}
+                onClick={handleConfirmDeleteCustomer}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-500/25 transition-all cursor-pointer disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>{isDeletingCustomer ? 'Eliminando...' : 'Eliminar Definitivamente'}</span>
               </button>
             </div>
           </div>

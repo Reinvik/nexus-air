@@ -83,6 +83,7 @@ export default function App() {
     generateWhatsAppUrl,
     addCustomer,
     updateCustomer,
+    deleteCustomer,
     addEquipment,
     deleteEquipment,
     addTechnician,
@@ -581,6 +582,7 @@ export default function App() {
             onAddEquipment={addEquipment}
             onUpdateCustomer={updateCustomer}
             onDeleteEquipment={deleteEquipment}
+            onDeleteCustomer={deleteCustomer}
           />
         )}
 

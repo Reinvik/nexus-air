@@ -1692,10 +1692,22 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
   const addCustomer = useCallback(async (custData: Omit<Customer, 'id' | 'created_at'>) => {
     const activeId = companyId || DEFAULT_COMPANY_ID;
     const newId = crypto.randomUUID();
+    const city = custData.city || (settings.country_code === 'CR' ? 'San José' : 'Santiago');
+    const rutClean = (custData.rut && custData.rut.trim()) || 'S/RUT';
+    const phoneClean = (custData.phone && custData.phone.trim()) || '+506 0000 0000';
+    const addressClean = (custData.address && custData.address.trim()) || 'Dirección no especificada';
+    const communeClean = (custData.commune && custData.commune.trim()) || (settings.country_code === 'CR' ? 'Central' : 'Santiago');
+
     const newCust: Customer = {
       ...custData,
       id: newId,
-      city: 'Santiago',
+      name: custData.name.trim(),
+      rut: rutClean,
+      phone: phoneClean,
+      email: custData.email ? custData.email.trim() : '',
+      address: addressClean,
+      commune: communeClean,
+      city,
       customer_type: custData.customer_type || 'residencial',
       created_at: format(new Date(), 'yyyy-MM-dd'),
       equipments: []
@@ -1707,13 +1719,13 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       const { error } = await supabaseAir.from('customers').insert([{
         id: newId,
         company_id: activeId,
-        name: custData.name,
-        rut: custData.rut,
-        phone: custData.phone,
-        email: custData.email,
-        address: custData.address,
-        commune: custData.commune,
-        notes: custData.notes
+        name: custData.name.trim(),
+        rut: rutClean,
+        phone: phoneClean,
+        email: custData.email && custData.email.trim() ? custData.email.trim() : null,
+        address: addressClean,
+        commune: communeClean,
+        notes: custData.notes && custData.notes.trim() ? custData.notes.trim() : null
       }]);
       if (error) {
         console.error('[useAirStore] Error inserting customer into Supabase:', error);
@@ -1721,10 +1733,10 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       }
     } catch (e: any) {
       console.warn('[useAirStore] Error inserting customer:', e);
-      toast.error(`Error de red: ${e?.message || e}`);
+      toast.error(`Error de red al registrar cliente: ${e?.message || e}`);
     }
     return newCust;
-  }, [companyId]);
+  }, [companyId, settings.country_code]);
 
   const updateCustomer = useCallback(async (id: string, updates: Partial<Customer>) => {
     setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
@@ -1734,13 +1746,13 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       const dbUpdates: any = {
         updated_at: new Date().toISOString()
       };
-      if (updates.name !== undefined) dbUpdates.name = updates.name;
-      if (updates.rut !== undefined) dbUpdates.rut = updates.rut;
-      if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
-      if (updates.email !== undefined) dbUpdates.email = updates.email;
-      if (updates.address !== undefined) dbUpdates.address = updates.address;
-      if (updates.commune !== undefined) dbUpdates.commune = updates.commune;
-      if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+      if (updates.name !== undefined) dbUpdates.name = updates.name.trim();
+      if (updates.rut !== undefined) dbUpdates.rut = updates.rut.trim() || 'S/RUT';
+      if (updates.phone !== undefined) dbUpdates.phone = updates.phone.trim();
+      if (updates.email !== undefined) dbUpdates.email = updates.email.trim() || null;
+      if (updates.address !== undefined) dbUpdates.address = updates.address.trim();
+      if (updates.commune !== undefined) dbUpdates.commune = updates.commune.trim();
+      if (updates.notes !== undefined) dbUpdates.notes = updates.notes.trim() || null;
 
       await supabaseAir
         .from('customers')
@@ -1753,12 +1765,24 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
 
   const deleteCustomer = useCallback(async (id: string) => {
     setCustomers(prev => prev.filter(c => c.id !== id));
-    toast.success('Cliente eliminado');
+    setEquipments(prev => prev.filter(e => e.customer_id !== id));
+    setOrders(prev => prev.filter(o => o.customer_id !== id));
+    toast.success('Cliente eliminado exitosamente');
 
     try {
-      await supabaseAir.from('customers').delete().eq('id', id);
-    } catch (e) {
+      // 1. Eliminar órdenes del cliente para evitar violación de FK ON DELETE RESTRICT
+      await supabaseAir.from('orders').delete().eq('customer_id', id);
+      // 2. Eliminar equipos asociados al cliente
+      await supabaseAir.from('equipments').delete().eq('customer_id', id);
+      // 3. Eliminar el registro del cliente
+      const { error } = await supabaseAir.from('customers').delete().eq('id', id);
+      if (error) {
+        console.error('[useAirStore] Error deleting customer from Supabase:', error);
+        toast.error(`Error al eliminar en la nube: ${error.message}`);
+      }
+    } catch (e: any) {
       console.warn('[useAirStore] Error deleting customer:', e);
+      toast.error(`Error al eliminar cliente: ${e?.message || e}`);
     }
   }, []);
 
@@ -1766,15 +1790,40 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
   const addEquipment = useCallback(async (eqData: Omit<AirEquipment, 'id' | 'next_maintenance_date'>) => {
     const activeId = companyId || DEFAULT_COMPANY_ID;
     const newId = crypto.randomUUID();
-    const baseDate = eqData.last_maintenance_date || eqData.installation_date || format(new Date(), 'yyyy-MM-dd');
-    const intervalDays = (settings.maintenance_interval_months || 6) * 30;
-    const nextDate = format(addDays(parseISO(baseDate), intervalDays), 'yyyy-MM-dd');
+
+    // Cálculo seguro de fecha sin tirar RangeError
+    let nextDate = format(addDays(new Date(), (settings.maintenance_interval_months || 6) * 30), 'yyyy-MM-dd');
+    try {
+      const rawDate = (eqData.last_maintenance_date && eqData.last_maintenance_date.trim()) || 
+                      (eqData.installation_date && eqData.installation_date.trim());
+      if (rawDate) {
+        const parsed = parseISO(rawDate);
+        if (!isNaN(parsed.getTime())) {
+          const intervalDays = (settings.maintenance_interval_months || 6) * 30;
+          nextDate = format(addDays(parsed, intervalDays), 'yyyy-MM-dd');
+        }
+      }
+    } catch {}
+
+    const brandClean = (eqData.brand && eqData.brand.trim()) || 'Anwo';
+    const modelClean = (eqData.model && eqData.model.trim()) || 'Split Inverter';
+    const locationClean = (eqData.location_in_property && eqData.location_in_property.trim()) || 'Ubicación Principal';
+    const btuClean = Number(eqData.btu) || 12000;
+    const installDate = (eqData.installation_date && eqData.installation_date.trim()) || null;
+    const lastMaintDate = (eqData.last_maintenance_date && eqData.last_maintenance_date.trim()) || null;
 
     const newEq: AirEquipment = {
       ...eqData,
       id: newId,
+      brand: brandClean,
+      model: modelClean,
+      location_in_property: locationClean,
+      btu: btuClean,
+      installation_date: installDate || undefined,
+      last_maintenance_date: lastMaintDate || undefined,
       next_maintenance_date: nextDate,
     };
+
     setEquipments(prev => [...prev, newEq]);
     setCustomers(prev => prev.map(c => {
       if (c.id === eqData.customer_id) {
@@ -1792,20 +1841,21 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         id: newId,
         company_id: activeId,
         customer_id: eqData.customer_id,
-        brand: eqData.brand,
-        model: eqData.model || null,
+        brand: brandClean,
+        model: modelClean,
         type: eqData.type || 'split_muro',
-        btu: eqData.btu,
+        btu: btuClean,
         technology: eqData.technology || 'inverter',
         refrigerant: eqData.refrigerant || 'R410A',
-        serial_number: eqData.serial_number || null,
-        serial_number_evaporator: eqData.serial_number_evaporator || null,
-        serial_number_condenser: eqData.serial_number_condenser || null,
-        location_in_property: eqData.location_in_property || null,
-        installation_date: eqData.installation_date || null,
-        last_maintenance_date: eqData.last_maintenance_date || null,
+        serial_number: eqData.serial_number && eqData.serial_number.trim() ? eqData.serial_number.trim() : null,
+        serial_number_evaporator: eqData.serial_number_evaporator && eqData.serial_number_evaporator.trim() ? eqData.serial_number_evaporator.trim() : null,
+        serial_number_condenser: eqData.serial_number_condenser && eqData.serial_number_condenser.trim() ? eqData.serial_number_condenser.trim() : null,
+        location_in_property: locationClean,
+        installation_date: installDate,
+        last_maintenance_date: lastMaintDate,
         next_maintenance_date: nextDate,
-        notes: eqData.notes || null,
+        status: eqData.status || 'operativo',
+        notes: eqData.notes && eqData.notes.trim() ? eqData.notes.trim() : null,
       }]);
       if (error) {
         console.error('[useAirStore] Error inserting equipment:', error);
