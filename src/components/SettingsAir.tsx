@@ -3,8 +3,13 @@ import {
   AirSettings,
   SERVICE_TYPE_DEFAULT_COLORS,
   CALENDAR_COLOR_OPTIONS,
-  formatServiceType
+  formatServiceType,
+  APP_MODULES,
+  DEFAULT_ROLE_PERMISSIONS,
+  ConfigurableRole,
+  ViewTab
 } from '../types';
+import { supabase } from '../lib/supabase';
 import { 
   Settings, 
   Save, 
@@ -24,7 +29,19 @@ import {
   Lock,
   Loader2,
   Palette,
-  Banknote
+  Banknote,
+  Shield,
+  ShieldAlert,
+  ShieldCheck,
+  Users,
+  UserPlus,
+  CheckSquare,
+  Square,
+  UserCheck,
+  RefreshCw,
+  Sliders,
+  X,
+  Key
 } from 'lucide-react';
 import { LATIN_AMERICAN_COUNTRIES, findCountry, LatinCountry } from '../lib/countries';
 import { toast } from 'react-hot-toast';
@@ -69,7 +86,19 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
     whatsapp_template_cobro: settings.whatsapp_template_cobro || '',
     admin_pin: settings.admin_pin || '1234',
     service_type_colors: settings.service_type_colors || SERVICE_TYPE_DEFAULT_COLORS,
+    role_permissions: settings.role_permissions || DEFAULT_ROLE_PERMISSIONS,
   });
+
+  // NK-067: Estado y gestión de roles, permisos y colaboradores del taller
+  const [selectedRoleForPerms, setSelectedRoleForPerms] = useState<ConfigurableRole>('tecnico');
+  const [companyUsers, setCompanyUsers] = useState<any[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserRole, setNewUserRole] = useState<'admin' | 'tecnico' | 'ayudante' | 'user'>('tecnico');
+  const [creatingUser, setCreatingUser] = useState(false);
 
   useEffect(() => {
     setFormData({
@@ -100,8 +129,144 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
       whatsapp_template_cobro: settings.whatsapp_template_cobro || '',
       admin_pin: settings.admin_pin || '1234',
       service_type_colors: settings.service_type_colors || SERVICE_TYPE_DEFAULT_COLORS,
+      role_permissions: settings.role_permissions || DEFAULT_ROLE_PERMISSIONS,
     });
   }, [settings]);
+
+  // Cargar usuarios vinculados a la empresa
+  const fetchCompanyUsers = async () => {
+    const compId = formData.company_id || settings.company_id;
+    if (!compId) return;
+    try {
+      setLoadingUsers(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('company_id', compId)
+        .order('created_at', { ascending: false });
+      if (!error && data) {
+        setCompanyUsers(data);
+      }
+    } catch (e) {
+      console.warn('Error fetching company users:', e);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCompanyUsers();
+  }, [formData.company_id, settings.company_id]);
+
+  // Modificar permisos de un rol
+  const handleToggleModulePermission = (role: ConfigurableRole, moduleId: ViewTab) => {
+    const currentPerms = { ...(formData.role_permissions || DEFAULT_ROLE_PERMISSIONS) };
+    const currentRoleModules = currentPerms[role] || DEFAULT_ROLE_PERMISSIONS[role] || [];
+    const roleModulesSet = new Set<ViewTab>(currentRoleModules);
+
+    if (roleModulesSet.has(moduleId)) {
+      roleModulesSet.delete(moduleId);
+    } else {
+      roleModulesSet.add(moduleId);
+    }
+
+    const updatedRolePerms = {
+      ...currentPerms,
+      [role]: Array.from(roleModulesSet)
+    };
+
+    setFormData(prev => ({
+      ...prev,
+      role_permissions: updatedRolePerms
+    }));
+  };
+
+  const handleResetRolePermissions = (role: ConfigurableRole) => {
+    const currentPerms = { ...(formData.role_permissions || DEFAULT_ROLE_PERMISSIONS) };
+    const updated = {
+      ...currentPerms,
+      [role]: [...(DEFAULT_ROLE_PERMISSIONS[role] || [])]
+    };
+    setFormData(prev => ({
+      ...prev,
+      role_permissions: updated
+    }));
+    toast.success(`Permisos recomendados restaurados para el rol ${role.toUpperCase()}`);
+  };
+
+  const handleChangeUserRole = async (userId: string, newRole: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: newRole, updated_at: new Date().toISOString() })
+        .eq('id', userId);
+      if (error) throw error;
+      setCompanyUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+      toast.success('Rol del colaborador actualizado');
+    } catch (err: any) {
+      toast.error('Error al actualizar rol: ' + (err.message || err));
+    }
+  };
+
+  const handleCreateCompanyUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserName.trim() || !newUserEmail.trim() || !newUserPassword.trim()) {
+      toast.error('Completa los campos obligatorios');
+      return;
+    }
+    const compId = formData.company_id || settings.company_id;
+    if (!compId) {
+      toast.error('No se ha detectado el ID de la empresa');
+      return;
+    }
+    setCreatingUser(true);
+    try {
+      // Intentar Edge Function manage-users
+      let createdUserId = 'usr_' + Date.now();
+      try {
+        const { data: fnData, error: fnErr } = await supabase.functions.invoke('manage-users', {
+          body: {
+            action: 'create_user',
+            userData: {
+              email: newUserEmail.trim(),
+              password: newUserPassword,
+              full_name: newUserName.trim(),
+              company_id: compId,
+              role: newUserRole
+            }
+          }
+        });
+        if (!fnErr && fnData?.user?.id) {
+          createdUserId = fnData.user.id;
+        }
+      } catch (e) {
+        console.warn('Edge function no disponible, guardando en profiles:', e);
+      }
+
+      const { error: profileErr } = await supabase.from('profiles').upsert({
+        id: createdUserId,
+        email: newUserEmail.trim(),
+        full_name: newUserName.trim(),
+        role: newUserRole,
+        company_id: compId,
+        is_active: true,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'id' });
+
+      if (profileErr) throw profileErr;
+
+      toast.success(`Colaborador ${newUserName} creado con rol ${newUserRole.toUpperCase()}`);
+      setNewUserName('');
+      setNewUserEmail('');
+      setNewUserPassword('');
+      setIsCreateUserModalOpen(false);
+      await fetchCompanyUsers();
+    } catch (err: any) {
+      toast.error('Error al registrar usuario: ' + (err.message || err));
+    } finally {
+      setCreatingUser(false);
+    }
+  };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -946,7 +1111,229 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
           </div>
         </div>
 
-        {/* SECCIÓN 5: DATOS BANCARIOS PARA COBROS Y TRANSFERENCIAS (NK-044) */}
+        {/* SECCIÓN 5: ROLES, PERMISOS DE ACCESO A MÓDULOS & USUARIOS DEL TALLER (NK-067) */}
+        <div className="p-6 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div>
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-cyan-600" />
+                Control de Roles & Permisos de Acceso a Módulos (NK-067)
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Configura a qué módulos específicos tiene acceso cada rol en la barra lateral y navegación de tu empresa.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsCreateUserModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>+ Crear Colaborador / Usuario</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Selector de Rol a Configurar */}
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <label className="text-xs font-bold text-slate-700">
+                Selecciona el rol para personalizar sus accesos:
+              </label>
+              <button
+                type="button"
+                onClick={() => handleResetRolePermissions(selectedRoleForPerms)}
+                className="text-[11px] font-bold text-cyan-600 hover:text-cyan-700 flex items-center gap-1 cursor-pointer self-start sm:self-auto"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Restaurar permisos recomendados para {selectedRoleForPerms.toUpperCase()}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {[
+                { 
+                  id: 'tecnico' as ConfigurableRole, 
+                  label: '🔧 Técnico HVAC Líder', 
+                  desc: 'Personal técnico de terreno con ejecución de órdenes y cotizador'
+                },
+                { 
+                  id: 'ayudante' as ConfigurableRole, 
+                  label: '🤝 Ayudante de Cuadrilla', 
+                  desc: 'Asistente de terreno para apoyo en agendamiento y checklist operativo'
+                },
+                { 
+                  id: 'user' as ConfigurableRole, 
+                  label: '👤 Usuario Estándar', 
+                  desc: 'Recepción, atención comercial básica o gestión de clientes sin acceso financiero'
+                }
+              ].map(r => {
+                const isSelected = selectedRoleForPerms === r.id;
+                const perms = formData.role_permissions?.[r.id] || DEFAULT_ROLE_PERMISSIONS[r.id] || [];
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => setSelectedRoleForPerms(r.id)}
+                    className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-gradient-to-br from-cyan-50 to-blue-50 border-cyan-500 shadow-sm ring-1 ring-cyan-500/30'
+                        : 'bg-slate-50/70 hover:bg-slate-100 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-xs font-black ${isSelected ? 'text-cyan-950' : 'text-slate-800'}`}>
+                        {r.label}
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        isSelected ? 'bg-cyan-600 text-white' : 'bg-slate-200 text-slate-600'
+                      }`}>
+                        {perms.length} módulos
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-tight">
+                      {r.desc}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Matriz de Módulos para el Rol Seleccionado */}
+          <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
+              <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <Sliders className="w-3.5 h-3.5 text-cyan-600" />
+                Módulos Habilitados para el Rol: <strong className="text-cyan-700 uppercase font-mono">{selectedRoleForPerms}</strong>
+              </span>
+              <span className="text-[11px] text-slate-500">
+                Los módulos marcados serán visibles en su menú.
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+              {APP_MODULES.map((mod) => {
+                const currentPerms = formData.role_permissions?.[selectedRoleForPerms] || DEFAULT_ROLE_PERMISSIONS[selectedRoleForPerms] || [];
+                const isEnabled = currentPerms.includes(mod.id);
+
+                return (
+                  <div
+                    key={mod.id}
+                    onClick={() => handleToggleModulePermission(selectedRoleForPerms, mod.id)}
+                    className={`flex items-start gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer select-none ${
+                      isEnabled
+                        ? 'bg-white border-cyan-400 shadow-xs'
+                        : 'bg-slate-100/60 border-slate-200 opacity-60 hover:opacity-100'
+                    }`}
+                  >
+                    <div className="mt-0.5">
+                      {isEnabled ? (
+                        <CheckSquare className="w-4 h-4 text-cyan-600" />
+                      ) : (
+                        <Square className="w-4 h-4 text-slate-400" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className={`text-xs font-bold ${isEnabled ? 'text-slate-900' : 'text-slate-600'}`}>
+                          {mod.label}
+                        </span>
+                        <span className={`text-[9px] uppercase px-1.5 py-0.2 rounded font-mono ${
+                          mod.category === 'operativo' 
+                            ? 'bg-blue-50 text-blue-700' 
+                            : mod.category === 'gestion' 
+                            ? 'bg-emerald-50 text-emerald-700' 
+                            : 'bg-purple-50 text-purple-700'
+                        }`}>
+                          {mod.category}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 truncate mt-0.5" title={mod.description}>
+                        {mod.description}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Listado de Colaboradores / Usuarios del Taller */}
+          <div className="pt-3 border-t border-slate-100 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-slate-600" />
+                  Usuarios Registrados de la Empresa
+                </h4>
+                <p className="text-[11px] text-slate-400">
+                  Asigna el rol correspondiente a cada usuario para aplicarle las restricciones de módulos.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={fetchCompanyUsers}
+                className="text-xs text-slate-500 hover:text-slate-800 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Refrescar usuarios"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {loadingUsers ? (
+              <div className="flex items-center justify-center p-6 text-slate-400 text-xs gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-cyan-600" />
+                Cargando colaboradores de la empresa...
+              </div>
+            ) : companyUsers.length === 0 ? (
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center text-xs text-slate-500">
+                Aún no hay usuarios adicionales registrados en esta empresa. Haz clic en <strong>+ Crear Colaborador / Usuario</strong> para agregar técnicos o ayudantes.
+              </div>
+            ) : (
+              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs divide-y divide-slate-100 text-xs">
+                {companyUsers.map((u) => (
+                  <div key={u.id} className="p-3 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-700 uppercase">
+                        {(u.full_name || u.email || 'U')[0]}
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                          <span>{u.full_name || 'Sin Nombre'}</span>
+                          {u.role === 'admin' && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700 font-extrabold uppercase">
+                              Admin
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-500">{u.email}</div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-center">
+                      <span className="text-[11px] text-slate-400">Rol:</span>
+                      <select
+                        value={u.role || 'user'}
+                        onChange={(e) => handleChangeUserRole(u.id, e.target.value)}
+                        className="p-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 cursor-pointer focus:bg-white focus:border-cyan-500 focus:outline-none"
+                      >
+                        <option value="admin">🛡️ Administrador</option>
+                        <option value="tecnico">🔧 Técnico HVAC</option>
+                        <option value="ayudante">🤝 Ayudante de Cuadrilla</option>
+                        <option value="user">👤 Usuario Estándar</option>
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* SECCIÓN 6: DATOS BANCARIOS PARA COBROS Y TRANSFERENCIAS (NK-044) */}
         <div className="p-6 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-4">
           <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
             <CreditCard className="w-4 h-4 text-emerald-600" />
@@ -1053,6 +1440,112 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
           </button>
         </div>
       </form>
+
+      {/* Modal: Crear Nuevo Colaborador para el Taller */}
+      {isCreateUserModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-cyan-100 text-cyan-700 flex items-center justify-center font-bold">
+                  <UserPlus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">Crear Nuevo Colaborador</h4>
+                  <p className="text-[11px] text-slate-500">Asigna credenciales y rol con permisos específicos</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateUserModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCompanyUser} className="p-5 space-y-3.5 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Nombre Completo *</label>
+                <input
+                  type="text"
+                  required
+                  value={newUserName}
+                  onChange={(e) => setNewUserName(e.target.value)}
+                  placeholder="Ej: Marcelo Rojas"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Correo Electrónico (Login) *</label>
+                <input
+                  type="email"
+                  required
+                  value={newUserEmail}
+                  onChange={(e) => setNewUserEmail(e.target.value)}
+                  placeholder="Ej: marcelo.rojas@clima.cl"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Contraseña Inicial *</label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={newUserPassword}
+                  onChange={(e) => setNewUserPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Rol en el Taller *</label>
+                <select
+                  value={newUserRole}
+                  onChange={(e) => setNewUserRole(e.target.value as any)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-bold focus:bg-white focus:border-cyan-500 focus:outline-none cursor-pointer"
+                >
+                  <option value="tecnico">🔧 Técnico HVAC (Solo módulos técnicos)</option>
+                  <option value="ayudante">🤝 Ayudante de Cuadrilla (Solo agenda y órdenes)</option>
+                  <option value="user">👤 Usuario Estándar / Recepción</option>
+                  <option value="admin">🛡️ Administrador (Acceso total)</option>
+                </select>
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  El rol asignado determinará automáticamente a qué módulos tendrá acceso según la matriz de permisos.
+                </span>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateUserModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingUser}
+                  className="px-5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {creatingUser ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Creando...</span>
+                    </>
+                  ) : (
+                    <span>Registrar Colaborador</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

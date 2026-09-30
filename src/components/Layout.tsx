@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ViewTab, AirSettings } from '../types';
+import { ViewTab, AirSettings, canUserAccessTab } from '../types';
 import { 
   Kanban, 
   Clock, 
@@ -67,7 +67,7 @@ export const Layout: React.FC<LayoutProps> = ({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { isSolago, brand, switchBrand } = useBrand();
 
-  const mainNav: { id: ViewTab; label: string; icon: React.ElementType; badge?: number; badgeColor?: string }[] = [
+  const allMainNav: { id: ViewTab; label: string; icon: React.ElementType; badge?: number; badgeColor?: string }[] = [
     { id: 'dashboard', label: 'Tablero Órdenes', icon: Kanban, badge: activeOrdersCount },
     { 
       id: 'recaptacion', 
@@ -79,8 +79,6 @@ export const Layout: React.FC<LayoutProps> = ({
     { id: 'agenda', label: 'Agenda & Visitas', icon: Calendar },
     { id: 'cotizador', label: 'Cotizador BTU', icon: Calculator },
   ];
-
-  const isTechnician = !isNexusOwner && (currentUserProfile?.role === 'tecnico' || currentUserProfile?.role === 'ayudante' || currentUserProfile?.role === 'technician');
 
   const allManageNav: { id: ViewTab; label: string; icon: React.ElementType }[] = [
     { id: 'inventory', label: 'Equipos & Stock', icon: Boxes },
@@ -95,9 +93,17 @@ export const Layout: React.FC<LayoutProps> = ({
     { id: 'settings', label: 'Configuración', icon: Settings },
   ];
 
-  const manageNav = isTechnician 
-    ? allManageNav.filter(item => item.id !== 'sales' && item.id !== 'finances' && item.id !== 'settings' && item.id !== 'payroll')
-    : allManageNav;
+  const userRole = currentUserProfile?.role || 'admin';
+  const rolePermissions = settings?.role_permissions;
+
+  // NK-067: Filtrar dinámicamente según permisos configurables del rol
+  const mainNav = allMainNav.filter(item => 
+    canUserAccessTab(item.id, userRole, isNexusOwner, rolePermissions)
+  );
+
+  const manageNav = allManageNav.filter(item => 
+    canUserAccessTab(item.id, userRole, isNexusOwner, rolePermissions)
+  );
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
@@ -231,36 +237,38 @@ export const Layout: React.FC<LayoutProps> = ({
             </div>
 
             {/* Category: GESTIÓN & EQUIPOS */}
-            <div>
-              <div className="text-[10px] font-extrabold text-[#475569] tracking-[0.15em] px-3 py-1.5 uppercase">
-                GESTIÓN & EQUIPOS
+            {manageNav.length > 0 && (
+              <div>
+                <div className="text-[10px] font-extrabold text-[#475569] tracking-[0.15em] px-3 py-1.5 uppercase">
+                  GESTIÓN & EQUIPOS
+                </div>
+                <div className="space-y-1 mt-1">
+                  {manageNav.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeTab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          setActiveTab(item.id);
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold nexus-sidebar-item cursor-pointer ${
+                          isActive
+                            ? 'active text-white font-bold'
+                            : 'text-slate-400 hover:text-white hover:bg-white/[0.03]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Icon className={`w-4 h-4 transition-colors ${isActive ? 'text-[#00d2ff]' : 'text-slate-500'}`} />
+                          <span>{item.label}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="space-y-1 mt-1">
-                {manageNav.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeTab === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        setActiveTab(item.id);
-                        setIsMobileMenuOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold nexus-sidebar-item cursor-pointer ${
-                        isActive
-                          ? 'active text-white font-bold'
-                          : 'text-slate-400 hover:text-white hover:bg-white/[0.03]'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Icon className={`w-4 h-4 transition-colors ${isActive ? 'text-[#00d2ff]' : 'text-slate-500'}`} />
-                        <span>{item.label}</span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            )}
 
             {/* Category: SUPERADMIN (EXCLUSIVO NEXUS OWNER) */}
             {isNexusOwner && (
@@ -319,7 +327,11 @@ export const Layout: React.FC<LayoutProps> = ({
                   ? (isSolago ? '👑 SoLago Owner HVAC' : '👑 Nexus Owner HVAC')
                   : currentUserProfile?.role === 'admin'
                   ? 'Administrador HVAC'
-                  : 'Técnico Certificado SEC'}
+                  : currentUserProfile?.role === 'ayudante'
+                  ? 'Ayudante de Cuadrilla'
+                  : currentUserProfile?.role === 'user'
+                  ? 'Usuario Estándar'
+                  : 'Técnico HVAC'}
               </div>
             </div>
           </div>
@@ -359,17 +371,19 @@ export const Layout: React.FC<LayoutProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`w-full py-2 px-2 ${
-              isSolago 
-                ? 'bg-[rgba(255,161,0,0.04)] hover:bg-[rgba(255,161,0,0.12)] border-[rgba(255,161,0,0.25)] hover:border-[rgba(255,161,0,0.45)] text-[#ffa100]' 
-                : 'bg-[rgba(6,182,212,0.03)] hover:bg-[rgba(6,182,212,0.12)] border-[rgba(6,182,212,0.2)] hover:border-[rgba(6,182,212,0.45)] text-[#00d2ff]'
-            } border hover:text-white rounded-xl text-[10.5px] font-bold flex items-center justify-center gap-2 whitespace-nowrap tracking-[0.03em] transition-all cursor-pointer`}
-          >
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>AJUSTES & PERFIL DE EMPRESA</span>
-          </button>
+          {canUserAccessTab('settings', userRole, isNexusOwner, rolePermissions) && (
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`w-full py-2 px-2 ${
+                isSolago 
+                  ? 'bg-[rgba(255,161,0,0.04)] hover:bg-[rgba(255,161,0,0.12)] border-[rgba(255,161,0,0.25)] hover:border-[rgba(255,161,0,0.45)] text-[#ffa100]' 
+                  : 'bg-[rgba(6,182,212,0.03)] hover:bg-[rgba(6,182,212,0.12)] border-[rgba(6,182,212,0.2)] hover:border-[rgba(6,182,212,0.45)] text-[#00d2ff]'
+              } border hover:text-white rounded-xl text-[10.5px] font-bold flex items-center justify-center gap-2 whitespace-nowrap tracking-[0.03em] transition-all cursor-pointer`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>AJUSTES & PERFIL DE EMPRESA</span>
+            </button>
+          )}
 
           <div className="flex items-center gap-2 pt-1">
             <button

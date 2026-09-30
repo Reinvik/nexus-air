@@ -468,6 +468,7 @@ export interface AirSettings {
   service_type_colors?: Record<string, string>; // NK-061: Colores configurables por tipo de servicio
   enable_staff_payroll?: boolean; // NK-062: Módulo activable de gestión de sueldos y pagos del personal
   staff_payroll_title?: string;   // NK-062: Nombre configurable de la sección
+  role_permissions?: Record<string, ViewTab[]>; // NK-067: Permisos de acceso a módulos por rol
   landing_config?: LandingPageConfig;
 }
 
@@ -624,4 +625,62 @@ export interface ProfileUser {
   last_login?: string;
   avatar_url?: string;
 }
+
+// NK-067: Sistema de Permisos y Roles de Acceso a Módulos
+export type ConfigurableRole = 'tecnico' | 'ayudante' | 'user';
+
+export interface AppModuleInfo {
+  id: ViewTab;
+  label: string;
+  category: 'operativo' | 'gestion' | 'configuracion';
+  description: string;
+}
+
+export const APP_MODULES: AppModuleInfo[] = [
+  { id: 'dashboard', label: 'Tablero Órdenes', category: 'operativo', description: 'Flujo kanban de órdenes de servicio y avances en vivo' },
+  { id: 'agenda', label: 'Agenda & Visitas', category: 'operativo', description: 'Calendario de visitas técnicas y acuerdos periódicos' },
+  { id: 'cotizador', label: 'Cotizador BTU', category: 'operativo', description: 'Cálculo de carga térmica y cotización rápida de equipos' },
+  { id: 'recaptacion', label: 'Recaptación 6M', category: 'operativo', description: 'Alertas de mantenimientos vencidos y fidelización' },
+  { id: 'inventory', label: 'Equipos & Stock', category: 'gestion', description: 'Inventario de equipos, repuestos, gases y accesorios' },
+  { id: 'customers', label: 'Clientes', category: 'gestion', description: 'Directorio de clientes residenciales y comerciales' },
+  { id: 'technicians', label: 'Técnicos HVAC', category: 'gestion', description: 'Gestión de colaboradores técnicos y comisiones' },
+  { id: 'payroll', label: 'Sueldos & Nómina', category: 'gestion', description: 'Liquidaciones de sueldos, pagos y préstamos' },
+  { id: 'sales', label: 'Ventas & Cobros', category: 'gestion', description: 'Historial comercial, facturación y estados de cobro' },
+  { id: 'finances', label: 'Finanzas & Equilibrio', category: 'gestion', description: 'Punto de equilibrio, costos fijos y egresos' },
+  { id: 'landingpage', label: 'Mi Landing Page', category: 'configuracion', description: 'Configuración de web pública y catálogo' },
+  { id: 'settings', label: 'Configuración', category: 'configuracion', description: 'Ajustes de la empresa, moneda, IVA y permisos' },
+];
+
+export const DEFAULT_ROLE_PERMISSIONS: Record<string, ViewTab[]> = {
+  admin: [
+    'dashboard', 'recaptacion', 'agenda', 'cotizador', 
+    'inventory', 'customers', 'technicians', 'payroll', 
+    'sales', 'finances', 'landingpage', 'settings'
+  ],
+  tecnico: [
+    'dashboard', 'agenda', 'cotizador', 'inventory'
+  ],
+  ayudante: [
+    'dashboard', 'agenda'
+  ],
+  user: [
+    'dashboard', 'agenda', 'cotizador', 'inventory', 'customers'
+  ]
+};
+
+export function canUserAccessTab(
+  tab: ViewTab,
+  userRole?: string,
+  isNexusOwner?: boolean,
+  rolePermissions?: Record<string, ViewTab[]>
+): boolean {
+  if (isNexusOwner) return true;
+  const role = (userRole || 'admin').toLowerCase();
+  if (role === 'admin' || role === 'nexus_owner' || role === 'owner' || role === 'superadmin') {
+    return true;
+  }
+  const allowed = rolePermissions?.[role] || DEFAULT_ROLE_PERMISSIONS[role] || DEFAULT_ROLE_PERMISSIONS.user || ['dashboard'];
+  return allowed.includes(tab);
+}
+
 

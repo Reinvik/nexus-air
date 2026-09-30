@@ -25,7 +25,7 @@ import { LandingEditorAir } from './components/LandingEditorAir';
 import { LoginAir } from './components/LoginAir';
 import { CustomerPortalAir } from './components/CustomerPortalAir';
 import { NexusOwnerAir } from './components/NexusOwnerAir';
-import { ViewTab, ServiceOrder, AirSettings, Customer, AirEquipment, ServiceType } from './types';
+import { ViewTab, ServiceOrder, AirSettings, Customer, AirEquipment, ServiceType, canUserAccessTab } from './types';
 import { Toaster, toast } from 'react-hot-toast';
 import { ShieldAlert } from 'lucide-react';
 import { useBrand } from './lib/brandConfig';
@@ -463,6 +463,25 @@ export default function App() {
     company_id: effectiveCompanyId
   };
 
+  // NK-067: Control de seguridad de pestaña activa según permisos de rol
+  useEffect(() => {
+    if (view === 'dashboard') {
+      const userRole = currentProfile?.role || 'admin';
+      const permissions = effectiveSettings?.role_permissions;
+      if (!canUserAccessTab(activeTab, userRole, isNexusOwner, permissions)) {
+        const allPossibleTabs: ViewTab[] = [
+          'dashboard', 'agenda', 'recaptacion', 'cotizador', 
+          'inventory', 'customers', 'technicians', 'payroll', 
+          'sales', 'finances', 'landingpage', 'settings'
+        ];
+        const allowedFallback = allPossibleTabs.find(t => 
+          canUserAccessTab(t, userRole, isNexusOwner, permissions)
+        ) || 'dashboard';
+        setActiveTab(allowedFallback);
+      }
+    }
+  }, [activeTab, currentProfile?.role, isNexusOwner, effectiveSettings?.role_permissions, view]);
+
   return (
     <>
       <Toaster position="top-right" />
@@ -667,6 +686,25 @@ export default function App() {
               </button>
             </div>
           )
+        )}
+
+        {/* NK-067: Mensaje elegante de Módulo Restringido si el usuario no tiene permisos asignados */}
+        {activeTab !== 'nexus_owner' && !canUserAccessTab(activeTab, currentProfile.role, isNexusOwner, effectiveSettings?.role_permissions) && (
+          <div className="bg-white rounded-3xl p-8 border border-amber-200 text-center max-w-lg mx-auto my-12 space-y-4 shadow-sm animate-fade-in">
+            <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto shadow-xs">
+              <ShieldAlert className="w-7 h-7" />
+            </div>
+            <h3 className="text-lg font-black text-slate-900">Módulo Restringido</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Tu rol actual (<strong className="text-slate-800 uppercase">{currentProfile.role || 'usuario'}</strong>) no cuenta con permisos para ver este módulo. Si necesitas acceso, solicítalo al administrador de tu empresa.
+            </p>
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className="px-5 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-xs cursor-pointer hover:bg-slate-800 transition-colors shadow-sm"
+            >
+              Ir a Tablero Permitido
+            </button>
+          </div>
         )}
       </Layout>
 
