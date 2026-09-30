@@ -26,7 +26,8 @@ import {
   ShieldAlert,
   Globe,
   Search,
-  Scale
+  Scale,
+  Banknote
 } from 'lucide-react';
 import { useBrand } from '../lib/brandConfig';
 
@@ -85,6 +86,9 @@ export const Layout: React.FC<LayoutProps> = ({
     { id: 'inventory', label: 'Equipos & Stock', icon: Boxes },
     { id: 'customers', label: 'Clientes', icon: Users },
     { id: 'technicians', label: 'Técnicos HVAC', icon: Wrench },
+    ...(settings?.enable_staff_payroll !== false ? [
+      { id: 'payroll' as ViewTab, label: settings?.staff_payroll_title || 'Sueldos & Nómina', icon: Banknote }
+    ] : []),
     { id: 'sales', label: 'Ventas & Cobros', icon: TrendingUp },
     { id: 'finances', label: 'Finanzas & Equilibrio', icon: Scale },
     { id: 'landingpage', label: 'Mi Landing Page', icon: Globe },
@@ -92,7 +96,7 @@ export const Layout: React.FC<LayoutProps> = ({
   ];
 
   const manageNav = isTechnician 
-    ? allManageNav.filter(item => item.id !== 'sales' && item.id !== 'finances' && item.id !== 'settings')
+    ? allManageNav.filter(item => item.id !== 'sales' && item.id !== 'finances' && item.id !== 'settings' && item.id !== 'payroll')
     : allManageNav;
 
   return (

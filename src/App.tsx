@@ -9,6 +9,7 @@ import { ThermalQuoterAir } from './components/ThermalQuoterAir';
 import { InventoryAir } from './components/InventoryAir';
 import { CustomersAir } from './components/CustomersAir';
 import { TechniciansAir } from './components/TechniciansAir';
+import { PayrollAir } from './components/PayrollAir';
 import { SalesAir } from './components/SalesAir';
 import { SettingsAir } from './components/SettingsAir';
 import { FinanceModuleAir } from './components/FinanceModuleAir';
@@ -575,6 +576,22 @@ export default function App() {
             onDeleteTechnician={deleteTechnician}
             onAddTechnicianPayout={addTechnicianPayout}
             onDeleteTechnicianPayout={deleteTechnicianPayout}
+            onNavigateToPayroll={() => setActiveTab('payroll')}
+          />
+        )}
+
+        {activeTab === 'payroll' && (
+          <PayrollAir
+            technicians={technicians}
+            orders={orders}
+            settings={effectiveSettings}
+            technicianPayouts={technicianPayouts}
+            onAddTechnician={addTechnician}
+            onUpdateTechnician={updateTechnician}
+            onDeleteTechnician={deleteTechnician}
+            onAddTechnicianPayout={addTechnicianPayout}
+            onDeleteTechnicianPayout={deleteTechnicianPayout}
+            onNavigateToTechnicians={() => setActiveTab('technicians')}
           />
         )}
 

@@ -136,13 +136,54 @@ export interface Customer {
 
 export type CustomerAir = Customer;
 
+export type StaffRole = 
+  | 'tecnico' 
+  | 'ayudante' 
+  | 'administracion' 
+  | 'recepcion' 
+  | 'limpieza' 
+  | 'chofer_logistica' 
+  | 'otro';
+
+export type SalaryMode = 'fixed' | 'commission' | 'fixed_and_commission';
+
+export function isTechnicalStaff(role?: string): boolean {
+  if (!role) return true;
+  return role === 'tecnico' || role === 'ayudante';
+}
+
+export function formatStaffRole(role?: string): string {
+  switch (role) {
+    case 'tecnico': return 'Técnico Líder';
+    case 'ayudante': return 'Ayudante Técnico';
+    case 'administracion': return 'Administración';
+    case 'recepcion': return 'Recepción / Ventas';
+    case 'limpieza': return 'Aseo & Mantención';
+    case 'chofer_logistica': return 'Chofer / Logística';
+    default: return role || 'Colaborador';
+  }
+}
+
+export function formatSalaryMode(mode?: SalaryMode): string {
+  switch (mode) {
+    case 'fixed': return 'Solo Sueldo Fijo';
+    case 'commission': return 'Solo Comisiones';
+    case 'fixed_and_commission': return 'Fijo + Comisiones';
+    default: return 'Comisiones';
+  }
+}
+
 export interface Technician {
   id: string;
   name: string;
   rut: string;
   phone: string;
   email?: string;
-  role?: 'tecnico' | 'ayudante';
+  role?: StaffRole | string;
+  custom_role_title?: string; // NK-062: Cargo personalizado si aplica
+  salary_mode?: SalaryMode;   // NK-062: Modalidad individual de pago
+  base_salary?: number;       // NK-062: Sueldo fijo mensual
+  working_days_default?: number; // NK-062: Días trabajados por defecto
   sec_certified: boolean;
   certification_number?: string;
   default_commission_type?: 'fixed' | 'percentage';
@@ -164,9 +205,15 @@ export interface TechnicianPayout {
   payout_number?: string; // ej: "LIQ-2026-001"
   technician_id: string;
   technician_name: string;
-  technician_role: 'tecnico' | 'ayudante';
+  technician_role: StaffRole | string;
+  salary_mode?: SalaryMode; // NK-062: Modalidad bajo la cual se liquidó
+  base_salary?: number;     // NK-062: Sueldo base en el período
+  commission_amount?: number; // NK-062: Comisiones sumadas en el período
+  bonus_amount?: number;    // NK-062: Bonos o haberes adicionales
+  deduction_amount?: number;// NK-062: Anticipos o descuentos aplicados
+  working_days?: number;    // NK-062: Días trabajados en el período
   period_month: string; // ej: "2026-09"
-  amount: number;
+  amount: number;       // Líquido total pagado
   payment_date: string; // YYYY-MM-DD
   payment_method: 'transferencia' | 'efectivo' | 'cheque' | 'otro';
   payment_reference?: string;
@@ -417,6 +464,8 @@ export interface AirSettings {
   coverage_communes?: string[];
   admin_pin?: string; // NK-052: Clave o PIN de administrador para anular/eliminar movimientos
   service_type_colors?: Record<string, string>; // NK-061: Colores configurables por tipo de servicio
+  enable_staff_payroll?: boolean; // NK-062: Módulo activable de gestión de sueldos y pagos del personal
+  staff_payroll_title?: string;   // NK-062: Nombre configurable de la sección
   landing_config?: LandingPageConfig;
 }
 
@@ -539,6 +588,7 @@ export type ViewTab =
   | 'inventory' 
   | 'customers' 
   | 'technicians' 
+  | 'payroll' // NK-062: Sueldos y pagos del personal
   | 'sales' 
   | 'finances'
   | 'settings'

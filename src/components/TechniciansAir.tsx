@@ -23,7 +23,8 @@ import {
   HardHat,
   Sparkles,
   CreditCard,
-  Receipt
+  Receipt,
+  Banknote
 } from 'lucide-react';
 import { formatAirPrice } from '../lib/countries';
 import { format } from 'date-fns';
@@ -38,6 +39,7 @@ interface TechniciansAirProps {
   onDeleteTechnician?: (id: string) => void;
   onAddTechnicianPayout?: (payout: Omit<TechnicianPayout, 'id' | 'company_id' | 'created_at'>) => Promise<any> | void;
   onDeleteTechnicianPayout?: (id: string) => Promise<any> | void;
+  onNavigateToPayroll?: () => void;
 }
 
 export const TechniciansAir: React.FC<TechniciansAirProps> = ({
@@ -50,6 +52,7 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
   onDeleteTechnician,
   onAddTechnicianPayout,
   onDeleteTechnicianPayout,
+  onNavigateToPayroll,
 }) => {
   const [roleFilter, setRoleFilter] = useState<'todos' | 'tecnico' | 'ayudante'>('todos');
   
@@ -437,6 +440,17 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {onNavigateToPayroll && (
+            <button
+              type="button"
+              onClick={onNavigateToPayroll}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs shadow-2xs transition-all cursor-pointer"
+            >
+              <Banknote className="w-4 h-4 text-emerald-600 stroke-[2.2]" />
+              <span>Sueldos & Nómina</span>
+            </button>
+          )}
+
           <button
             onClick={() => {
               setRole('tecnico');

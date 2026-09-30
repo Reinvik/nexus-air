@@ -724,25 +724,43 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       }
 
       if (dbTechnicians && dbTechnicians.length > 0) {
-        setTechnicians(dbTechnicians.map((t: any) => ({
-          id: t.id,
-          name: t.name,
-          rut: t.rut,
-          phone: t.phone,
-          email: t.email,
-          role: t.role || 'tecnico',
-          sec_certified: t.sec_certified ?? true,
-          status: t.active ? 'disponible' : 'inactivo',
-          default_commission_type: t.default_commission_type || 'fixed',
-          default_commission_value: t.default_commission_value !== null && t.default_commission_value !== undefined ? Number(t.default_commission_value) : 20000,
-          commission_mantencion_type: t.commission_mantencion_type || 'fixed',
-          commission_mantencion_value: t.commission_mantencion_value !== null && t.commission_mantencion_value !== undefined ? Number(t.commission_mantencion_value) : 20000,
-          commission_instalacion_type: t.commission_instalacion_type || 'fixed',
-          commission_instalacion_value: t.commission_instalacion_value !== null && t.commission_instalacion_value !== undefined ? Number(t.commission_instalacion_value) : 35000,
-          commission_reparacion_type: t.commission_reparacion_type || 'fixed',
-          commission_reparacion_value: t.commission_reparacion_value !== null && t.commission_reparacion_value !== undefined ? Number(t.commission_reparacion_value) : 15000,
-          active_orders_count: 1
-        })));
+        let localTechs: Record<string, any> = {};
+        try {
+          const raw = localStorage.getItem(`nexus_air_technicians_${activeId}`);
+          if (raw) {
+            const list = JSON.parse(raw);
+            if (Array.isArray(list)) {
+              list.forEach((lt: any) => { if (lt && lt.id) localTechs[lt.id] = lt; });
+            }
+          }
+        } catch {}
+
+        setTechnicians(dbTechnicians.map((t: any) => {
+          const local = localTechs[t.id] || {};
+          return {
+            id: t.id,
+            name: t.name,
+            rut: t.rut,
+            phone: t.phone,
+            email: t.email,
+            role: t.role || local.role || 'tecnico',
+            custom_role_title: t.custom_role_title || local.custom_role_title,
+            salary_mode: t.salary_mode || local.salary_mode || ((t.role === 'ayudante' || t.role === 'administracion') ? 'fixed' : 'commission'),
+            base_salary: t.base_salary !== undefined ? Number(t.base_salary) : (local.base_salary !== undefined ? Number(local.base_salary) : (t.role === 'ayudante' ? 600000 : (t.role === 'administracion' ? 750000 : 0))),
+            working_days_default: t.working_days_default || local.working_days_default || 30,
+            sec_certified: t.sec_certified ?? true,
+            status: t.active ? 'disponible' : 'inactivo',
+            default_commission_type: t.default_commission_type || 'fixed',
+            default_commission_value: t.default_commission_value !== null && t.default_commission_value !== undefined ? Number(t.default_commission_value) : 20000,
+            commission_mantencion_type: t.commission_mantencion_type || 'fixed',
+            commission_mantencion_value: t.commission_mantencion_value !== null && t.commission_mantencion_value !== undefined ? Number(t.commission_mantencion_value) : 20000,
+            commission_instalacion_type: t.commission_instalacion_type || 'fixed',
+            commission_instalacion_value: t.commission_instalacion_value !== null && t.commission_instalacion_value !== undefined ? Number(t.commission_instalacion_value) : 35000,
+            commission_reparacion_type: t.commission_reparacion_type || 'fixed',
+            commission_reparacion_value: t.commission_reparacion_value !== null && t.commission_reparacion_value !== undefined ? Number(t.commission_reparacion_value) : 15000,
+            active_orders_count: 1
+          };
+        }));
       } else if (!isMock) {
         setTechnicians([]);
       }
@@ -907,23 +925,49 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         .order('payment_date', { ascending: false });
 
       if (dbPayouts && dbPayouts.length > 0) {
-        setTechnicianPayouts(dbPayouts.map((p: any) => ({
-          id: p.id,
-          company_id: p.company_id,
-          payout_number: p.payout_number,
-          technician_id: p.technician_id,
-          technician_name: p.technician_name,
-          technician_role: p.technician_role,
-          period_month: p.period_month,
-          amount: Number(p.amount) || 0,
-          payment_date: p.payment_date,
-          payment_method: p.payment_method,
-          payment_reference: p.payment_reference,
-          notes: p.notes,
-          order_ids: Array.isArray(p.order_ids) ? p.order_ids : [],
-          created_at: p.created_at,
-          updated_at: p.updated_at
-        })));
+        let localPayouts: Record<string, any> = {};
+        try {
+          const raw = localStorage.getItem(`nexus_air_technician_payouts_${activeId}`);
+          if (raw) {
+            const list = JSON.parse(raw);
+            if (Array.isArray(list)) {
+              list.forEach((lp: any) => { if (lp && lp.id) localPayouts[lp.id] = lp; });
+            }
+          }
+        } catch {}
+
+        setTechnicianPayouts(dbPayouts.map((p: any) => {
+          const local = localPayouts[p.id] || {};
+          let parsedMeta: any = {};
+          if (p.notes && typeof p.notes === 'string' && p.notes.startsWith('{')) {
+            try {
+              parsedMeta = JSON.parse(p.notes);
+            } catch {}
+          }
+          return {
+            id: p.id,
+            company_id: p.company_id,
+            payout_number: p.payout_number || local.payout_number,
+            technician_id: p.technician_id,
+            technician_name: p.technician_name,
+            technician_role: p.technician_role,
+            salary_mode: p.salary_mode || local.salary_mode || parsedMeta.salary_mode,
+            base_salary: p.base_salary !== undefined ? Number(p.base_salary) : (local.base_salary !== undefined ? Number(local.base_salary) : parsedMeta.base_salary),
+            commission_amount: p.commission_amount !== undefined ? Number(p.commission_amount) : (local.commission_amount !== undefined ? Number(local.commission_amount) : parsedMeta.commission_amount),
+            bonus_amount: p.bonus_amount !== undefined ? Number(p.bonus_amount) : (local.bonus_amount !== undefined ? Number(local.bonus_amount) : parsedMeta.bonus_amount),
+            deduction_amount: p.deduction_amount !== undefined ? Number(p.deduction_amount) : (local.deduction_amount !== undefined ? Number(local.deduction_amount) : parsedMeta.deduction_amount),
+            working_days: p.working_days !== undefined ? Number(p.working_days) : (local.working_days !== undefined ? Number(local.working_days) : parsedMeta.working_days),
+            period_month: p.period_month,
+            amount: Number(p.amount) || 0,
+            payment_date: p.payment_date,
+            payment_method: p.payment_method,
+            payment_reference: p.payment_reference,
+            notes: parsedMeta.user_notes !== undefined ? parsedMeta.user_notes : p.notes,
+            order_ids: Array.isArray(p.order_ids) ? p.order_ids : (local.order_ids || []),
+            created_at: p.created_at,
+            updated_at: p.updated_at
+          };
+        }));
       } else if (!isMock) {
         setTechnicianPayouts([]);
       }
@@ -1859,6 +1903,10 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       id: newId,
       status: techData.status || 'disponible',
       role: techData.role || 'tecnico',
+      custom_role_title: techData.custom_role_title,
+      salary_mode: techData.salary_mode || ((techData.role === 'ayudante' || techData.role === 'administracion') ? 'fixed' : 'commission'),
+      base_salary: techData.base_salary !== undefined ? Number(techData.base_salary) : (techData.role === 'ayudante' ? 600000 : (techData.role === 'administracion' ? 750000 : 0)),
+      working_days_default: techData.working_days_default || 30,
       default_commission_type: techData.default_commission_type || 'fixed',
       default_commission_value: techData.default_commission_value !== undefined ? Number(techData.default_commission_value) : 20000,
       commission_mantencion_type: techData.commission_mantencion_type || 'fixed',
@@ -1877,7 +1925,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       } catch {}
       return updated;
     });
-    toast.success(`${newTech.role === 'ayudante' ? 'Ayudante' : 'Técnico'} ${newTech.name} registrado`);
+    toast.success(`Colaborador ${newTech.name} registrado`);
 
     try {
       await supabaseAir.from('technicians').insert([{
@@ -1888,7 +1936,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         phone: techData.phone,
         rut: techData.rut,
         role: newTech.role,
-        sec_certified: techData.sec_certified ?? true,
+        sec_certified: techData.sec_certified ?? (newTech.role === 'tecnico'),
         active: true,
         default_commission_type: newTech.default_commission_type,
         default_commission_value: newTech.default_commission_value,
@@ -1914,7 +1962,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       } catch {}
       return updated;
     });
-    toast.success('Personal técnico actualizado');
+    toast.success('Colaborador actualizado');
 
     try {
       const dbUpdates: any = { updated_at: new Date().toISOString() };
@@ -2138,7 +2186,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     }
   }, [companyId, settings]);
 
-  // Liquidación de Honorarios a Técnicos (NK-043)
+  // Liquidación de Honorarios a Técnicos y Nómina (NK-043 & NK-062)
   const addTechnicianPayout = useCallback(async (payoutData: Omit<TechnicianPayout, 'id' | 'company_id' | 'created_at'>) => {
     const activeId = companyId || DEFAULT_COMPANY_ID;
     const newId = crypto.randomUUID();
@@ -2153,10 +2201,29 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       updated_at: new Date().toISOString()
     };
 
-    setTechnicianPayouts(prev => [newPayout, ...prev]);
-    toast.success('Pago de honorarios registrado exitosamente');
+    setTechnicianPayouts(prev => {
+      // Si ya existía liquidación para el mismo colaborador en el mismo mes, reemplazarla
+      const filtered = prev.filter(p => !(p.technician_id === newPayout.technician_id && p.period_month === newPayout.period_month));
+      const updated = [newPayout, ...filtered];
+      try {
+        localStorage.setItem(`nexus_air_technician_payouts_${activeId}`, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    toast.success('Liquidación de sueldo / honorarios registrada exitosamente');
 
     try {
+      // Guardar metadata extendida de nómina en notes como JSON para asegurar compatibilidad de esquema
+      const notesPayload = JSON.stringify({
+        user_notes: newPayout.notes || '',
+        salary_mode: newPayout.salary_mode,
+        base_salary: newPayout.base_salary,
+        commission_amount: newPayout.commission_amount,
+        bonus_amount: newPayout.bonus_amount,
+        deduction_amount: newPayout.deduction_amount,
+        working_days: newPayout.working_days
+      });
+
       const { error } = await supabaseAir
         .from('technician_payouts')
         .insert({
@@ -2171,7 +2238,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
           payment_date: newPayout.payment_date,
           payment_method: newPayout.payment_method,
           payment_reference: newPayout.payment_reference,
-          notes: newPayout.notes,
+          notes: notesPayload,
           order_ids: newPayout.order_ids || []
         });
 

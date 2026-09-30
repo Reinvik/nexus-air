@@ -52,9 +52,9 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
     };
   }, [isOpen, onClose]);
 
-  // NK-046: Filtrar para que solo salgan técnicos en el selector de técnicos y solo ayudantes en el de ayudantes
+  // NK-046 & NK-062: Solo técnicos líderes pueden ser asignados como técnico principal
   const availableTechnicians = useMemo(() => 
-    technicians.filter(t => t.role !== 'ayudante'), 
+    technicians.filter(t => t.role === 'tecnico' || (!t.role && t.role !== 'ayudante')), 
     [technicians]
   );
 
@@ -67,7 +67,7 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
   const [scheduledDate, setScheduledDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [scheduledSlot, setScheduledSlot] = useState('09:30 - 11:30');
   const [technicianId, setTechnicianId] = useState(
-    technicians.find(t => t.role !== 'ayudante')?.id || technicians[0]?.id || ''
+    technicians.find(t => t.role === 'tecnico' || (!t.role && t.role !== 'ayudante'))?.id || ''
   );
   const [assistantId, setAssistantId] = useState('');
 

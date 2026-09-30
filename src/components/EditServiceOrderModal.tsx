@@ -109,9 +109,9 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
   const [equipmentId, setEquipmentId] = useState(order?.equipment_id || '');
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
 
-  // NK-046: Filtrar para que solo salgan técnicos en el selector de técnicos y solo ayudantes en el de ayudantes
+  // NK-046 & NK-062: Solo técnicos líderes pueden ser asignados como técnico principal
   const availableTechnicians = useMemo(() => 
-    technicians.filter(t => t.role !== 'ayudante' || t.id === order?.assigned_technician_id), 
+    technicians.filter(t => t.role === 'tecnico' || (!t.role && t.role !== 'ayudante') || t.id === order?.assigned_technician_id), 
     [technicians, order?.assigned_technician_id]
   );
 

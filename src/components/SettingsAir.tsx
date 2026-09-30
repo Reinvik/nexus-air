@@ -23,7 +23,8 @@ import {
   CreditCard,
   Lock,
   Loader2,
-  Palette
+  Palette,
+  Banknote
 } from 'lucide-react';
 import { LATIN_AMERICAN_COUNTRIES, findCountry, LatinCountry } from '../lib/countries';
 import { toast } from 'react-hot-toast';
@@ -845,6 +846,60 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
               );
             })}
           </div>
+        </div>
+
+        {/* SECCIÓN: MÓDULO DE NÓMINA & SUELDOS DEL PERSONAL (NK-062) */}
+        <div className="p-6 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100">
+            <div>
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <Banknote className="w-4 h-4 text-emerald-600 stroke-[2.2]" />
+                Módulo de Nómina & Sueldos del Personal (NK-062)
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Control de sueldos fijos, comisiones operativas, anticipos y emisión de comprobantes de liquidación mensual.
+              </p>
+            </div>
+            
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.enable_staff_payroll !== false}
+                onChange={(e) => setFormData(prev => ({ ...prev, enable_staff_payroll: e.target.checked }))}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+              <span className="ml-2 text-xs font-bold text-slate-700">
+                {formData.enable_staff_payroll !== false ? 'Activo' : 'Desactivado'}
+              </span>
+            </label>
+          </div>
+
+          {formData.enable_staff_payroll !== false && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pt-1">
+              <div>
+                <label className="text-slate-700 font-semibold block mb-1">
+                  Nombre de la Pestaña / Módulo
+                </label>
+                <input
+                  type="text"
+                  value={formData.staff_payroll_title || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, staff_payroll_title: e.target.value }))}
+                  placeholder="Sueldos & Nómina"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-xl space-y-1">
+                <span className="font-bold text-emerald-950 text-xs block">
+                  ✓ Regla de Operaciones Blindada
+                </span>
+                <p className="text-[11px] text-emerald-800 leading-relaxed">
+                  Los colaboradores administrativos (recepción, oficina, limpieza) conviven dentro de la nómina mensual pero tienen bloqueada su asignación en órdenes de trabajo técnicas.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* SECCIÓN 4: PLANTILLAS DE WHATSAPP */}
