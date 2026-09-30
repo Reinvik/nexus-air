@@ -1569,17 +1569,24 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
       {/* Delete Equipment Confirmation Modal */}
       {equipmentToDelete && (
         <div 
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setEquipmentToDelete(null);
-          }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs cursor-pointer"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs overflow-y-auto"
         >
           <div 
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in duration-150 cursor-default"
+            className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in duration-150 cursor-default my-auto relative"
           >
-            <div className="flex items-start gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0">
+            {/* Botón X de cerrar */}
+            <button
+              type="button"
+              onClick={() => setEquipmentToDelete(null)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+              title="Cerrar ventana"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-start gap-3.5 pr-6">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0 shadow-xs">
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <div className="space-y-1">
@@ -1614,23 +1621,31 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
         </div>
       )}
 
-      {/* Delete Customer Confirmation Modal with Admin PIN (Seguridad Requerida) */}
+      {/* Delete Customer Confirmation Modal with Admin PIN (Seguridad Requerida - Protegido contra clics accidentales) */}
       {customerToDelete && (
         <div 
-          onClick={(e) => {
-            if (e.target === e.currentTarget && !isDeletingCustomer) {
-              setCustomerToDelete(null);
-              setDeletePinInput('');
-              setDeletePinError('');
-            }
-          }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs cursor-pointer"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs overflow-y-auto"
         >
           <div 
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in duration-150 cursor-default"
+            className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in duration-150 cursor-default my-auto relative"
           >
-            <div className="flex items-start gap-4">
+            {/* Botón X de cerrar */}
+            <button
+              type="button"
+              disabled={isDeletingCustomer}
+              onClick={() => {
+                setCustomerToDelete(null);
+                setDeletePinInput('');
+                setDeletePinError('');
+              }}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+              title="Cerrar ventana"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-start gap-4 pr-6">
               <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0 shadow-xs">
                 <AlertTriangle className="w-6 h-6" />
               </div>
@@ -1660,61 +1675,64 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
               })()}
             </div>
 
-            {/* Input PIN de Seguridad */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-800">
-                Ingrese Contraseña / PIN de Administrador
-              </label>
-              <input
-                type="password"
-                autoFocus
-                value={deletePinInput}
-                onChange={(e) => {
-                  setDeletePinInput(e.target.value);
-                  setDeletePinError('');
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleConfirmDeleteCustomer();
-                  }
-                }}
-                placeholder="PIN de Administrador (por defecto: 1234)"
-                className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm font-mono tracking-widest text-slate-900 focus:bg-white focus:outline-none transition-colors ${
-                  deletePinError ? 'border-rose-500 focus:border-rose-500' : 'border-slate-200 focus:border-cyan-500'
-                }`}
-              />
-              {deletePinError ? (
-                <p className="text-[11px] text-rose-600 font-semibold">{deletePinError}</p>
-              ) : (
-                <p className="text-[10px] text-slate-400">
-                  Por seguridad, solo un usuario con clave de administrador puede autorizar la eliminación de clientes.
-                </p>
-              )}
-            </div>
+            {/* Formulario para ingresar PIN y confirmar */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleConfirmDeleteCustomer();
+              }}
+              className="space-y-4"
+            >
+              {/* Input PIN de Seguridad */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-800">
+                  Ingrese Contraseña / PIN de Administrador
+                </label>
+                <input
+                  type="password"
+                  autoFocus
+                  value={deletePinInput}
+                  onChange={(e) => {
+                    setDeletePinInput(e.target.value);
+                    setDeletePinError('');
+                  }}
+                  placeholder="PIN de Administrador (por defecto: 1234)"
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm font-mono tracking-widest text-slate-900 focus:bg-white focus:outline-none transition-colors ${
+                    deletePinError ? 'border-rose-500 focus:border-rose-500' : 'border-slate-200 focus:border-cyan-500'
+                  }`}
+                />
+                {deletePinError ? (
+                  <p className="text-[11px] text-rose-600 font-semibold">{deletePinError}</p>
+                ) : (
+                  <p className="text-[10px] text-slate-400">
+                    Esta ventana no se cerrará al hacer clic por fuera para evitar pérdidas accidentales de datos.
+                  </p>
+                )}
+              </div>
 
-            <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-slate-100">
-              <button
-                type="button"
-                disabled={isDeletingCustomer}
-                onClick={() => {
-                  setCustomerToDelete(null);
-                  setDeletePinInput('');
-                  setDeletePinError('');
-                }}
-                className="px-4 py-2.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                disabled={!deletePinInput.trim() || isDeletingCustomer}
-                onClick={handleConfirmDeleteCustomer}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-500/25 transition-all cursor-pointer disabled:opacity-50"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>{isDeletingCustomer ? 'Eliminando...' : 'Eliminar Definitivamente'}</span>
-              </button>
-            </div>
+              <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={isDeletingCustomer}
+                  onClick={() => {
+                    setCustomerToDelete(null);
+                    setDeletePinInput('');
+                    setDeletePinError('');
+                  }}
+                  className="px-4 py-2.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={!deletePinInput.trim() || isDeletingCustomer}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-500/25 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>{isDeletingCustomer ? 'Eliminando...' : 'Eliminar Definitivamente'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
