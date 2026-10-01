@@ -155,10 +155,20 @@ export const KanbanCardAir: React.FC<KanbanCardAirProps> = ({
       {/* 3. Equipo HVAC Compacto */}
       <div className="flex items-center justify-between text-[10.5px] bg-slate-50 border border-slate-200/80 rounded-lg px-2 py-0.5">
         <span className="font-semibold text-cyan-900 truncate">
-          ❄️ {order.equipment ? `${order.equipment.brand} ${order.equipment.btu.toLocaleString()} BTU` : 'Equipo por Evaluar'}
-          {order.equipment?.technology && ` (${order.equipment.technology.toUpperCase()})`}
+          {order.equipment_ids && order.equipment_ids.length > 1 ? (
+            <span className="flex items-center gap-1">
+              <span>❄️</span>
+              <span className="font-bold text-cyan-700">{order.equipment_ids.length} Equipos</span>
+              <span className="text-slate-500 font-normal">({order.equipments_summary ? order.equipments_summary.split(':')[1]?.trim() : 'Múltiples'})</span>
+            </span>
+          ) : (
+            <>
+              ❄️ {order.equipment ? `${order.equipment.brand} ${order.equipment.btu.toLocaleString()} BTU` : (order.equipments_summary || 'Equipo por Evaluar')}
+              {order.equipment?.technology && ` (${order.equipment.technology.toUpperCase()})`}
+            </>
+          )}
         </span>
-        {order.equipment?.location_in_property && (
+        {order.equipment?.location_in_property && (!order.equipment_ids || order.equipment_ids.length <= 1) && (
           <span className="text-[10px] text-slate-500 font-medium truncate ml-1 shrink-0">
             📍 {order.equipment.location_in_property}
           </span>
@@ -255,7 +265,7 @@ export const KanbanCardAir: React.FC<KanbanCardAirProps> = ({
               <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
               <span>Cerrado {order.completed_at ? order.completed_at.replace('T', ' ').slice(11, 16) : ''}</span>
             </div>
-            {onOpenReceipt && (
+            {onOpenReceipt && !hideAmount && (
               <button
                 onClick={() => onOpenReceipt(order)}
                 className="flex items-center gap-1 px-2 py-0.5 rounded bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-[10px] transition-all cursor-pointer shadow-2xs"

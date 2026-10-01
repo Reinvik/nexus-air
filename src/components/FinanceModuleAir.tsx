@@ -82,6 +82,26 @@ const MONTH_NAMES = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
 
+// Helper robusto para comparación de año y mes evitando desfaces de huso horario UTC (NK-076)
+const isInSelectedPeriod = (dateStr: string | undefined | null, targetMonth: number, targetYear: number): boolean => {
+  if (!dateStr) return false;
+  const str = String(dateStr).trim();
+  const dateOnly = str.split('T')[0];
+  const parts = dateOnly.split('-');
+  if (parts.length >= 2) {
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1; // 0-indexed
+    if (!isNaN(y) && !isNaN(m)) {
+      return y === targetYear && m === targetMonth;
+    }
+  }
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    return d.getMonth() === targetMonth && d.getFullYear() === targetYear;
+  }
+  return false;
+};
+
 export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
   orders,
   settings,
@@ -229,18 +249,29 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
   // CÁLCULOS FINANCIEROS Y PUNTO DE EQUILIBRIO (useMemo)
   // -------------------------------------------------------------
 
-  // 1. Órdenes del mes seleccionado (excluyendo canceladas)
+  // 1. Órdenes del mes seleccionado (excluyendo canceladas) - NK-076
   const monthOrders = useMemo(() => {
     return orders.filter(ord => {
       if (ord.status === 'cancelado') return false;
-      const d = new Date(ord.scheduled_date || ord.created_at || Date.now());
-      return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+      const inScheduled = isInSelectedPeriod(ord.scheduled_date, selectedMonth, selectedYear);
+      const inPayment = isInSelectedPeriod(ord.payment_date, selectedMonth, selectedYear);
+      const inCreated = isInSelectedPeriod(ord.created_at, selectedMonth, selectedYear);
+      return inScheduled || inPayment || (inCreated && !ord.scheduled_date);
     });
   }, [orders, selectedMonth, selectedYear]);
 
-  // Total facturado en el mes
+  // Total facturado / contratado en el mes
   const monthSalesTotal = useMemo(() => {
     return monthOrders.reduce((sum, ord) => sum + (Number(ord.total) || 0), 0);
+  }, [monthOrders]);
+
+  // Total cobrado / recaudado efectivamente en el mes
+  const monthCollectedTotal = useMemo(() => {
+    return monthOrders.reduce((sum, ord) => {
+      if (ord.payment_status === 'pagado') return sum + (Number(ord.total) || 0);
+      if (ord.payment_status === 'abono') return sum + (Number(ord.paid_amount) || 0);
+      return sum;
+    }, 0);
   }, [monthOrders]);
 
   const monthOrdersCount = monthOrders.length;
@@ -253,12 +284,11 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
 
   // 2. Costos Variables del Mes:
   // - Insumos consumidos en órdenes
-  // - Honorarios y comisiones de técnicos
+  // - Honorarios y comisiones de técnicos (liquidaciones reales + devengadas)
   // - Egresos variables registrados
   const monthVariableExpensesTotal = useMemo(() => {
     return expenses.reduce((sum, exp) => {
-      const d = new Date(exp.date || Date.now());
-      if (d.getMonth() === selectedMonth && d.getFullYear() === selectedYear) {
+      if (isInSelectedPeriod(exp.date || exp.created_at, selectedMonth, selectedYear)) {
         if (!exp.is_fixed) {
           return sum + (Number(exp.amount) || 0);
         }
@@ -267,7 +297,21 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
     }, 0);
   }, [expenses, selectedMonth, selectedYear]);
 
-  const monthTechCommissionsTotal = useMemo(() => {
+  // Comisiones liquidadas/pagadas a técnicos formalmente en el mes (NK-076)
+  const monthTechPayoutsTotal = useMemo(() => {
+    return (technicianPayouts || []).reduce((sum, p) => {
+      const inMonth = isInSelectedPeriod(p.payment_date, selectedMonth, selectedYear) ||
+                      isInSelectedPeriod(p.created_at, selectedMonth, selectedYear) ||
+                      (p.period_month && (() => {
+                        const parts = p.period_month.split('-');
+                        return parts.length >= 2 && parseInt(parts[0], 10) === selectedYear && (parseInt(parts[1], 10) - 1) === selectedMonth;
+                      })());
+      return inMonth ? sum + (Number(p.amount) || 0) : sum;
+    }, 0);
+  }, [technicianPayouts, selectedMonth, selectedYear]);
+
+  // Comisiones estimadas en las órdenes del mes
+  const monthEstimatedCommissionsTotal = useMemo(() => {
     return monthOrders.reduce((sum, ord) => {
       let techComm = 0;
       if (ord.technician_payout_type === 'percentage') {
@@ -286,6 +330,14 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
       return sum + techComm + assComm;
     }, 0);
   }, [monthOrders]);
+
+  // Total comisiones a técnicos: si hay liquidaciones formalmente pagadas las toma en cuenta; de lo contrario usa lo devengado
+  const monthTechCommissionsTotal = useMemo(() => {
+    if (monthTechPayoutsTotal > 0) {
+      return Math.max(monthTechPayoutsTotal, monthEstimatedCommissionsTotal);
+    }
+    return monthEstimatedCommissionsTotal;
+  }, [monthTechPayoutsTotal, monthEstimatedCommissionsTotal]);
 
   const totalVariableCosts = monthVariableExpensesTotal + monthTechCommissionsTotal;
 
@@ -306,8 +358,7 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
   // Gastos registrados en el mes con flag is_fixed: true
   const monthRegisteredFixedExpenses = useMemo(() => {
     return expenses.reduce((sum, exp) => {
-      const d = new Date(exp.date || Date.now());
-      if (d.getMonth() === selectedMonth && d.getFullYear() === selectedYear) {
+      if (isInSelectedPeriod(exp.date || exp.created_at, selectedMonth, selectedYear)) {
         if (exp.is_fixed) {
           return sum + (Number(exp.amount) || 0);
         }
@@ -319,8 +370,7 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
   // NK-045: Desglose específico para servicios públicos, gasolina/combustible e insumos del mes
   const monthPublicServicesExpense = useMemo(() => {
     return expenses.reduce((sum, exp) => {
-      const d = new Date(exp.date || Date.now());
-      if (d.getMonth() === selectedMonth && d.getFullYear() === selectedYear) {
+      if (isInSelectedPeriod(exp.date || exp.created_at, selectedMonth, selectedYear)) {
         if (exp.category === 'servicios_basicos') {
           return sum + (Number(exp.amount) || 0);
         }
@@ -331,8 +381,7 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
 
   const monthFuelExpense = useMemo(() => {
     return expenses.reduce((sum, exp) => {
-      const d = new Date(exp.date || Date.now());
-      if (d.getMonth() === selectedMonth && d.getFullYear() === selectedYear) {
+      if (isInSelectedPeriod(exp.date || exp.created_at, selectedMonth, selectedYear)) {
         if (exp.category === 'combustible') {
           return sum + (Number(exp.amount) || 0);
         }
@@ -343,8 +392,7 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
 
   const monthSuppliesExpense = useMemo(() => {
     return expenses.reduce((sum, exp) => {
-      const d = new Date(exp.date || Date.now());
-      if (d.getMonth() === selectedMonth && d.getFullYear() === selectedYear) {
+      if (isInSelectedPeriod(exp.date || exp.created_at, selectedMonth, selectedYear)) {
         if (exp.category === 'repuestos_insumos' || exp.category === 'herramientas') {
           return sum + (Number(exp.amount) || 0);
         }
@@ -546,22 +594,84 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
     window.open(url, '_blank');
   };
 
-  // Filtrado de egresos
+  // Filtrado de egresos unificados (Gastos operativos + Liquidaciones de técnicos) - NK-076
+  const allMonthlyExpenses = useMemo(() => {
+    const list: Array<{
+      id: string;
+      isPayout?: boolean;
+      date: string;
+      category: ExpenseCategory;
+      description: string;
+      supplier?: string;
+      invoice_number?: string;
+      payment_method: string;
+      amount: number;
+      status: 'pagado' | 'pendiente';
+      is_fixed: boolean;
+      rawExpense?: Expense;
+      rawPayout?: TechnicianPayout;
+    }> = [];
+
+    expenses.forEach(exp => {
+      if (isInSelectedPeriod(exp.date || exp.created_at, selectedMonth, selectedYear)) {
+        list.push({
+          id: exp.id,
+          isPayout: false,
+          date: exp.date,
+          category: exp.category,
+          description: exp.description,
+          supplier: exp.supplier,
+          invoice_number: exp.invoice_number,
+          payment_method: exp.payment_method,
+          amount: exp.amount,
+          status: exp.status,
+          is_fixed: exp.is_fixed,
+          rawExpense: exp
+        });
+      }
+    });
+
+    (technicianPayouts || []).forEach(p => {
+      const inMonth = isInSelectedPeriod(p.payment_date, selectedMonth, selectedYear) ||
+                      isInSelectedPeriod(p.created_at, selectedMonth, selectedYear) ||
+                      (p.period_month && (() => {
+                        const parts = p.period_month.split('-');
+                        return parts.length >= 2 && parseInt(parts[0], 10) === selectedYear && (parseInt(parts[1], 10) - 1) === selectedMonth;
+                      })());
+      if (inMonth) {
+        list.push({
+          id: p.id,
+          isPayout: true,
+          date: p.payment_date || p.created_at?.split('T')[0] || '',
+          category: 'nomina_viaticos',
+          description: `Liquidación / Comisión: ${p.technician_name}`,
+          supplier: p.technician_name,
+          invoice_number: p.payout_number || 'LIQ',
+          payment_method: p.payment_method || 'transferencia',
+          amount: p.amount,
+          status: 'pagado',
+          is_fixed: false,
+          rawPayout: p
+        });
+      }
+    });
+
+    return list.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : 0));
+  }, [expenses, technicianPayouts, selectedMonth, selectedYear]);
+
   const filteredExpenses = useMemo(() => {
-    return expenses.filter(exp => {
-      const d = new Date(exp.date || Date.now());
-      if (d.getMonth() !== selectedMonth || d.getFullYear() !== selectedYear) return false;
-      if (expenseCategoryFilter !== 'all' && exp.category !== expenseCategoryFilter) return false;
+    return allMonthlyExpenses.filter(item => {
+      if (expenseCategoryFilter !== 'all' && item.category !== expenseCategoryFilter) return false;
       if (expenseSearch.trim()) {
         const q = expenseSearch.toLowerCase();
-        const desc = (exp.description || '').toLowerCase();
-        const sup = (exp.supplier || '').toLowerCase();
-        const inv = (exp.invoice_number || '').toLowerCase();
+        const desc = (item.description || '').toLowerCase();
+        const sup = (item.supplier || '').toLowerCase();
+        const inv = (item.invoice_number || '').toLowerCase();
         if (!desc.includes(q) && !sup.includes(q) && !inv.includes(q)) return false;
       }
       return true;
     });
-  }, [expenses, selectedMonth, selectedYear, expenseCategoryFilter, expenseSearch]);
+  }, [allMonthlyExpenses, expenseCategoryFilter, expenseSearch]);
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
@@ -1265,28 +1375,34 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                             </span>
                           </td>
                           <td className="p-3.5 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditExpense(exp)}
-                                className="p-1 rounded-md text-slate-400 hover:text-cyan-600 hover:bg-slate-100 transition-colors cursor-pointer"
-                                title="Editar egreso"
-                              >
-                                <Edit3 className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (window.confirm('¿Seguro que deseas eliminar este egreso?')) {
-                                    onDeleteExpense(exp.id);
-                                  }
-                                }}
-                                className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                                title="Eliminar egreso"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+                            {exp.isPayout ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-50 text-cyan-700 border border-cyan-200" title="Generado desde módulo de Nómina/Técnicos">
+                                Nómina
+                              </span>
+                            ) : (
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => exp.rawExpense && handleOpenEditExpense(exp.rawExpense)}
+                                  className="p-1 rounded-md text-slate-400 hover:text-cyan-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                                  title="Editar egreso"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (window.confirm('¿Seguro que deseas eliminar este egreso?')) {
+                                      onDeleteExpense(exp.id);
+                                    }
+                                  }}
+                                  className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                  title="Eliminar egreso"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       );
@@ -1332,7 +1448,7 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
               <div className="flex justify-between items-center py-2 px-3 bg-slate-50 rounded-xl font-bold text-slate-800">
                 <span className="flex items-center gap-2">
                   <ArrowUpRight className="w-4 h-4 text-emerald-600" />
-                  (+) INGRESOS TOTALES POR SERVICIOS HVAC ({monthOrdersCount} órdenes)
+                  (+) INGRESOS TOTALES POR SERVICIOS HVAC ({monthOrdersCount} órdenes {monthCollectedTotal !== monthSalesTotal ? `• Cobrado: ${formatAirPrice(monthCollectedTotal, settings.currency_symbol, countryCode)}` : ''})
                 </span>
                 <span className="text-sm text-slate-900">
                   {formatAirPrice(monthSalesTotal, settings.currency_symbol, countryCode)}
@@ -1342,7 +1458,7 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
               {/* Costos Variables */}
               <div className="pl-6 space-y-2 border-l-2 border-slate-200 py-1">
                 <div className="flex justify-between text-slate-600">
-                  <span>(-) Comisiones a Técnicos y Ayudantes de Terreno:</span>
+                  <span>(-) Comisiones a Técnicos y Ayudantes {monthTechPayoutsTotal > 0 ? `(Liquidaciones pagadas: ${formatAirPrice(monthTechPayoutsTotal, settings.currency_symbol, countryCode)})` : ''}:</span>
                   <span>{formatAirPrice(monthTechCommissionsTotal, settings.currency_symbol, countryCode)}</span>
                 </div>
                 <div className="flex justify-between text-slate-600">

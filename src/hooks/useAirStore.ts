@@ -169,12 +169,17 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       const saved = localStorage.getItem(`nexus_air_expenses_${companyId}`);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          // Filtrar exp-7 o mock de bomba de vacío de 220.000 para empresas reales
+          return !isMockCompany 
+            ? parsed.filter((e: any) => e.id !== 'exp-7' && !e.description?.includes('Bomba de vacío 2 etapas'))
+            : parsed;
+        }
       }
     } catch (e) {
       console.warn('Error reading expenses from localStorage:', e);
     }
-    return isMockCompany ? INITIAL_EXPENSES : INITIAL_EXPENSES;
+    return isMockCompany ? INITIAL_EXPENSES : [];
   });
 
   const [financeSettings, setFinanceSettings] = useState<FinanceSettings>(() => {
@@ -915,6 +920,8 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
             invoice_number: o.invoice_number,
             folio: o.folio,
             calendar_color: o.calendar_color || (o.checklist && typeof o.checklist === 'object' && o.checklist.calendar_color) || undefined,
+            equipment_ids: (o.checklist && typeof o.checklist === 'object' && o.checklist.equipment_ids) || (o.equipment_id ? [o.equipment_id] : []),
+            equipments_summary: (o.checklist && typeof o.checklist === 'object' && o.checklist.equipments_summary) || undefined,
           };
         });
         setOrders(mappedOrders);
@@ -1086,11 +1093,20 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
           localStorage.setItem(`nexus_air_expenses_${activeId}`, JSON.stringify(mappedExp));
         } catch {}
       } else if (!isMock) {
-        // Si no hay en BD, migrar los gastos locales existentes a Supabase para no perderlos
+        // Si no hay en BD, migrar los gastos locales existentes a Supabase para no perderlos (excluyendo mocks)
         let localExp: Expense[] = [];
         try {
           const raw = localStorage.getItem(`nexus_air_expenses_${activeId}`);
-          if (raw) localExp = JSON.parse(raw);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              localExp = parsed.filter(item => 
+                item.id !== 'exp-7' && 
+                !item.id?.startsWith('exp-') && 
+                !item.description?.toLowerCase().includes('bomba de vacío')
+              );
+            }
+          }
         } catch {}
 
         if (localExp && localExp.length > 0) {
@@ -1290,20 +1306,42 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       if (o.id !== orderId) return o;
       const completedAt = newStatus === 'completado' ? (o.completed_at || completedAtStr) : o.completed_at;
       
-      // Si se completa, actualizar fecha de mantenimiento en equipo a hoy (+ intervalo configurado)
-      if (newStatus === 'completado' && o.equipment_id) {
-        const todayStr = format(new Date(), 'yyyy-MM-dd');
-        const intervalDays = (settings.maintenance_interval_months || 6) * 30;
-        setEquipments(eqPrev => eqPrev.map(eq => {
-          if (eq.id === o.equipment_id) {
-            return {
-              ...eq,
+      // Si se completa, actualizar fecha de mantenimiento en los equipos intervenidos a hoy (+ intervalo configurado) - NK-077
+      if (newStatus === 'completado') {
+        const targetEqIds: string[] = (o.equipment_ids && o.equipment_ids.length > 0)
+          ? o.equipment_ids
+          : (o.equipment_id ? [o.equipment_id] : []);
+
+        if (targetEqIds.length > 0) {
+          const todayStr = format(new Date(), 'yyyy-MM-dd');
+          const intervalDays = (settings.maintenance_interval_months || 6) * 30;
+          const nextDateStr = format(addDays(new Date(), intervalDays), 'yyyy-MM-dd');
+
+          setEquipments(eqPrev => eqPrev.map(eq => {
+            if (targetEqIds.includes(eq.id)) {
+              return {
+                ...eq,
+                last_maintenance_date: todayStr,
+                next_maintenance_date: nextDateStr,
+              };
+            }
+            return eq;
+          }));
+
+          // Sincronizar en base de datos Supabase
+          supabaseAir
+            .from('equipments')
+            .update({
               last_maintenance_date: todayStr,
-              next_maintenance_date: format(addDays(new Date(), intervalDays), 'yyyy-MM-dd'),
-            };
-          }
-          return eq;
-        }));
+              next_maintenance_date: nextDateStr,
+              updated_at: new Date().toISOString()
+            })
+            .in('id', targetEqIds)
+            .then(({ error: eqErr }) => {
+              if (eqErr) console.warn('[useAirStore] Error updating equipments in cloud:', eqErr);
+            })
+            .catch(err => console.warn('[useAirStore] Exception updating equipments in cloud:', err));
+        }
       }
 
       return { ...o, status: newStatus, completed_at: completedAt };
@@ -1363,6 +1401,15 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         const curOrder = orders.find(o => o.id === orderId);
         const baseCl = dbUpdates.checklist || curOrder?.checklist || {};
         dbUpdates.checklist = { ...baseCl, calendar_color: updates.calendar_color };
+      }
+      if (updates.equipment_ids !== undefined || updates.equipments_summary !== undefined) {
+        const curOrder = orders.find(o => o.id === orderId);
+        const baseCl = dbUpdates.checklist || curOrder?.checklist || {};
+        dbUpdates.checklist = { 
+          ...baseCl, 
+          equipment_ids: updates.equipment_ids !== undefined ? updates.equipment_ids : curOrder?.equipment_ids,
+          equipments_summary: updates.equipments_summary !== undefined ? updates.equipments_summary : curOrder?.equipments_summary
+        };
       }
       if (updates.apply_tax !== undefined) dbUpdates.apply_tax = updates.apply_tax;
       if (updates.payment_reference !== undefined) dbUpdates.payment_reference = updates.payment_reference;
@@ -1564,10 +1611,11 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         total: newOrder.total,
         payment_status: newOrder.payment_status,
         payment_method: newOrder.payment_method,
-        technician_location: newOrder.technician_location || null,
         checklist: {
           ...(newOrder.checklist || {}),
           calendar_color: orderData.calendar_color || undefined,
+          equipment_ids: (orderData as any).equipment_ids || undefined,
+          equipments_summary: (orderData as any).equipments_summary || undefined,
         },
         completed_at: newOrder.completed_at ? new Date().toISOString() : null,
         apply_tax: (orderData as any).apply_tax ?? true,

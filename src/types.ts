@@ -292,6 +292,8 @@ export interface ServiceOrder {
   customer_email?: string;
   equipment_id?: string;
   equipment?: AirEquipment;
+  equipment_ids?: string[]; // NK-077: Múltiples equipos intervenidos en la orden
+  equipments_summary?: string; // NK-077: Resumen descriptivo de los equipos
   service_type: ServiceType;
   status: OrderStatus;
   scheduled_date: string;

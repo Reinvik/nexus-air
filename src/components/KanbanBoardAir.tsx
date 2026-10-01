@@ -16,7 +16,9 @@ import {
   ChevronRight,
   BarChart2,
   X,
-  ArrowRight
+  ArrowRight,
+  User,
+  UserCheck
 } from 'lucide-react';
 import { format, subDays, addDays, parseISO, isToday, isYesterday } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -89,6 +91,60 @@ export const KanbanBoardAir: React.FC<KanbanBoardAirProps> = ({
   const [simulatedRole, setSimulatedRole] = useState<'admin' | 'tecnico'>('admin');
   const effectiveIsTechnician = userIsTechnician || (simulatedRole === 'tecnico');
   const shouldHideAmounts = effectiveIsTechnician && (settings?.hide_technician_amounts !== false);
+
+  // NK-079: Identificar al técnico vinculado por correo electrónico o ID
+  const loggedInTech = useMemo(() => {
+    if (!effectiveIsTechnician) return null;
+    const userEmail = (currentUserProfile?.email || '').trim().toLowerCase();
+    const userName = (currentUserProfile?.full_name || '').trim().toLowerCase();
+    return technicians.find(t => 
+      (userEmail && t.email && t.email.trim().toLowerCase() === userEmail) ||
+      (currentUserProfile?.id && t.id === currentUserProfile.id) ||
+      (userName && t.name && t.name.trim().toLowerCase() === userName)
+    );
+  }, [technicians, effectiveIsTechnician, currentUserProfile]);
+
+  const matchesTechnicianOwnership = (ord: ServiceOrder): boolean => {
+    if (!effectiveIsTechnician) return true; // Administradores y dueños ven todo el taller
+    
+    // Si encontramos al técnico en el catálogo
+    if (loggedInTech) {
+      if (ord.assigned_technician_id === loggedInTech.id || ord.assigned_assistant_id === loggedInTech.id) {
+        return true;
+      }
+    }
+
+    // Vinculación directa por correo electrónico
+    const userEmail = (currentUserProfile?.email || '').trim().toLowerCase();
+    if (userEmail) {
+      if (ord.assigned_technician?.email && ord.assigned_technician.email.trim().toLowerCase() === userEmail) {
+        return true;
+      }
+      if (ord.assigned_assistant?.email && ord.assigned_assistant.email.trim().toLowerCase() === userEmail) {
+        return true;
+      }
+    }
+
+    // Vinculación por ID de usuario
+    if (currentUserProfile?.id) {
+      if (ord.assigned_technician_id === currentUserProfile.id || ord.assigned_assistant_id === currentUserProfile.id) {
+        return true;
+      }
+    }
+
+    // Vinculación por nombre si no hay email
+    const userName = (currentUserProfile?.full_name || '').trim().toLowerCase();
+    if (userName) {
+      if (ord.assigned_technician?.name && ord.assigned_technician.name.trim().toLowerCase() === userName) {
+        return true;
+      }
+      if (ord.assigned_assistant?.name && ord.assigned_assistant.name.trim().toLowerCase() === userName) {
+        return true;
+      }
+    }
+
+    return false;
+  };
 
   // Fechas de referencia
   const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
@@ -189,9 +245,12 @@ export const KanbanBoardAir: React.FC<KanbanBoardAirProps> = ({
     return true;
   };
 
-  // 3. Filtrado por Búsqueda, Servicio y Técnico
+  // 3. Filtrado por Búsqueda, Servicio y Técnico (NK-079: técnicos solo ven sus tareas)
   const filteredOrders = useMemo(() => {
     return orders.filter((ord) => {
+      // Si el usuario es técnico, restringir a las tareas que le corresponden
+      if (!matchesTechnicianOwnership(ord)) return false;
+
       const matchSearch =
         ord.ticket_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (ord.customer?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -199,11 +258,13 @@ export const KanbanBoardAir: React.FC<KanbanBoardAirProps> = ({
         (ord.equipment?.brand || '').toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchType = filterType === 'all' || ord.service_type === filterType;
-      const matchTech = filterTech === 'all' || ord.assigned_technician_id === filterTech;
+      const matchTech = effectiveIsTechnician 
+        ? true 
+        : (filterTech === 'all' || ord.assigned_technician_id === filterTech);
 
       return matchSearch && matchType && matchTech;
     });
-  }, [orders, searchTerm, filterType, filterTech]);
+  }, [orders, searchTerm, filterType, filterTech, effectiveIsTechnician, loggedInTech, currentUserProfile]);
 
   // Manejadores de navegación de fecha
   const handlePrevDay = () => {
@@ -283,21 +344,28 @@ export const KanbanBoardAir: React.FC<KanbanBoardAirProps> = ({
             </select>
           </div>
 
-          {/* Filtro por Técnico */}
-          <div className="flex items-center gap-1 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-lg px-2 py-1 text-xs transition-colors">
-            <select
-              value={filterTech}
-              onChange={(e) => setFilterTech(e.target.value)}
-              className="bg-transparent text-slate-700 font-medium focus:outline-none cursor-pointer text-xs"
-            >
-              <option value="all">Técnicos: Todos</option>
-              {technicians.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name} {t.sec_certified ? '(SEC)' : ''}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Filtro por Técnico (NK-079: Bloqueado a mis tareas si es técnico) */}
+          {effectiveIsTechnician ? (
+            <div className="flex items-center gap-1.5 bg-cyan-50 border border-cyan-200/90 rounded-lg px-2.5 py-1 text-xs text-cyan-800 font-bold shadow-2xs">
+              <UserCheck className="w-3.5 h-3.5 text-cyan-600" />
+              <span>Mis Tareas ({loggedInTech?.name || currentUserProfile?.full_name || 'Técnico'})</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-lg px-2 py-1 text-xs transition-colors">
+              <select
+                value={filterTech}
+                onChange={(e) => setFilterTech(e.target.value)}
+                className="bg-transparent text-slate-700 font-medium focus:outline-none cursor-pointer text-xs"
+              >
+                <option value="all">Técnicos: Todos</option>
+                {technicians.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} {t.sec_certified ? '(SEC)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Separador vertical sutil */}
           <div className="hidden sm:block h-4 w-px bg-slate-200 mx-0.5" />
@@ -616,7 +684,7 @@ export const KanbanBoardAir: React.FC<KanbanBoardAirProps> = ({
                       onEdit={onEditOrder}
                       onOpenInspection={onOpenInspection}
                       onUpdateStatus={onUpdateStatus}
-                      onOpenReceipt={onOpenReceipt}
+                      onOpenReceipt={effectiveIsTechnician ? undefined : onOpenReceipt}
                     />
                   ))
                 )}

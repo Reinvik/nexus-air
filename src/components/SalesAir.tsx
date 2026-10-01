@@ -657,11 +657,13 @@ export const SalesAir: React.FC<SalesAirProps> = ({
   const handleConfirmDeleteMovement = async () => {
     if (!movementToDelete) return;
 
-    const correctPin = settings?.admin_pin || '1234';
-    const inputClean = adminPinInput.trim();
-    if (inputClean !== correctPin && inputClean !== '1234' && inputClean !== 'admin') {
-      toast.error('Clave de administrador incorrecta. Ingrese la clave válida para autorizar.');
-      return;
+    if (movementToDelete.type !== 'expense') {
+      const correctPin = settings?.admin_pin || '1234';
+      const inputClean = adminPinInput.trim();
+      if (inputClean !== correctPin && inputClean !== '1234' && inputClean !== 'admin') {
+        toast.error('Clave de administrador incorrecta. Ingrese la clave válida para autorizar.');
+        return;
+      }
     }
 
     setIsDeletingMovement(true);
@@ -2498,31 +2500,37 @@ export const SalesAir: React.FC<SalesAirProps> = ({
               }}
               className="space-y-4"
             >
-              {/* Campo Clave de Administrador */}
-              <div className="space-y-1.5 pt-1">
-                <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <Lock className="w-3.5 h-3.5 text-slate-500" />
-                    Clave de Administrador
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-normal">
-                    (Por defecto: 1234)
-                  </span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="password"
-                    autoFocus
-                    value={adminPinInput}
-                    onChange={(e) => setAdminPinInput(e.target.value)}
-                    placeholder="Ingresa la clave admin..."
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 font-mono text-sm tracking-widest focus:bg-white focus:border-rose-500 focus:outline-none transition-colors"
-                  />
+              {/* Campo Clave de Administrador (obligatorio para órdenes y liquidaciones) */}
+              {movementToDelete.type !== 'expense' ? (
+                <div className="space-y-1.5 pt-1">
+                  <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-slate-500" />
+                      Clave de Administrador
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      (Por defecto: 1234)
+                    </span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="password"
+                      autoFocus
+                      value={adminPinInput}
+                      onChange={(e) => setAdminPinInput(e.target.value)}
+                      placeholder="Ingresa la clave admin..."
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 font-mono text-sm tracking-widest focus:bg-white focus:border-rose-500 focus:outline-none transition-colors"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    Esta ventana no se cerrará al hacer clic por fuera para evitar pérdidas accidentales.
+                  </p>
                 </div>
-                <p className="text-[10px] text-slate-400">
-                  Esta ventana no se cerrará al hacer clic por fuera para evitar pérdidas accidentales.
-                </p>
-              </div>
+              ) : (
+                <div className="p-3 bg-rose-50/60 border border-rose-200/80 rounded-xl text-xs text-rose-800">
+                  ¿Estás seguro de que deseas eliminar este gasto? Esta acción actualizará inmediatamente los cálculos de utilidad y balances contables.
+                </div>
+              )}
 
               {/* Footer con Botones */}
               <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-slate-100">
@@ -2539,11 +2547,11 @@ export const SalesAir: React.FC<SalesAirProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={isDeletingMovement || !adminPinInput.trim()}
+                  disabled={isDeletingMovement || (movementToDelete.type !== 'expense' && !adminPinInput.trim())}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs shadow-md shadow-rose-600/20 transition-all cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  <span>{isDeletingMovement ? 'Procesando...' : (deleteMode === 'cancel_payment' ? 'Confirmar Anulación' : 'Confirmar Eliminación')}</span>
+                  <span>{isDeletingMovement ? 'Procesando...' : (movementToDelete.type === 'expense' ? 'Eliminar Gasto' : (deleteMode === 'cancel_payment' ? 'Confirmar Anulación' : 'Confirmar Eliminación'))}</span>
                 </button>
               </div>
             </form>

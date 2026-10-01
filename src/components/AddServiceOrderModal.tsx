@@ -10,7 +10,7 @@ import {
   SERVICE_TYPE_DEFAULT_COLORS,
   formatServiceType
 } from '../types';
-import { X, Plus, Calendar, Clock, User, Wrench, UserCheck, Users, Percent, DollarSign, AlertTriangle, UserPlus, Palette, Check } from 'lucide-react';
+import { X, Plus, Calendar, Clock, User, Wrench, UserCheck, Users, Percent, DollarSign, AlertTriangle, UserPlus, Palette, Check, CheckSquare, Square, Snowflake } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import { QuickCreateCustomerModal } from './QuickCreateCustomerModal';
@@ -61,6 +61,7 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
 
   const [customerId, setCustomerId] = useState(customers[0]?.id || '');
   const [equipmentId, setEquipmentId] = useState('');
+  const [selectedEquipmentIds, setSelectedEquipmentIds] = useState<string[]>([]);
   const [serviceType, setServiceType] = useState<ServiceType>('mantencion_preventiva');
   const [calendarColor, setCalendarColor] = useState<string>(() => 
     settings?.service_type_colors?.['mantencion_preventiva'] || SERVICE_TYPE_DEFAULT_COLORS['mantencion_preventiva'] || '#0284c7'
@@ -122,6 +123,7 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
     setCustomerId(newCust.id);
     if (newEq) {
       setEquipmentId(newEq.id);
+      setSelectedEquipmentIds([newEq.id]);
     }
     if (!description) {
       setDescription(`Servicio de ${serviceType.replace('_', ' ')} para ${newCust.name}`);
@@ -129,6 +131,34 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
   };
 
   const clientEquipments = equipments.filter(e => e.customer_id === customerId);
+
+  // NK-077: Mantener selección múltiple sincronizada al cambiar de cliente
+  useEffect(() => {
+    if (clientEquipments.length > 0) {
+      setSelectedEquipmentIds(prev => {
+        const stillValid = prev.filter(id => clientEquipments.some(e => e.id === id));
+        if (stillValid.length > 0) return stillValid;
+        // Por defecto, preseleccionar todos los equipos del cliente
+        return clientEquipments.map(e => e.id);
+      });
+    } else {
+      setSelectedEquipmentIds([]);
+    }
+  }, [customerId, clientEquipments.length]);
+
+  const toggleEquipmentSelection = (id: string) => {
+    setSelectedEquipmentIds(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const selectAllEquipments = () => {
+    setSelectedEquipmentIds(clientEquipments.map(e => e.id));
+  };
+
+  const deselectAllEquipments = () => {
+    setSelectedEquipmentIds([]);
+  };
 
   // Auto-cargar comisión pactada según el tipo de servicio y colaborador (NK-012)
   useEffect(() => {
@@ -190,9 +220,16 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
       return;
     }
 
+    const chosenEquipments = clientEquipments.filter(e => selectedEquipmentIds.includes(e.id));
+    const summary = chosenEquipments.length > 0
+      ? `${chosenEquipments.length} equipo(s): ${chosenEquipments.map(e => `${e.brand} ${e.btu ? `${e.btu} BTU` : ''} (${e.location_in_property || 'Ubicación n/d'})`.trim()).join(', ')}`
+      : undefined;
+
     onAddOrder({
       customer_id: selectedCust.id,
-      equipment_id: equipmentId || (clientEquipments[0]?.id),
+      equipment_id: selectedEquipmentIds[0] || (clientEquipments[0]?.id),
+      equipment_ids: selectedEquipmentIds.length > 0 ? selectedEquipmentIds : (clientEquipments[0]?.id ? [clientEquipments[0].id] : []),
+      equipments_summary: summary,
       service_type: serviceType,
       status: 'ingresado',
       scheduled_date: scheduledDate,
@@ -326,26 +363,96 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                     )}
                   </div>
 
-                  <div className="space-y-1.5 pt-2 border-t border-slate-200/70">
-                    <label className="font-semibold text-slate-700 flex items-center gap-1.5">
-                      <Wrench className="w-3.5 h-3.5 text-blue-600" />
-                      Equipo a Intervenir
-                    </label>
-                    <select
-                      value={equipmentId}
-                      onChange={(e) => setEquipmentId(e.target.value)}
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:border-cyan-500 focus:outline-none transition-colors"
-                    >
-                      <option value="">Seleccionar equipo registrado...</option>
-                      {clientEquipments.map(eq => (
-                        <option key={eq.id} value={eq.id}>
-                          {eq.brand} {eq.btu} BTU - {eq.location_in_property} ({eq.type})
-                        </option>
-                      ))}
-                    </select>
-                    {clientEquipments.length === 0 && (
-                      <p className="text-[11px] text-amber-600 font-medium">
+                  <div className="space-y-2 pt-2 border-t border-slate-200/70">
+                    <div className="flex items-center justify-between">
+                      <label className="font-semibold text-slate-700 flex items-center gap-1.5 text-xs">
+                        <Wrench className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Equipos a Intervenir</span>
+                        {clientEquipments.length > 0 && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-100 text-cyan-800">
+                            {selectedEquipmentIds.length} de {clientEquipments.length}
+                          </span>
+                        )}
+                      </label>
+                      {clientEquipments.length > 1 && (
+                        <div className="flex items-center gap-2 text-[11px]">
+                          <button
+                            type="button"
+                            onClick={selectAllEquipments}
+                            className="text-cyan-600 hover:text-cyan-800 font-semibold cursor-pointer"
+                          >
+                            Todos
+                          </button>
+                          <span className="text-slate-300">•</span>
+                          <button
+                            type="button"
+                            onClick={deselectAllEquipments}
+                            className="text-slate-500 hover:text-slate-700 font-semibold cursor-pointer"
+                          >
+                            Ninguno
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {clientEquipments.length > 0 ? (
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                        {clientEquipments.map(eq => {
+                          const isSelected = selectedEquipmentIds.includes(eq.id);
+                          return (
+                            <div
+                              key={eq.id}
+                              onClick={() => toggleEquipmentSelection(eq.id)}
+                              className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${
+                                isSelected 
+                                  ? 'bg-cyan-50/80 border-cyan-300 shadow-xs' 
+                                  : 'bg-white border-slate-200 hover:bg-slate-50 opacity-70'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${isSelected ? 'text-cyan-600' : 'text-slate-400'}`}>
+                                  {isSelected ? <CheckSquare className="w-4 h-4 text-cyan-600" /> : <Square className="w-4 h-4 text-slate-300" />}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-bold text-xs text-slate-800 truncate">
+                                      {eq.brand} {eq.btu ? `${eq.btu} BTU` : ''}
+                                    </span>
+                                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-mono">
+                                      {eq.type || 'split'}
+                                    </span>
+                                  </div>
+                                  <div className="text-[11px] text-slate-500 truncate flex items-center gap-1 mt-0.5">
+                                    <span>📍 {eq.location_in_property || 'Ubicación no especificada'}</span>
+                                    {eq.next_maintenance_date && (
+                                      <>
+                                        <span className="text-slate-300">•</span>
+                                        <span className="text-[10px] text-slate-400">Próx: {eq.next_maintenance_date}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0 ${
+                                isSelected 
+                                  ? 'bg-cyan-600 text-white' 
+                                  : 'bg-slate-100 text-slate-500'
+                              }`}>
+                                {isSelected ? 'Intervenir' : 'Omitir'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-amber-600 font-medium p-2.5 rounded-xl bg-amber-50/60 border border-amber-200">
                         El cliente no tiene equipos vinculados aún; se creará la orden con asignación abierta.
+                      </p>
+                    )}
+
+                    {clientEquipments.length > 0 && (
+                      <p className="text-[10px] text-slate-400 leading-tight">
+                        💡 Cada equipo no seleccionado continuará apareciendo como pendiente de mantenimiento en Recaptación con su ciclo independiente.
                       </p>
                     )}
                   </div>
