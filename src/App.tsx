@@ -236,17 +236,18 @@ export default function App() {
   }, [user, loadingAuth, view]);
 
   // Perfil del usuario activo (Top-level para evitar violación de reglas de hooks #310)
+  const isOwnerEmail = isNexusOwner || ['ariel.mellag@gmail.com', 'fariacricardog@gmail.com', 'equipo@belean.cl'].includes(user?.email?.toLowerCase() || '');
   const currentProfile = profile || {
-    email: user?.email || 'admin@nexusair.cl',
-    full_name: profile?.full_name || user?.email?.split('@')[0] || 'Administrador HVAC',
-    role: profile?.role || 'admin',
+    email: user?.email || '',
+    full_name: profile?.full_name || user?.email?.split('@')[0] || (isOwnerEmail ? 'Administrador HVAC' : 'Colaborador HVAC'),
+    role: profile?.role || user?.user_metadata?.role || (isOwnerEmail ? 'admin' : 'user'),
     company_id: effectiveCompanyId
   };
 
   // NK-067: Control de seguridad de pestaña activa según permisos de rol (siempre invocado al mismo nivel)
   useEffect(() => {
     if (view === 'dashboard') {
-      const userRole = currentProfile?.role || 'admin';
+      const userRole = currentProfile?.role || 'user';
       const permissions = effectiveSettings?.role_permissions;
       if (!canUserAccessTab(activeTab, userRole, isNexusOwner, permissions)) {
         const allPossibleTabs: ViewTab[] = [

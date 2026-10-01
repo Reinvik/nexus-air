@@ -221,8 +221,23 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
     }
     setCreatingUser(true);
     try {
+      // Verificar si ya existe un perfil registrado con ese email
+      let createdUserId = crypto.randomUUID();
+      try {
+        const { data: existingProf } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('email', newUserEmail.trim())
+          .maybeSingle();
+
+        if (existingProf?.id) {
+          createdUserId = existingProf.id;
+        }
+      } catch (checkErr) {
+        console.warn('Error verificando usuario existente:', checkErr);
+      }
+
       // Intentar Edge Function manage-users
-      let createdUserId = 'usr_' + Date.now();
       try {
         const { data: fnData, error: fnErr } = await supabase.functions.invoke('manage-users', {
           body: {
@@ -249,6 +264,7 @@ export const SettingsAir: React.FC<SettingsAirProps> = ({
         full_name: newUserName.trim(),
         role: newUserRole,
         company_id: compId,
+        contrasena: newUserPassword,
         is_active: true,
         updated_at: new Date().toISOString()
       }, { onConflict: 'id' });

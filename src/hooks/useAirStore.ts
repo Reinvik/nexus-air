@@ -544,7 +544,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
             default_apply_tax: dbSettings.default_apply_tax !== undefined 
               ? dbSettings.default_apply_tax 
               : (localSaved?.default_apply_tax !== undefined ? localSaved.default_apply_tax : (prev.default_apply_tax !== false)),
-            default_tax_mode: dbSettings.default_tax_mode || localSaved?.default_tax_mode || prev.default_tax_mode || 'included',
+            default_tax_mode: dbSettings.finance_settings?.default_tax_mode || dbSettings.default_tax_mode || localSaved?.default_tax_mode || prev.default_tax_mode || 'included',
             maintenance_interval_months: (dbSettings.maintenance_interval_months !== null && dbSettings.maintenance_interval_months !== undefined)
               ? Number(dbSettings.maintenance_interval_months)
               : (localSaved?.maintenance_interval_months ?? prev.maintenance_interval_months ?? 6),
@@ -557,14 +557,18 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
             pre_expiration_warning_days: (dbSettings.pre_expiration_warning_days !== null && dbSettings.pre_expiration_warning_days !== undefined)
               ? Number(dbSettings.pre_expiration_warning_days)
               : (localSaved?.pre_expiration_warning_days ?? prev.pre_expiration_warning_days ?? 15),
+            standard_maintenance_price: dbSettings.finance_settings?.standard_maintenance_price ?? localSaved?.standard_maintenance_price ?? prev.standard_maintenance_price,
+            standard_installation_price: dbSettings.finance_settings?.standard_installation_price ?? localSaved?.standard_installation_price ?? prev.standard_installation_price,
             bank_name: dbSettings.bank_name || localSaved?.bank_name || prev.bank_name || '',
             bank_account_type: dbSettings.bank_account_type || localSaved?.bank_account_type || prev.bank_account_type || '',
             bank_account_number: dbSettings.bank_account_number || localSaved?.bank_account_number || prev.bank_account_number || '',
             bank_account_rut: dbSettings.bank_account_rut || localSaved?.bank_account_rut || prev.bank_account_rut || '',
             bank_account_email: dbSettings.bank_account_email || localSaved?.bank_account_email || prev.bank_account_email || '',
             whatsapp_template_cobro: dbSettings.whatsapp_template_cobro || localSaved?.whatsapp_template_cobro || prev.whatsapp_template_cobro || '',
-            admin_pin: dbSettings.admin_pin || localSaved?.admin_pin || prev.admin_pin || '1234',
+            admin_pin: dbSettings.finance_settings?.admin_pin || dbSettings.admin_pin || localSaved?.admin_pin || prev.admin_pin || '1234',
             service_type_colors: dbSettings.finance_settings?.service_type_colors || localSaved?.service_type_colors || prev.service_type_colors || SERVICE_TYPE_DEFAULT_COLORS,
+            role_permissions: dbSettings.finance_settings?.role_permissions || localSaved?.role_permissions || prev.role_permissions || DEFAULT_ROLE_PERMISSIONS,
+            finance_settings: dbSettings.finance_settings || localSaved?.finance_settings || prev.finance_settings || {},
           };
 
           try {
@@ -2166,26 +2170,30 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       if (updates.company_slogan !== undefined) dbUpdates.company_slogan = updates.company_slogan;
       if (updates.city !== undefined) dbUpdates.city = updates.city;
       if (updates.default_apply_tax !== undefined) dbUpdates.default_apply_tax = updates.default_apply_tax;
-      if (updates.default_tax_mode !== undefined) dbUpdates.default_tax_mode = updates.default_tax_mode;
       if (updates.maintenance_interval_months !== undefined) dbUpdates.maintenance_interval_months = Number(updates.maintenance_interval_months);
       if (updates.quality_control_days !== undefined) dbUpdates.quality_control_days = Number(updates.quality_control_days);
       if (updates.inactive_recovery_months !== undefined) dbUpdates.inactive_recovery_months = Number(updates.inactive_recovery_months);
       if (updates.pre_expiration_warning_days !== undefined) dbUpdates.pre_expiration_warning_days = Number(updates.pre_expiration_warning_days);
-      if (updates.standard_maintenance_price !== undefined) dbUpdates.standard_maintenance_price = Number(updates.standard_maintenance_price);
-      if (updates.standard_installation_price !== undefined) dbUpdates.standard_installation_price = Number(updates.standard_installation_price);
       if (updates.bank_name !== undefined) dbUpdates.bank_name = updates.bank_name;
       if (updates.bank_account_type !== undefined) dbUpdates.bank_account_type = updates.bank_account_type;
       if (updates.bank_account_number !== undefined) dbUpdates.bank_account_number = updates.bank_account_number;
       if (updates.bank_account_rut !== undefined) dbUpdates.bank_account_rut = updates.bank_account_rut;
       if (updates.bank_account_email !== undefined) dbUpdates.bank_account_email = updates.bank_account_email;
       if (updates.whatsapp_template_cobro !== undefined) dbUpdates.whatsapp_template_cobro = updates.whatsapp_template_cobro;
-      if (updates.admin_pin !== undefined) dbUpdates.admin_pin = updates.admin_pin;
-      if (updates.service_type_colors !== undefined) {
-        dbUpdates.finance_settings = {
-          ...(settings.finance_settings || {}),
-          service_type_colors: updates.service_type_colors,
-        };
-      }
+
+      // NK-067: Empaquetar configuraciones extendidas y matriz de permisos por rol en el campo jsonb nativo finance_settings
+      const currentFin = settings.finance_settings || {};
+      const updatesFin = updates.finance_settings || {};
+      dbUpdates.finance_settings = {
+        ...currentFin,
+        ...updatesFin,
+        ...(updates.service_type_colors !== undefined ? { service_type_colors: updates.service_type_colors } : {}),
+        ...(updates.role_permissions !== undefined ? { role_permissions: updates.role_permissions } : (currentFin.role_permissions ? { role_permissions: currentFin.role_permissions } : {})),
+        ...(updates.admin_pin !== undefined ? { admin_pin: updates.admin_pin } : (currentFin.admin_pin ? { admin_pin: currentFin.admin_pin } : {})),
+        ...(updates.default_tax_mode !== undefined ? { default_tax_mode: updates.default_tax_mode } : (currentFin.default_tax_mode ? { default_tax_mode: currentFin.default_tax_mode } : {})),
+        ...(updates.standard_maintenance_price !== undefined ? { standard_maintenance_price: Number(updates.standard_maintenance_price) } : (currentFin.standard_maintenance_price !== undefined ? { standard_maintenance_price: currentFin.standard_maintenance_price } : {})),
+        ...(updates.standard_installation_price !== undefined ? { standard_installation_price: Number(updates.standard_installation_price) } : (currentFin.standard_installation_price !== undefined ? { standard_installation_price: currentFin.standard_installation_price } : {})),
+      };
 
       // 1. Intentar actualizar directamente la fila existente en air.settings
       const { data: updatedRows, error: updateErr } = await supabaseAir

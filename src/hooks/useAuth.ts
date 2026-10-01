@@ -40,9 +40,9 @@ export function useAuth() {
     }
   });
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string, userEmail?: string) => {
     try {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
@@ -52,15 +52,38 @@ export function useAuth() {
         console.warn('[useAuth] Profile fetch note:', error.message);
       }
 
+      // Si no existe por UUID (ej. creado antes en profiles o por email), buscar por email
+      const targetEmail = userEmail || user?.email;
+      if (!data && targetEmail) {
+        const { data: byEmail } = await supabase
+          .from('profiles')
+          .select('*')
+          .ilike('email', targetEmail.trim())
+          .maybeSingle();
+
+        if (byEmail) {
+          data = byEmail;
+          // Auto-vincular el ID oficial de Auth para sesiones futuras
+          try {
+            await supabase.from('profiles').update({ id: userId, updated_at: new Date().toISOString() }).eq('email', targetEmail.trim());
+          } catch (linkErr) {
+            console.warn('[useAuth] Link profile UUID warning:', linkErr);
+          }
+        }
+      }
+
       if (data) {
         setProfile(data as UserProfile);
       } else {
-        // Si no existe perfil en la tabla, asignar fallback vinculado a la empresa principal
+        // Fallback seguro: NUNCA asignar 'admin' a ciegas a usuarios que no son owners reconocidos
+        const isKnownOwner = OWNER_EMAILS.includes(targetEmail?.toLowerCase() || '');
+        const defaultFallbackRole = isKnownOwner ? 'admin' : (user?.user_metadata?.role || 'user');
+
         setProfile({
           id: userId,
-          email: user?.email || '',
-          full_name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Administrador',
-          role: user?.user_metadata?.role || 'admin',
+          email: targetEmail || '',
+          full_name: user?.user_metadata?.full_name || targetEmail?.split('@')[0] || 'Colaborador HVAC',
+          role: defaultFallbackRole,
           company_id: user?.user_metadata?.company_id || DEFAULT_COMPANY_ID,
           is_active: true
         });
@@ -82,7 +105,7 @@ export function useAuth() {
 
         if (session?.user) {
           setUser(session.user);
-          await fetchProfile(session.user.id);
+          await fetchProfile(session.user.id, session.user.email);
         } else {
           setUser(null);
           setProfile(null);
@@ -99,7 +122,7 @@ export function useAuth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) {
-        await fetchProfile(session.user.id);
+        await fetchProfile(session.user.id, session.user.email);
       } else {
         setProfile(null);
         setLoadingAuth(false);

@@ -93,7 +93,7 @@ export const Layout: React.FC<LayoutProps> = ({
     { id: 'settings', label: 'Configuración', icon: Settings },
   ];
 
-  const userRole = currentUserProfile?.role || 'admin';
+  const userRole = currentUserProfile?.role || 'user';
   const rolePermissions = settings?.role_permissions;
 
   // NK-067: Filtrar dinámicamente según permisos configurables del rol
