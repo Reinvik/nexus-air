@@ -922,7 +922,84 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         setOrders([]);
       }
 
-      // 7. Liquidaciones de Técnicos (NK-043)
+      // 7. Mantenimientos Periódicos Acordados (NK-081)
+      try {
+        const { data: dbRecurring, error: recErr } = await supabaseAir
+          .from('recurring_schedules')
+          .select('*')
+          .eq('company_id', activeId)
+          .order('created_at', { ascending: false });
+
+        if (!recErr && dbRecurring && dbRecurring.length > 0) {
+          const mappedRec: RecurringMaintenanceSchedule[] = dbRecurring.map((r: any) => ({
+            id: r.id,
+            company_id: r.company_id,
+            customer_id: r.customer_id,
+            customer_name: r.customer_name || '',
+            customer_phone: r.customer_phone || '',
+            customer_address: r.customer_address || '',
+            customer_commune: r.customer_commune || '',
+            equipment_ids: Array.isArray(r.equipment_ids) ? r.equipment_ids : [],
+            equipments_summary: r.equipments_summary || '',
+            frequency_months: Number(r.frequency_months) || 6,
+            start_date: r.start_date || '',
+            next_suggested_date: r.next_suggested_date || '',
+            confirmed_date: r.confirmed_date || undefined,
+            preferred_time_slot: r.preferred_time_slot || '',
+            preferred_technician_id: r.preferred_technician_id || undefined,
+            notes: r.notes || '',
+            status: r.status || 'programado',
+            last_notified_at: r.last_notified_at || undefined,
+            associated_order_id: r.associated_order_id || undefined,
+            created_at: r.created_at || new Date().toISOString(),
+            updated_at: r.updated_at || undefined,
+          }));
+          setRecurringSchedules(mappedRec);
+          try {
+            localStorage.setItem(`nexus_air_recurring_schedules_${activeId}`, JSON.stringify(mappedRec));
+          } catch {}
+        } else if (!isMock && (!dbRecurring || dbRecurring.length === 0)) {
+          try {
+            const saved = localStorage.getItem(`nexus_air_recurring_schedules_${activeId}`);
+            if (saved) {
+              const localList: RecurringMaintenanceSchedule[] = JSON.parse(saved);
+              if (Array.isArray(localList) && localList.length > 0) {
+                for (const loc of localList) {
+                  await supabaseAir.from('recurring_schedules').upsert({
+                    id: loc.id,
+                    company_id: activeId,
+                    customer_id: loc.customer_id,
+                    customer_name: loc.customer_name,
+                    customer_phone: loc.customer_phone,
+                    customer_address: loc.customer_address,
+                    customer_commune: loc.customer_commune,
+                    equipment_ids: loc.equipment_ids,
+                    equipments_summary: loc.equipments_summary,
+                    frequency_months: loc.frequency_months,
+                    start_date: loc.start_date,
+                    next_suggested_date: loc.next_suggested_date,
+                    confirmed_date: loc.confirmed_date,
+                    preferred_time_slot: loc.preferred_time_slot,
+                    preferred_technician_id: loc.preferred_technician_id,
+                    notes: loc.notes,
+                    status: loc.status,
+                    associated_order_id: loc.associated_order_id,
+                    created_at: loc.created_at || new Date().toISOString(),
+                    updated_at: loc.updated_at || new Date().toISOString()
+                  }, { onConflict: 'id' });
+                }
+                setRecurringSchedules(localList);
+              }
+            }
+          } catch (migrateErr) {
+            console.warn('[useAirStore] Error migrating local recurring schedules to cloud:', migrateErr);
+          }
+        }
+      } catch (errRec) {
+        console.warn('[useAirStore] Failed to fetch recurring_schedules:', errRec);
+      }
+
+      // 8. Liquidaciones de Técnicos (NK-043)
       const { data: dbPayouts } = await supabaseAir
         .from('technician_payouts')
         .select('*')
@@ -1569,7 +1646,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
   }, [settings.whatsapp_template_recaptacion]);
 
-  // NK-053: Métodos de Mantenimientos Periódicos Acordados con el Cliente
+  // NK-053 & NK-081: Métodos de Mantenimientos Periódicos Acordados con el Cliente (Cloud sync)
   const addRecurringSchedule = useCallback(async (data: Omit<RecurringMaintenanceSchedule, 'id' | 'created_at'>): Promise<RecurringMaintenanceSchedule> => {
     const activeId = companyId || DEFAULT_COMPANY_ID;
     const newId = crypto.randomUUID();
@@ -1582,17 +1659,76 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     };
 
     setRecurringSchedules(prev => [newSchedule, ...prev]);
+
+    try {
+      const { error } = await supabaseAir.from('recurring_schedules').insert([{
+        id: newSchedule.id,
+        company_id: newSchedule.company_id,
+        customer_id: newSchedule.customer_id,
+        customer_name: newSchedule.customer_name,
+        customer_phone: newSchedule.customer_phone,
+        customer_address: newSchedule.customer_address,
+        customer_commune: newSchedule.customer_commune,
+        equipment_ids: newSchedule.equipment_ids,
+        equipments_summary: newSchedule.equipments_summary,
+        frequency_months: newSchedule.frequency_months,
+        start_date: newSchedule.start_date,
+        next_suggested_date: newSchedule.next_suggested_date,
+        confirmed_date: newSchedule.confirmed_date,
+        preferred_time_slot: newSchedule.preferred_time_slot,
+        preferred_technician_id: newSchedule.preferred_technician_id,
+        notes: newSchedule.notes,
+        status: newSchedule.status,
+        associated_order_id: newSchedule.associated_order_id,
+        created_at: newSchedule.created_at,
+        updated_at: new Date().toISOString()
+      }]);
+      if (error) {
+        console.error('[useAirStore] Failed to insert recurring schedule to cloud:', error);
+      }
+    } catch (e) {
+      console.warn('[useAirStore] Exception inserting recurring schedule to cloud:', e);
+    }
+
     toast.success(`Plan periódico registrado para ${data.customer_name}`);
     return newSchedule;
   }, [companyId]);
 
   const updateRecurringSchedule = useCallback(async (id: string, updates: Partial<RecurringMaintenanceSchedule>) => {
-    setRecurringSchedules(prev => prev.map(s => s.id === id ? { ...s, ...updates, updated_at: new Date().toISOString() } : s));
+    const updatedAt = new Date().toISOString();
+    setRecurringSchedules(prev => prev.map(s => s.id === id ? { ...s, ...updates, updated_at: updatedAt } : s));
+
+    try {
+      const { error } = await supabaseAir.from('recurring_schedules')
+        .update({
+          ...updates,
+          updated_at: updatedAt
+        })
+        .eq('id', id);
+      if (error) {
+        console.error('[useAirStore] Failed to update recurring schedule in cloud:', error);
+      }
+    } catch (e) {
+      console.warn('[useAirStore] Exception updating recurring schedule in cloud:', e);
+    }
+
     toast.success('Acuerdo periódico actualizado');
   }, []);
 
   const deleteRecurringSchedule = useCallback(async (id: string) => {
     setRecurringSchedules(prev => prev.filter(s => s.id !== id));
+
+    try {
+      const { error } = await supabaseAir.from('recurring_schedules')
+        .delete()
+        .eq('id', id);
+      if (error) {
+        console.error('[useAirStore] Failed to delete recurring schedule from cloud:', error);
+      }
+    } catch (e) {
+      console.warn('[useAirStore] Exception deleting recurring schedule from cloud:', e);
+    }
+
     toast.success('Acuerdo periódico eliminado');
   }, []);
 
@@ -1660,7 +1796,8 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       payment_status: 'pendiente'
     });
 
-    // Actualizar el estado del acuerdo periódico
+    // Actualizar el estado del acuerdo periódico local y en la nube
+    const nowIso = new Date().toISOString();
     setRecurringSchedules(prev => prev.map(s => {
       if (s.id === scheduleId) {
         return {
@@ -1668,11 +1805,27 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
           status: 'confirmado_agendado',
           confirmed_date: scheduledDate,
           associated_order_id: newOrder.id,
-          updated_at: new Date().toISOString()
+          updated_at: nowIso
         };
       }
       return s;
     }));
+
+    try {
+      const { error: updErr } = await supabaseAir.from('recurring_schedules')
+        .update({
+          status: 'confirmado_agendado',
+          confirmed_date: scheduledDate,
+          associated_order_id: newOrder.id,
+          updated_at: nowIso
+        })
+        .eq('id', scheduleId);
+      if (updErr) {
+        console.error('[useAirStore] Error updating confirmed recurring schedule in cloud:', updErr);
+      }
+    } catch (e) {
+      console.warn('[useAirStore] Exception updating confirmed recurring schedule:', e);
+    }
 
     toast.success(`Visita confirmada y agendada para el ${scheduledDate}`);
     return newOrder;
