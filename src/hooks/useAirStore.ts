@@ -15,7 +15,8 @@ import {
   Expense,
   FinanceSettings,
   RecurringMaintenanceSchedule,
-  SERVICE_TYPE_DEFAULT_COLORS
+  SERVICE_TYPE_DEFAULT_COLORS,
+  DEFAULT_ROLE_PERMISSIONS
 } from '../types';
 import { 
   INITIAL_SETTINGS, 
