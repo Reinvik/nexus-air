@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Technician, 
   ServiceOrder, 
@@ -41,7 +41,7 @@ import {
   Briefcase,
   UserCheck
 } from 'lucide-react';
-import { formatAirPrice } from '../lib/countries';
+import { formatAirPrice, getCountryPlaceholders } from '../lib/countries';
 import { format, subMonths, addMonths } from 'date-fns';
 
 interface PayrollAirProps {
@@ -108,10 +108,12 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
   const [payReference, setPayReference] = useState<string>('');
   const [payNotes, setPayNotes] = useState<string>('');
 
+  const placeholders = useMemo(() => getCountryPlaceholders(settings?.country_code), [settings?.country_code]);
+
   // Form State para Agregar / Editar Colaborador
   const [staffName, setStaffName] = useState('');
   const [staffRut, setStaffRut] = useState('');
-  const [staffPhone, setStaffPhone] = useState('+56 9 ');
+  const [staffPhone, setStaffPhone] = useState(placeholders.defaultPhonePrefix);
   const [staffEmail, setStaffEmail] = useState('');
   const [staffRole, setStaffRole] = useState<StaffRole>('tecnico');
   const [staffCustomTitle, setStaffCustomTitle] = useState('');
@@ -120,6 +122,12 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
   const [staffWorkingDays, setStaffWorkingDays] = useState<number>(30);
   const [staffSecCertified, setStaffSecCertified] = useState(true);
   const [staffCertNumber, setStaffCertNumber] = useState('SEC-HVAC-');
+
+  useEffect(() => {
+    if (placeholders.defaultPhonePrefix && (!staffPhone || staffPhone === '+56 9 ' || staffPhone === '+506 ' || staffPhone === '+58 ')) {
+      setStaffPhone(placeholders.defaultPhonePrefix);
+    }
+  }, [placeholders.defaultPhonePrefix]);
 
   // Comisiones
   const [commMantType, setCommMantType] = useState<'fixed' | 'percentage'>('fixed');
@@ -1711,12 +1719,12 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-slate-700 font-medium">RUT / Identificación</label>
+                  <label className="text-slate-700 font-medium">{settings?.tax_id_label || 'RUT / Identificación'}</label>
                   <input
                     type="text"
                     value={staffRut}
                     onChange={(e) => setStaffRut(e.target.value)}
-                    placeholder="17.821.340-9"
+                    placeholder={placeholders.taxPlaceholder}
                     required
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 mt-1"
                   />
@@ -1727,6 +1735,7 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
                     type="text"
                     value={staffPhone}
                     onChange={(e) => setStaffPhone(e.target.value)}
+                    placeholder={placeholders.phonePlaceholder}
                     required
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 mt-1"
                   />
@@ -1921,11 +1930,12 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-slate-700 font-medium">RUT / Identificación</label>
+                  <label className="text-slate-700 font-medium">{settings?.tax_id_label || 'RUT / Identificación'}</label>
                   <input
                     type="text"
                     value={staffRut}
                     onChange={(e) => setStaffRut(e.target.value)}
+                    placeholder={placeholders.taxPlaceholder}
                     required
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 mt-1"
                   />
@@ -1936,6 +1946,7 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
                     type="text"
                     value={staffPhone}
                     onChange={(e) => setStaffPhone(e.target.value)}
+                    placeholder={placeholders.phonePlaceholder}
                     required
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 mt-1"
                   />

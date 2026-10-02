@@ -42,6 +42,7 @@ import {
 } from '../lib/landingConfigAir';
 import { LandingTenantAir } from './LandingTenantAir';
 import { toast } from 'react-hot-toast';
+import { getCountryPlaceholders } from '../lib/countries';
 
 interface LandingEditorAirProps {
   settings: AirSettings;
@@ -62,6 +63,7 @@ export const LandingEditorAir: React.FC<LandingEditorAirProps> = ({
                settings.country === 'Costa Rica' || 
                settings.company_slug === 'venefrio' ||
                (settings.fantasy_name || '').toLowerCase().includes('venefrio');
+  const placeholders = getCountryPlaceholders(settings.country_code);
   const defaultServices = isCR ? DEFAULT_HVAC_SERVICES_CR : DEFAULT_HVAC_SERVICES;
   const defaultCoverage = isCR ? DEFAULT_COVERAGE_CANTONS_CR : DEFAULT_COVERAGE_COMMUNES;
 
@@ -843,7 +845,7 @@ export const LandingEditorAir: React.FC<LandingEditorAirProps> = ({
                         type="text"
                         value={draftConfig.phone || ''}
                         onChange={(e) => updateField('phone', e.target.value)}
-                        placeholder={isCR ? "+506 7202 8833" : "+56 9 3005 7769"}
+                        placeholder={placeholders.phonePlaceholder}
                         className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 font-semibold"
                       />
                     </div>

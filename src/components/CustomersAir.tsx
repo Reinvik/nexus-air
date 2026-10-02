@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Customer, AirEquipment, EquipmentType, RefrigerantType, AirSettings } from '../types';
 import { 
   Users, 
@@ -11,7 +11,7 @@ import {
   Edit3, 
   Trash2, 
   AlertTriangle, 
-  FileText,
+  FileText, 
   Building2,
   Layers,
   ChevronDown,
@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
+import { findCountry, getCountryPlaceholders } from '../lib/countries';
 
 interface CustomersAirProps {
   customers: Customer[];
@@ -56,15 +57,26 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
   const [deletePinError, setDeletePinError] = useState('');
   const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
 
+  const placeholders = useMemo(() => getCountryPlaceholders(settings?.country_code), [settings?.country_code]);
+  const country = useMemo(() => findCountry(settings?.country_code), [settings?.country_code]);
+  const defaultCity = country?.sample_cities?.[0] || 'San José';
+  const defaultCommune = settings?.country_code === 'CR' ? 'Central' : settings?.country_code === 'VE' ? 'Chacao' : 'Las Condes';
+
   // New Customer Form State
   const [name, setName] = useState('');
   const [rut, setRut] = useState('');
-  const [phone, setPhone] = useState('+56 9 ');
+  const [phone, setPhone] = useState(placeholders.defaultPhonePrefix);
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
-  const [commune, setCommune] = useState('Las Condes');
-  const [city, setCity] = useState('Santiago');
+  const [commune, setCommune] = useState(defaultCommune);
+  const [city, setCity] = useState(defaultCity);
   const [customerType, setCustomerType] = useState<Customer['customer_type']>('residencial');
+
+  useEffect(() => {
+    if (placeholders.defaultPhonePrefix && (!phone || phone === '+56 9 ' || phone === '+506 ' || phone === '+58 ')) {
+      setPhone(placeholders.defaultPhonePrefix);
+    }
+  }, [placeholders.defaultPhonePrefix]);
 
   // Initial Equipment in New Customer Modal
   const [includeInitialEq, setIncludeInitialEq] = useState(false);
@@ -285,6 +297,7 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
     setIsAddCustModalOpen(false);
     setName('');
     setRut('');
+    setPhone(placeholders.defaultPhonePrefix);
     setIncludeInitialEq(false);
     if (created && 'id' in created && created.id) {
       setSelectedCustomerId(created.id);
@@ -864,7 +877,7 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
                     type="text"
                     value={rut}
                     onChange={(e) => setRut(e.target.value)}
-                    placeholder={settings?.tax_id_label || 'RUT / ID'}
+                    placeholder={settings?.tax_id_label ? `Ej: ${settings.tax_id_label}` : `Ej: ${placeholders.taxPlaceholder}`}
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none mt-1"
                   />
                 </div>
@@ -897,6 +910,7 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
                   type="text"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
+                  placeholder={placeholders.phonePlaceholder}
                   className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none mt-1 font-mono"
                   required
                 />
@@ -1454,7 +1468,7 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
                     type="text"
                     value={editRut}
                     onChange={(e) => setEditRut(e.target.value)}
-                    placeholder={settings?.tax_id_label ? `Ej: ${settings.tax_id_label}` : '12.345.678-9'}
+                    placeholder={settings?.tax_id_label ? `Ej: ${settings.tax_id_label}` : `Ej: ${placeholders.taxPlaceholder}`}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:border-cyan-500 focus:outline-none"
                     required
                   />
@@ -1468,6 +1482,7 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
                     type="text"
                     value={editPhone}
                     onChange={(e) => setEditPhone(e.target.value)}
+                    placeholder={placeholders.phonePlaceholder}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:border-cyan-500 focus:outline-none"
                     required
                   />

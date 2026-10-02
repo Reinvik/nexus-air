@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ServiceOrder, AirSettings, TechnicianPayout, Expense, ExpenseCategory, formatServiceType } from '../types';
-import { formatAirPrice } from '../lib/countries';
+import { formatAirPrice, getCountryPlaceholders } from '../lib/countries';
 import { 
   TrendingUp, 
   DollarSign, 
@@ -81,6 +81,7 @@ export const SalesAir: React.FC<SalesAirProps> = ({
 }) => {
   const currencySymbol = settings?.currency_symbol || '₡';
   const countryCode = settings?.country_code || 'CR';
+  const placeholders = useMemo(() => getCountryPlaceholders(countryCode), [countryCode]);
 
   // Date Filter State (NK-037)
   const [selectedPreset, setSelectedPreset] = useState<DatePreset>('all');
@@ -1868,7 +1869,7 @@ export const SalesAir: React.FC<SalesAirProps> = ({
                 type="text"
                 value={reminderPhone}
                 onChange={(e) => setReminderPhone(e.target.value)}
-                placeholder="+56 9 1234 5678"
+                placeholder={placeholders.phonePlaceholder}
                 className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 font-mono focus:bg-white focus:border-cyan-500 focus:outline-none"
               />
             </div>

@@ -3,6 +3,7 @@ import { ServiceType, AirSettings, ServiceOrder, Customer, AirEquipment, formatS
 import { X, Calendar, Clock, MapPin, Phone, User, CheckCircle2, Wind, Sparkles, ShieldCheck, Search } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { TimeSlotPicker } from './TimeSlotPicker';
+import { findCountry, getCountryPlaceholders } from '../lib/countries';
 
 export interface BookingPrefill {
   customer?: Customer;
@@ -38,9 +39,10 @@ export const PublicBookingModal: React.FC<PublicBookingModalProps> = ({
   prefill = null,
   onConfirmBooking,
 }) => {
-  const isCR = settings?.country_code === 'CR' || settings?.country === 'Costa Rica' || settings?.company_slug === 'venefrio';
-  const defaultPrefix = settings?.phone_prefix || (isCR ? '+506 ' : '+56 9 ');
-  const defaultCity = settings?.sample_cities?.[0] || (isCR ? 'San José' : 'Las Condes');
+  const country = findCountry(settings?.country_code);
+  const placeholders = getCountryPlaceholders(settings?.country_code);
+  const defaultPrefix = settings?.phone_prefix ? `${settings.phone_prefix} ` : placeholders.defaultPhonePrefix;
+  const defaultCity = settings?.sample_cities?.[0] || country?.sample_cities?.[0] || 'San José';
 
   const [rut, setRut] = useState('');
   const [name, setName] = useState('');
@@ -281,7 +283,7 @@ export const PublicBookingModal: React.FC<PublicBookingModalProps> = ({
                     handleLookupCustomer(e.target.value);
                   }}
                   onBlur={(e) => handleLookupCustomer(e.target.value)}
-                  placeholder={settings.tax_id_label ? `Ej: ${settings.tax_id_label}` : '12.345.678-9'}
+                  placeholder={settings.tax_id_label ? `Ej: ${settings.tax_id_label}` : `Ej: ${placeholders.taxPlaceholder}`}
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-colors"
                 />
               </div>
@@ -301,6 +303,7 @@ export const PublicBookingModal: React.FC<PublicBookingModalProps> = ({
                     handleLookupCustomer(e.target.value);
                   }}
                   onBlur={(e) => handleLookupCustomer(e.target.value)}
+                  placeholder={placeholders.phonePlaceholder}
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-colors"
                   required
                 />

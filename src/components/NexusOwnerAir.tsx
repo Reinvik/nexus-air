@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase, supabaseAir } from '../lib/supabase';
-import { findCountry } from '../lib/countries';
+import { findCountry, getCountryPlaceholders } from '../lib/countries';
 import { Company, ProfileUser, UserRole, AirSettings } from '../types';
 import { 
   Crown, 
@@ -277,9 +277,9 @@ export const NexusOwnerAir: React.FC<NexusOwnerAirProps> = ({
           company_name: newCompanyName.trim(),
           fantasy_name: newCompanyName.trim(),
           company_slug: cleanSlug,
-          email: newCompanyEmail.trim() || 'contacto@' + cleanSlug + '.cl',
-          phone: newCompanyPhone.trim() || '+56 9 3005 7769',
-          address: newCompanyAddress.trim() || 'Santiago, Chile',
+          email: newCompanyEmail.trim() || `contacto@${cleanSlug}.com`,
+          phone: newCompanyPhone.trim() || `${countryData.phone_prefix} 1234 5678`,
+          address: newCompanyAddress.trim() || `${countryData.sample_cities?.[0] || 'Ciudad'}, ${countryData.name}`,
           country: countryData.name,
           country_code: countryData.code,
           currency_symbol: countryData.currency_symbol,
@@ -304,9 +304,9 @@ export const NexusOwnerAir: React.FC<NexusOwnerAirProps> = ({
             company_id: companyId,
             company_name: newCompanyName.trim(),
             company_slug: cleanSlug,
-            email: newCompanyEmail.trim() || 'contacto@' + cleanSlug + '.cl',
-            phone: newCompanyPhone.trim() || '+56 9 3005 7769',
-            address: newCompanyAddress.trim() || 'Santiago, Chile',
+            email: newCompanyEmail.trim() || `contacto@${cleanSlug}.com`,
+            phone: newCompanyPhone.trim() || `${countryData.phone_prefix} 1234 5678`,
+            address: newCompanyAddress.trim() || `${countryData.sample_cities?.[0] || 'Ciudad'}, ${countryData.name}`,
             country: countryData.name,
             country_code: countryData.code,
             currency_symbol: countryData.currency_symbol,
@@ -1098,7 +1098,7 @@ export const NexusOwnerAir: React.FC<NexusOwnerAirProps> = ({
                     type="email"
                     value={newCompanyEmail}
                     onChange={e => setNewCompanyEmail(e.target.value)}
-                    placeholder="contacto@empresa.cl"
+                    placeholder="contacto@empresa.com"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-cyan-500"
                   />
                 </div>
@@ -1111,7 +1111,7 @@ export const NexusOwnerAir: React.FC<NexusOwnerAirProps> = ({
                     type="tel"
                     value={newCompanyPhone}
                     onChange={e => setNewCompanyPhone(e.target.value)}
-                    placeholder="+56 9 1234 5678"
+                    placeholder={getCountryPlaceholders(newCompanyCountry).phonePlaceholder}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-cyan-500"
                   />
                 </div>

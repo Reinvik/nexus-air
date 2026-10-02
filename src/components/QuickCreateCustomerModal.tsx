@@ -72,6 +72,14 @@ export const QuickCreateCustomerModal: React.FC<QuickCreateCustomerModalProps> =
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  useEffect(() => {
+    if (isOpen) {
+      if (!phone || phone === '+56 9 ' || phone === '+506 ' || phone === '+58 ') {
+        setPhone(defaultPhone);
+      }
+    }
+  }, [isOpen, defaultPhone]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -209,7 +217,7 @@ export const QuickCreateCustomerModal: React.FC<QuickCreateCustomerModalProps> =
                     type="text"
                     value={rut}
                     onChange={(e) => setRut(e.target.value)}
-                    placeholder="Ej: 17.257.060-7"
+                    placeholder={`Ej: ${placeholders.taxPlaceholder}`}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:border-cyan-500 focus:outline-none transition-colors"
                   />
                 </div>
@@ -242,7 +250,7 @@ export const QuickCreateCustomerModal: React.FC<QuickCreateCustomerModalProps> =
                       type="text"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+56 9 1234 5678"
+                      placeholder={placeholders.phonePlaceholder}
                       className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 font-mono focus:bg-white focus:border-cyan-500 focus:outline-none transition-colors"
                       required
                     />
