@@ -172,14 +172,15 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         if (Array.isArray(parsed)) {
           // Filtrar exp-7 o mock de bomba de vacío de 220.000 para empresas reales
           return !isMockCompany 
-            ? parsed.filter((e: any) => e.id !== 'exp-7' && !e.description?.includes('Bomba de vacío 2 etapas'))
+            ? parsed.filter((e: any) => e.id !== 'exp-7' && !e.description?.toLowerCase().includes('bomba de vacío') && e.supplier !== 'Refriherramientas Chile')
             : parsed;
         }
       }
+      return isMockCompany ? INITIAL_EXPENSES : [];
     } catch (e) {
       console.warn('Error reading expenses from localStorage:', e);
+      return [];
     }
-    return isMockCompany ? INITIAL_EXPENSES : [];
   });
 
   const [financeSettings, setFinanceSettings] = useState<FinanceSettings>(() => {
@@ -453,11 +454,24 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
 
     // 10. Sincronizar egresos
     try {
+      const isMockCompany = companyId === DEMO_SANDBOX_COMPANY_ID;
       const savedExp = localStorage.getItem(`nexus_air_expenses_${companyId}`);
-      if (savedExp) setExpenses(JSON.parse(savedExp));
-      else setExpenses(INITIAL_EXPENSES);
+      if (savedExp) {
+        const parsed = JSON.parse(savedExp);
+        if (Array.isArray(parsed)) {
+          const clean = !isMockCompany
+            ? parsed.filter((e: any) => e.id !== 'exp-7' && !e.description?.toLowerCase().includes('bomba de vacío') && e.supplier !== 'Refriherramientas Chile')
+            : parsed;
+          setExpenses(clean);
+          localStorage.setItem(`nexus_air_expenses_${companyId}`, JSON.stringify(clean));
+        } else {
+          setExpenses(isMockCompany ? INITIAL_EXPENSES : []);
+        }
+      } else {
+        setExpenses(isMockCompany ? INITIAL_EXPENSES : []);
+      }
     } catch {
-      setExpenses(INITIAL_EXPENSES);
+      setExpenses(companyId === DEMO_SANDBOX_COMPANY_ID ? INITIAL_EXPENSES : []);
     }
 
     // 11. Sincronizar configuración de finanzas
@@ -1071,7 +1085,11 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         .order('date', { ascending: false });
 
       if (dbExpenses && dbExpenses.length > 0) {
-        const mappedExp: Expense[] = dbExpenses.map((exp: any) => ({
+        const cleanDbExp = !isMock
+          ? dbExpenses.filter((e: any) => e.id !== 'exp-7' && !e.description?.toLowerCase().includes('bomba de vacío') && e.supplier !== 'Refriherramientas Chile')
+          : dbExpenses;
+
+        const mappedExp: Expense[] = cleanDbExp.map((exp: any) => ({
           id: exp.id,
           company_id: exp.company_id,
           date: typeof exp.date === 'string' ? exp.date.split('T')[0] : exp.date,
@@ -1093,49 +1111,10 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
           localStorage.setItem(`nexus_air_expenses_${activeId}`, JSON.stringify(mappedExp));
         } catch {}
       } else if (!isMock) {
-        // Si no hay en BD, migrar los gastos locales existentes a Supabase para no perderlos (excluyendo mocks)
-        let localExp: Expense[] = [];
+        setExpenses([]);
         try {
-          const raw = localStorage.getItem(`nexus_air_expenses_${activeId}`);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) {
-              localExp = parsed.filter(item => 
-                item.id !== 'exp-7' && 
-                !item.id?.startsWith('exp-') && 
-                !item.description?.toLowerCase().includes('bomba de vacío')
-              );
-            }
-          }
+          localStorage.setItem(`nexus_air_expenses_${activeId}`, JSON.stringify([]));
         } catch {}
-
-        if (localExp && localExp.length > 0) {
-          for (const item of localExp) {
-            try {
-              await supabaseAir.from('expenses').upsert({
-                id: item.id || ('exp-' + crypto.randomUUID().slice(0, 8)),
-                company_id: activeId,
-                date: item.date || format(new Date(), 'yyyy-MM-dd'),
-                category: item.category || 'otro',
-                description: item.description || 'Gasto registrado',
-                amount: item.amount || 0,
-                amount_usd: item.amount_usd || 0,
-                currency: item.currency || 'CRC',
-                payment_method: item.payment_method || 'transferencia',
-                status: item.status || 'pagado',
-                supplier: item.supplier || '',
-                invoice_number: item.invoice_number || '',
-                is_fixed: Boolean(item.is_fixed),
-                notes: item.notes || ''
-              });
-            } catch (err) {
-              console.warn('[useAirStore] Error syncing local expense to cloud:', err);
-            }
-          }
-          setExpenses(localExp);
-        } else {
-          setExpenses([]);
-        }
       }
 
       // 9. Costos Fijos Estructurales en la Nube (NK-048)

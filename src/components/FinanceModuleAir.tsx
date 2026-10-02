@@ -47,7 +47,9 @@ import {
   Flame,
   FileSpreadsheet,
   RefreshCw,
-  Globe
+  Globe,
+  Eye,
+  Info
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -134,6 +136,7 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
   const [tempFixedCosts, setTempFixedCosts] = useState<FixedCosts>({ ...fixedCosts });
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+  const [showBreakEvenDetailModal, setShowBreakEvenDetailModal] = useState(false);
 
   // Formulario de nuevo / editar egreso
   const [expCategory, setExpCategory] = useState<ExpenseCategory>('combustible');
@@ -814,15 +817,21 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
         <div className="space-y-6">
           {/* Fila de Tarjetas KPI Clave */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* KPI 1: Punto de Equilibrio Mensual */}
-            <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between">
+            {/* KPI 1: Punto de Equilibrio Mensual (Clickable para ver Detalle) */}
+            <div 
+              onClick={() => setShowBreakEvenDetailModal(true)}
+              className="p-4 rounded-2xl bg-white border border-slate-200 hover:border-cyan-400 hover:shadow-md transition-all flex flex-col justify-between cursor-pointer group relative overflow-hidden"
+              title="Haz clic para ver el detalle y fórmula del Punto de Equilibrio"
+            >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">
+                <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider flex items-center gap-1.5">
+                  <Target className="w-3.5 h-3.5 text-cyan-600" />
                   Punto de Equilibrio (Breakeven)
                 </span>
-                <div className="w-8 h-8 rounded-lg bg-cyan-50 text-cyan-600 flex items-center justify-center">
-                  <Target className="w-4 h-4" />
-                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-cyan-50 text-cyan-700 border border-cyan-200 group-hover:bg-cyan-600 group-hover:text-white transition-colors flex items-center gap-1">
+                  <Eye className="w-3 h-3" />
+                  Ver Detalle
+                </span>
               </div>
               <div className="mt-2">
                 <DualCurrencyAir
@@ -834,9 +843,12 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                   ufValue={financeSettings?.uf_value}
                 />
               </div>
-              <p className="text-[11px] text-slate-500 mt-2">
-                Facturación mínima requerida para no ganar ni perder este mes.
-              </p>
+              <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 pt-2 border-t border-slate-100">
+                <span className="truncate">Facturación mínima requerida</span>
+                <span className="text-cyan-600 font-bold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5 shrink-0 ml-1">
+                  Fórmula & desglose <ChevronRight className="w-3 h-3" />
+                </span>
+              </div>
             </div>
 
             {/* KPI 2: Facturación Real del Mes */}
@@ -896,13 +908,17 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
               </p>
             </div>
 
-            {/* KPI 4: Margen y Servicios Necesarios */}
-            <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between">
+            {/* KPI 4: Margen y Servicios Necesarios (Clickable para ver Detalle) */}
+            <div 
+              onClick={() => setShowBreakEvenDetailModal(true)}
+              className="p-4 rounded-2xl bg-white border border-slate-200 hover:border-cyan-400 hover:shadow-md transition-all flex flex-col justify-between cursor-pointer group"
+              title="Haz clic para ver el detalle de equivalencia en órdenes"
+            >
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">
                   Margen Contribución
                 </span>
-                <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">
+                <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-cyan-50 text-cyan-700 border border-cyan-200 group-hover:bg-cyan-600 group-hover:text-white transition-colors">
                   {effectiveMarginPct}%
                 </span>
               </div>
@@ -916,9 +932,12 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                   <strong className="font-mono text-cyan-800">{breakEvenInstallations} eq.</strong>
                 </div>
               </div>
-              <p className="text-[10px] text-slate-400 mt-2">
-                Basado en precios estándar configurados en el sistema.
-              </p>
+              <div className="flex items-center justify-between text-[10px] text-slate-400 mt-2 pt-1 border-t border-slate-100">
+                <span>Equivalencia de meta</span>
+                <span className="text-cyan-600 font-semibold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                  Ver detalle <ChevronRight className="w-3 h-3" />
+                </span>
+              </div>
             </div>
           </div>
 
@@ -937,6 +956,15 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowBreakEvenDetailModal(true)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                  title="Ver desglose completo del Punto de Equilibrio"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Ver Detalle</span>
+                </button>
                 <span className={`px-2.5 py-1 rounded-xl text-xs font-bold border ${
                   isBreakevenReached
                     ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
@@ -1495,6 +1523,24 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                   {formatAirPrice(netOperatingProfit, settings.currency_symbol, countryCode)}
                 </span>
               </div>
+
+              {/* Vínculo al Punto de Equilibrio desde el P&L */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-cyan-50/70 border border-cyan-200 rounded-xl text-xs text-cyan-900 mt-2">
+                <div className="flex items-center gap-2">
+                  <Target className="w-4 h-4 text-cyan-700 shrink-0" />
+                  <span>
+                    Punto de Equilibrio calculado para este período: <strong>{formatAirPrice(breakEvenAmount, settings.currency_symbol, countryCode)}</strong>
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowBreakEvenDetailModal(true)}
+                  className="font-bold text-cyan-700 hover:text-cyan-900 underline flex items-center gap-1 cursor-pointer self-start sm:self-auto"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Ver Desglose de Equilibrio</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1973,6 +2019,330 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
               >
                 Actualizar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL 4: DETALLE COMPLETO DEL PUNTO DE EQUILIBRIO (BREAK-EVEN) */}
+      {/* ------------------------------------------------------------- */}
+      {showBreakEvenDetailModal && (
+        <div 
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto animate-fade-in"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-3xl w-full p-5 sm:p-7 shadow-2xl border border-slate-200 space-y-6 my-auto max-h-[92vh] overflow-y-auto cursor-default relative text-slate-900"
+          >
+            {/* Botón Cerrar X */}
+            <button
+              type="button"
+              onClick={() => setShowBreakEvenDetailModal(false)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+              title="Cerrar ventana"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header del Modal */}
+            <div className="flex items-start gap-4 pr-8">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-cyan-500/20">
+                <Target className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-lg font-black text-slate-900">
+                    Detalle del Punto de Equilibrio (Breakeven)
+                  </h3>
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                    isBreakevenReached
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                      : breakevenCoveragePct >= 70
+                      ? 'bg-amber-50 text-amber-800 border-amber-300'
+                      : 'bg-rose-50 text-rose-800 border-rose-300'
+                  }`}>
+                    {isBreakevenReached 
+                      ? '🟢 Meta Cubierta (Zona de Ganancia)' 
+                      : breakevenCoveragePct >= 70 
+                      ? `🟡 ${breakevenCoveragePct}% Cubierto (Zona Aceleración)` 
+                      : `🔴 ${breakevenCoveragePct}% Cubierto (Zona Pérdida)`}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 flex items-center gap-2">
+                  <span>{MONTH_NAMES[selectedMonth]} {selectedYear}</span>
+                  <span>•</span>
+                  <span>{countryInfo.flag} {countryInfo.name} ({countryInfo.currency_code})</span>
+                </p>
+              </div>
+            </div>
+
+            {/* Ecuación Visual del Punto de Equilibrio */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 text-white shadow-md space-y-3">
+              <div className="flex items-center justify-between text-xs text-slate-300 font-bold uppercase tracking-wider">
+                <span className="flex items-center gap-1.5">
+                  <Calculator className="w-4 h-4 text-cyan-400" />
+                  Ecuación Financiera de Equilibrio
+                </span>
+                <span className="text-cyan-400 font-mono text-[11px] bg-cyan-950/60 px-2 py-0.5 rounded-md border border-cyan-800/50">
+                  PE ($) = Costos Fijos ÷ Margen Contribución
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-7 gap-2 items-center py-2">
+                {/* Numerador: Costos Fijos */}
+                <div className="sm:col-span-3 p-3 bg-white/10 rounded-xl backdrop-blur-xs text-center border border-white/10">
+                  <span className="text-[10px] text-slate-300 uppercase font-semibold block">Costos Fijos Estructurales</span>
+                  <span className="text-lg font-black font-mono text-white block mt-0.5">
+                    {formatAirPrice(totalFixedCosts, settings.currency_symbol, countryCode)}
+                  </span>
+                  <span className="text-[10px] text-slate-400 block truncate">Arriendo, nómina, serv., marketing</span>
+                </div>
+
+                {/* Signo División */}
+                <div className="sm:col-span-1 flex items-center justify-center text-cyan-400 font-black text-2xl">
+                  ÷
+                </div>
+
+                {/* Denominador: Margen */}
+                <div className="sm:col-span-3 p-3 bg-white/10 rounded-xl backdrop-blur-xs text-center border border-white/10">
+                  <span className="text-[10px] text-slate-300 uppercase font-semibold block">Margen de Contribución</span>
+                  <span className="text-lg font-black font-mono text-cyan-300 block mt-0.5">
+                    {effectiveMarginPct}% <span className="text-xs font-normal text-slate-300">({(effectiveMarginPct / 100).toFixed(2)})</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 block truncate">Libre tras pagar técnicos e insumos</span>
+                </div>
+              </div>
+
+              <div className="p-3 bg-cyan-500/20 rounded-xl border border-cyan-400/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span className="text-xs font-bold text-cyan-200">Facturación Mínima de Equilibrio:</span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-xl font-black font-mono text-cyan-300">
+                    {formatAirPrice(breakEvenAmount, settings.currency_symbol, countryCode)}
+                  </span>
+                  <span className="text-[11px] text-cyan-300/80 font-normal">
+                    (Ventas necesarias para costo cero)
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Comparativa: Meta vs Facturación Lograda */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">Facturación Lograda</span>
+                <span className="text-lg font-black font-mono text-slate-900 block">
+                  {formatAirPrice(monthSalesTotal, settings.currency_symbol, countryCode)}
+                </span>
+                <span className="text-[11px] text-slate-500 block">
+                  {monthOrdersCount} {monthOrdersCount === 1 ? 'orden realizada' : 'órdenes realizadas'} este mes
+                </span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-cyan-50/60 border border-cyan-200 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-cyan-700 block">Meta Punto de Equilibrio</span>
+                <span className="text-lg font-black font-mono text-cyan-900 block">
+                  {formatAirPrice(breakEvenAmount, settings.currency_symbol, countryCode)}
+                </span>
+                <span className="text-[11px] text-cyan-700 block font-semibold">
+                  {breakevenCoveragePct}% de cobertura alcanzada
+                </span>
+              </div>
+
+              <div className={`p-4 rounded-2xl border space-y-1 ${
+                isBreakevenReached ? 'bg-emerald-50/70 border-emerald-200' : 'bg-rose-50/70 border-rose-200'
+              }`}>
+                <span className={`text-[10px] uppercase font-bold block ${isBreakevenReached ? 'text-emerald-700' : 'text-rose-700'}`}>
+                  {isBreakevenReached ? 'Superávit / Utilidad Pura' : 'Brecha Faltante'}
+                </span>
+                <span className={`text-lg font-black font-mono block ${isBreakevenReached ? 'text-emerald-800' : 'text-rose-800'}`}>
+                  {isBreakevenReached
+                    ? `+${formatAirPrice(monthSalesTotal - breakEvenAmount, settings.currency_symbol, countryCode)}`
+                    : `-${formatAirPrice(breakEvenAmount - monthSalesTotal, settings.currency_symbol, countryCode)}`}
+                </span>
+                <span className={`text-[11px] font-medium block ${isBreakevenReached ? 'text-emerald-700' : 'text-rose-600'}`}>
+                  {isBreakevenReached ? '✓ Por encima del equilibrio' : '⚠️ Por debajo del costo estructural'}
+                </span>
+              </div>
+            </div>
+
+            {/* Pestañas / Bloques: Desglose de Costos Fijos & Equivalencia en Servicios */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Bloque 1: Desglose de Costos Fijos */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 space-y-3 shadow-xs">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-cyan-600" />
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      Desglose de Costos Fijos
+                    </h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowBreakEvenDetailModal(false);
+                      setTempFixedCosts({ ...fixedCosts });
+                      setShowFixedCostsModal(true);
+                    }}
+                    className="text-[11px] font-bold text-cyan-600 hover:text-cyan-700 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Edit3 className="w-3 h-3" />
+                    <span>Modificar</span>
+                  </button>
+                </div>
+
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex justify-between py-1 border-b border-slate-50 text-slate-600">
+                    <span className="flex items-center gap-1.5">🏢 Arriendo Taller / Bodega:</span>
+                    <strong className="font-mono text-slate-800">{formatAirPrice(Number(fixedCosts.rent || 0), settings.currency_symbol, countryCode)}</strong>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50 text-slate-600">
+                    <span className="flex items-center gap-1.5">👥 Nómina / Sueldos Fijos:</span>
+                    <strong className="font-mono text-slate-800">{formatAirPrice(Number(fixedCosts.salaries || 0), settings.currency_symbol, countryCode)}</strong>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50 text-slate-600">
+                    <span className="flex items-center gap-1.5">⚡ Servicios Básicos (Luz/Agua/Net):</span>
+                    <strong className="font-mono text-slate-800">{formatAirPrice(Number(fixedCosts.services || 0), settings.currency_symbol, countryCode)}</strong>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50 text-slate-600">
+                    <span className="flex items-center gap-1.5">🚚 Movilización / Combustible Flota:</span>
+                    <strong className="font-mono text-slate-800">{formatAirPrice(Number(fixedCosts.transport || 0), settings.currency_symbol, countryCode)}</strong>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50 text-slate-600">
+                    <span className="flex items-center gap-1.5">📢 Marketing / Google Ads:</span>
+                    <strong className="font-mono text-slate-800">{formatAirPrice(Number(fixedCosts.marketing || 0), settings.currency_symbol, countryCode)}</strong>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50 text-slate-600">
+                    <span className="flex items-center gap-1.5">💻 Software & Hosting:</span>
+                    <strong className="font-mono text-slate-800">{formatAirPrice(Number(fixedCosts.software || 0), settings.currency_symbol, countryCode)}</strong>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50 text-slate-600">
+                    <span className="flex items-center gap-1.5">📦 Otros Gastos Fijos:</span>
+                    <strong className="font-mono text-slate-800">{formatAirPrice(Number(fixedCosts.other || 0), settings.currency_symbol, countryCode)}</strong>
+                  </div>
+                  {monthRegisteredFixedExpenses > 0 && (
+                    <div className="flex justify-between py-1 border-b border-slate-50 text-slate-600">
+                      <span className="flex items-center gap-1.5">🏷️ Egresos Fijos adicionales del mes:</span>
+                      <strong className="font-mono text-cyan-800">+{formatAirPrice(monthRegisteredFixedExpenses, settings.currency_symbol, countryCode)}</strong>
+                    </div>
+                  )}
+                  <div className="flex justify-between py-2 pt-2.5 font-bold text-slate-900 border-t border-slate-200">
+                    <span>Total Costos Fijos Estructurales:</span>
+                    <span className="font-mono text-cyan-700">{formatAirPrice(totalFixedCosts, settings.currency_symbol, countryCode)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bloque 2: Equivalencia en Servicios Climatización */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 space-y-3 shadow-xs">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Wrench className="w-4 h-4 text-cyan-600" />
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      Servicios Necesarios para el Equilibrio
+                    </h4>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-mono">Meta en unidades</span>
+                </div>
+
+                <div className="space-y-2.5 text-xs">
+                  {/* Escenario 1: Órdenes por Ticket Promedio */}
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-slate-800">Por Ticket Promedio Real:</span>
+                      <span className="font-mono font-black text-cyan-700 text-sm">
+                        {breakEvenOrdersCount} órdenes
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[11px] text-slate-500">
+                      <span>Ticket actual: {formatAirPrice(avgTicket, settings.currency_symbol, countryCode)}</span>
+                      <span>Llevas: <strong>{monthOrdersCount}</strong> de {breakEvenOrdersCount}</span>
+                    </div>
+                    <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden mt-1">
+                      <div 
+                        className="bg-cyan-500 h-full rounded-full transition-all"
+                        style={{ width: `${Math.min(100, Math.round((monthOrdersCount / Math.max(1, breakEvenOrdersCount)) * 100))}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Escenario 2: Mantenimientos Preventivos 6M */}
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-slate-800">Si fueran solo Mantenimientos (6M):</span>
+                      <span className="font-mono font-black text-slate-900 text-sm">
+                        {breakEvenMaintenances} equipos
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      Precio estándar: {formatAirPrice(settings.standard_maintenance_price || 45000, settings.currency_symbol, countryCode)} c/u
+                    </div>
+                  </div>
+
+                  {/* Escenario 3: Instalaciones Split */}
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-slate-800">Si fueran solo Instalaciones Split:</span>
+                      <span className="font-mono font-black text-slate-900 text-sm">
+                        {breakEvenInstallations} instalaciones
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      Precio estándar: {formatAirPrice(settings.standard_installation_price || 120000, settings.currency_symbol, countryCode)} c/u
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bloque 3: Margen de Contribución y Costos Variables */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-cyan-50/50 border border-cyan-200/80 space-y-2.5 text-xs text-slate-700">
+              <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
+                <PieChart className="w-4 h-4 text-cyan-600" />
+                <span>¿Cómo funciona el Margen de Contribución del {effectiveMarginPct}%?</span>
+              </div>
+              <p className="leading-relaxed text-slate-600">
+                Por cada <strong>{formatAirPrice(100000, settings.currency_symbol, countryCode)}</strong> que facturas en climatización, aproximadamente un <strong>{100 - effectiveMarginPct}%</strong> se consume en costos directos de la operación (comisión del técnico instalador, refrigerante, cañería, soldadura y traslados). El <strong>{effectiveMarginPct}%</strong> restante ({formatAirPrice(Math.round(100000 * (effectiveMarginPct / 100)), settings.currency_symbol, countryCode)}) es lo que efectivamente entra a pagar la estructura fija del taller hasta llegar al punto de equilibrio.
+              </p>
+              <div className="flex flex-wrap gap-4 pt-1 font-mono text-[11px] text-slate-600 border-t border-cyan-200/60">
+                <span>Comisiones Técnicos mes: <strong>{formatAirPrice(monthTechCommissionsTotal, settings.currency_symbol, countryCode)}</strong></span>
+                <span>Insumos Variables mes: <strong>{formatAirPrice(monthVariableExpensesTotal, settings.currency_symbol, countryCode)}</strong></span>
+                <span>Total Variables: <strong>{formatAirPrice(totalVariableCosts, settings.currency_symbol, countryCode)}</strong></span>
+              </div>
+            </div>
+
+            {/* Footer con Acciones */}
+            <div className="pt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={generateWhatsAppFinanceReport}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors cursor-pointer shadow-xs"
+              >
+                <Share2 className="w-4 h-4" />
+                <span>Enviar Reporte por WhatsApp</span>
+              </button>
+
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBreakEvenDetailModal(false);
+                    setTempFixedCosts({ ...fixedCosts });
+                    setShowFixedCostsModal(true);
+                  }}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-cyan-700 bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 transition-colors cursor-pointer"
+                >
+                  <Edit3 className="w-3.5 h-3.5 inline mr-1" />
+                  Editar Costos Fijos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBreakEvenDetailModal(false)}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white transition-colors cursor-pointer"
+                >
+                  Cerrar
+                </button>
+              </div>
             </div>
           </div>
         </div>

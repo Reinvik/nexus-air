@@ -678,20 +678,6 @@ export const INITIAL_EXPENSES: Expense[] = [
     is_fixed: true,
     created_at: format(subDays(today, 12), 'yyyy-MM-dd 10:20'),
   },
-  {
-    id: 'exp-7',
-    date: format(subMonths(today, 1), 'yyyy-MM-dd'),
-    category: 'herramientas',
-    description: 'Bomba de vacío 2 etapas 5 CFM + manómetro digital Testo',
-    amount: 220000,
-    amount_usd: 234,
-    payment_method: 'transferencia',
-    status: 'pagado',
-    supplier: 'Refriherramientas Chile',
-    invoice_number: 'FAC-1002',
-    is_fixed: false,
-    created_at: format(subMonths(today, 1), 'yyyy-MM-dd 12:00'),
-  },
 ];
 
 // NK-053: Mantenimientos Periódicos Acordados con Clientes (Distinto a recaptación fría)
