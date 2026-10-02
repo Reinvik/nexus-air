@@ -482,6 +482,21 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     } catch {
       setFinanceSettings(INITIAL_FINANCE_SETTINGS);
     }
+
+    // 12. Sincronizar mantenimientos periódicos acordados (NK-081)
+    try {
+      const isMockCompany = companyId === DEMO_SANDBOX_COMPANY_ID;
+      const savedRec = localStorage.getItem(`nexus_air_recurring_schedules_${companyId}`);
+      if (savedRec) {
+        const parsed = JSON.parse(savedRec);
+        if (Array.isArray(parsed)) setRecurringSchedules(parsed);
+        else setRecurringSchedules(isMockCompany ? INITIAL_RECURRING_SCHEDULES : []);
+      } else {
+        setRecurringSchedules(isMockCompany ? INITIAL_RECURRING_SCHEDULES : []);
+      }
+    } catch {
+      setRecurringSchedules(companyId === DEMO_SANDBOX_COMPANY_ID ? INITIAL_RECURRING_SCHEDULES : []);
+    }
   }, [companyId]);
 
   // Cargar datos desde Supabase (Schema 'air')
@@ -1527,10 +1542,18 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       completed_at: orderData.status === 'completado' ? format(new Date(), 'yyyy-MM-dd HH:mm') : undefined
     };
 
-    // NK-053: Si el cliente solicitó mantenimiento periódico acordado y no tiene schedule asociado, registrarlo
+    // NK-053 & NK-081: Si el cliente solicitó mantenimiento periódico acordado y no tiene schedule asociado, registrarlo
     if (orderData.is_recurring_confirmed && !orderData.recurring_schedule_id && orderData.customer_id) {
       const cust = customers.find(c => c.id === orderData.customer_id);
-      const eq = equipments.find(e => e.id === orderData.equipment_id);
+      const eqIds = (orderData as any).equipment_ids && (orderData as any).equipment_ids.length > 0
+        ? (orderData as any).equipment_ids
+        : (orderData.equipment_id ? [orderData.equipment_id] : []);
+      const matchedEqs = equipments.filter(e => eqIds.includes(e.id));
+      const eq = matchedEqs[0] || equipments.find(e => e.id === orderData.equipment_id);
+      const summaryText = (orderData as any).equipments_summary || 
+        (matchedEqs.length > 0 
+          ? `${matchedEqs.length} equipo(s): ${matchedEqs.map(e => `${e.brand} ${e.btu ? `${e.btu} BTU` : ''} (${e.location_in_property || 'Ubicación n/d'})`.trim()).join(', ')}`
+          : (eq ? `${eq.brand} ${eq.btu ? `${eq.btu} BTU` : ''} (${eq.location_in_property || 'Ubicación n/d'})`.trim() : 'Equipos de climatización'));
       const freq = orderData.recurring_frequency_months || 6;
       const startDate = orderData.scheduled_date || format(new Date(), 'yyyy-MM-dd');
       let nextDate = startDate;
@@ -1548,8 +1571,8 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         customer_phone: cust?.phone || '',
         customer_address: cust?.address || '',
         customer_commune: cust?.commune,
-        equipment_ids: orderData.equipment_id ? [orderData.equipment_id] : [],
-        equipments_summary: eq ? `${eq.brand} ${eq.btu} BTU (${eq.location_in_property})` : 'Equipos de climatización',
+        equipment_ids: eqIds,
+        equipments_summary: summaryText,
         frequency_months: freq,
         start_date: startDate,
         next_suggested_date: nextDate,
@@ -1560,6 +1583,34 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         created_at: new Date().toISOString()
       };
       setRecurringSchedules(prev => [newRecSchedule, ...prev]);
+
+      try {
+        supabaseAir.from('recurring_schedules').insert([{
+          id: newRecSchedule.id,
+          company_id: newRecSchedule.company_id,
+          customer_id: newRecSchedule.customer_id,
+          customer_name: newRecSchedule.customer_name,
+          customer_phone: newRecSchedule.customer_phone,
+          customer_address: newRecSchedule.customer_address,
+          customer_commune: newRecSchedule.customer_commune,
+          equipment_ids: newRecSchedule.equipment_ids,
+          equipments_summary: newRecSchedule.equipments_summary,
+          frequency_months: newRecSchedule.frequency_months,
+          start_date: newRecSchedule.start_date,
+          next_suggested_date: newRecSchedule.next_suggested_date,
+          preferred_time_slot: newRecSchedule.preferred_time_slot,
+          preferred_technician_id: newRecSchedule.preferred_technician_id,
+          notes: newRecSchedule.notes,
+          status: newRecSchedule.status,
+          associated_order_id: newId,
+          created_at: newRecSchedule.created_at,
+          updated_at: new Date().toISOString()
+        }]).then(({ error: recErr }) => {
+          if (recErr) console.warn('[useAirStore] Failed to insert recurring schedule to cloud:', recErr);
+        });
+      } catch (eRec) {
+        console.warn('[useAirStore] Exception inserting recurring schedule to cloud:', eRec);
+      }
     }
 
     setOrders(prev => [newOrder, ...prev]);

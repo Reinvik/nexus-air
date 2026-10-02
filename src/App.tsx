@@ -215,23 +215,57 @@ export default function App() {
     return (saved as MainView) || 'landing';
   });
 
+  // NK-083: Inicializar pestaña activa leyendo parámetros de URL (search o hash) y respaldo en localStorage
   const [activeTab, setActiveTab] = useState<ViewTab>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab') as ViewTab | null;
+      if (tabParam) return tabParam;
+      const hash = window.location.hash.replace('#', '') as ViewTab;
+      if (hash) return hash;
+    }
     const saved = localStorage.getItem('nexus_air_tab');
     return (saved as ViewTab) || 'dashboard';
   });
 
-  useEffect(() => {
-    localStorage.setItem('nexus_air_view', view);
-  }, [view]);
-
+  // NK-083: Sincronizar pestaña activa en localStorage y en la URL para que no se pierda al recargar
   useEffect(() => {
     localStorage.setItem('nexus_air_tab', activeTab);
-  }, [activeTab]);
+    if (typeof window !== 'undefined' && view === 'dashboard') {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('tab') !== activeTab) {
+        url.searchParams.set('tab', activeTab);
+        window.history.replaceState({}, '', url.toString());
+      }
+    }
+  }, [activeTab, view]);
 
-  // Si el usuario inicia sesión y estaba en login, ir automáticamente a dashboard
+  // NK-083: Sincronizar vista activa en localStorage y URL
   useEffect(() => {
-    if (!loadingAuth && user && view === 'login') {
-      setView('dashboard');
+    localStorage.setItem('nexus_air_view', view);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (view === 'dashboard' && user) {
+        url.searchParams.set('view', 'dashboard');
+        if (activeTab) url.searchParams.set('tab', activeTab);
+        window.history.replaceState({}, '', url.toString());
+      } else if (view === 'customer' || view === 'login') {
+        url.searchParams.set('view', view);
+        window.history.replaceState({}, '', url.toString());
+      } else if (view === 'landing' && !url.searchParams.get('t')) {
+        url.searchParams.delete('view');
+        url.searchParams.delete('tab');
+        window.history.replaceState({}, '', url.toString());
+      }
+    }
+  }, [view, user, activeTab]);
+
+  // Si el usuario inicia sesión y estaba en login o recargó en dashboard, ir automáticamente a dashboard
+  useEffect(() => {
+    if (!loadingAuth && user) {
+      if (view === 'login' || (view === 'landing' && localStorage.getItem('nexus_air_view') === 'dashboard')) {
+        setView('dashboard');
+      }
     }
   }, [user, loadingAuth, view]);
 
@@ -244,9 +278,12 @@ export default function App() {
     company_id: effectiveCompanyId
   };
 
-  // NK-067: Control de seguridad de pestaña activa según permisos de rol (siempre invocado al mismo nivel)
+  // NK-067 & NK-083: Control de seguridad de pestaña activa según permisos de rol.
+  // CRÍTICO: NO forzar reseteo a dashboard mientras loadingAuth sea true, para evitar que una recarga (F5)
+  // devuelva al usuario a la página de inicio antes de haber validado su sesión y perfil de admin.
   useEffect(() => {
-    if (view === 'dashboard') {
+    if (loadingAuth) return;
+    if (view === 'dashboard' && user) {
       const userRole = currentProfile?.role || 'user';
       const permissions = effectiveSettings?.role_permissions;
       if (!canUserAccessTab(activeTab, userRole, isNexusOwner, permissions)) {
@@ -261,7 +298,7 @@ export default function App() {
         setActiveTab(allowedFallback);
       }
     }
-  }, [activeTab, currentProfile?.role, isNexusOwner, effectiveSettings?.role_permissions, view]);
+  }, [loadingAuth, user, activeTab, currentProfile?.role, isNexusOwner, effectiveSettings?.role_permissions, view]);
 
   // Modal States
   const [isAddOrderModalOpen, setIsAddOrderModalOpen] = useState(false);

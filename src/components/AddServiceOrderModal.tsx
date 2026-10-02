@@ -87,7 +87,23 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
   const [taxMode, setTaxMode] = useState<'included' | 'plus'>(() => 
     settings?.default_tax_mode === 'plus' ? 'plus' : 'included'
   );
-  const [basePrice, setBasePrice] = useState<number>(45000);
+  // NK-077: Precio unitario base según servicio y configuración
+  const getServiceBaseUnitPrice = useCallback((type: ServiceType) => {
+    if (type === 'mantencion_preventiva' || (type as any) === 'mantenimiento_preventivo') {
+      return settings?.standard_maintenance_price || 45000;
+    }
+    if (type === 'instalacion') return 130000;
+    if (type === 'visita_tecnica') return 30000;
+    if (type === 'recarga_gas') return 65000;
+    return 45000;
+  }, [settings?.standard_maintenance_price]);
+
+  const [unitPrice, setUnitPrice] = useState<number>(() => {
+    return settings?.standard_maintenance_price || 45000;
+  });
+  const [basePrice, setBasePrice] = useState<number>(() => {
+    return settings?.standard_maintenance_price || 45000;
+  });
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
   // NK-053: Mantenimiento Periódico Acordado con el Cliente
   const [isRecurringConfirmed, setIsRecurringConfirmed] = useState(false);
@@ -118,6 +134,12 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
       return { subtotal, tax, total };
     }
   }, [basePrice, applyTax, taxMode, taxRate]);
+
+  // NK-077: Al cambiar cantidad de equipos seleccionados o precio unitario, multiplicar automáticamente
+  useEffect(() => {
+    const count = Math.max(1, selectedEquipmentIds.length);
+    setBasePrice(unitPrice * count);
+  }, [selectedEquipmentIds.length, unitPrice]);
 
   const handleCustomerCreated = (newCust: Customer, newEq?: AirEquipment) => {
     setCustomerId(newCust.id);
@@ -225,6 +247,9 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
       ? `${chosenEquipments.length} equipo(s): ${chosenEquipments.map(e => `${e.brand} ${e.btu ? `${e.btu} BTU` : ''} (${e.location_in_property || 'Ubicación n/d'})`.trim()).join(', ')}`
       : undefined;
 
+    const eqCount = Math.max(1, selectedEquipmentIds.length);
+    const itemUnitPrice = calculatedFinancials.total > 0 ? Math.round(calculatedFinancials.total / eqCount) : unitPrice;
+
     onAddOrder({
       customer_id: selectedCust.id,
       equipment_id: selectedEquipmentIds[0] || (clientEquipments[0]?.id),
@@ -244,9 +269,9 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
       items: [
         {
           id: `it-${Date.now()}`,
-          description: `Servicio de ${serviceType.replace('_', ' ')}`,
-          quantity: 1,
-          unit_price: calculatedFinancials.total,
+          description: `Servicio de ${serviceType.replace('_', ' ')} (${eqCount} ${eqCount === 1 ? 'aire / equipo' : 'aires / equipos'})`,
+          quantity: eqCount,
+          unit_price: itemUnitPrice,
           total: calculatedFinancials.total,
           type: 'servicio',
         }
@@ -467,10 +492,10 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                       onChange={(e) => {
                         const val = e.target.value as ServiceType;
                         setServiceType(val);
-                        if (val === 'mantencion_preventiva') setBasePrice(45000);
-                        if (val === 'instalacion') setBasePrice(130000);
-                        if (val === 'visita_tecnica') setBasePrice(30000);
-                        if (val === 'recarga_gas') setBasePrice(65000);
+                        const newUnit = getServiceBaseUnitPrice(val);
+                        setUnitPrice(newUnit);
+                        const count = Math.max(1, selectedEquipmentIds.length);
+                        setBasePrice(newUnit * count);
                         const suggestedCol = settings?.service_type_colors?.[val] || SERVICE_TYPE_DEFAULT_COLORS[val] || '#0284c7';
                         setCalendarColor(suggestedCol);
                       }}
@@ -714,6 +739,50 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                     </div>
                   </div>
 
+                  {/* NK-077: Desglose y multiplicador de precio por equipo */}
+                  <div className="p-3 bg-cyan-50/80 border border-cyan-200/90 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-cyan-950 flex items-center gap-1.5">
+                        <Wrench className="w-3.5 h-3.5 text-cyan-700" />
+                        Precio Unitario por Equipo
+                      </span>
+                      <span className="text-[11px] font-mono text-cyan-800 font-bold bg-white px-2 py-0.5 rounded border border-cyan-200">
+                        {selectedEquipmentIds.length || 1} {(selectedEquipmentIds.length === 1 || selectedEquipmentIds.length === 0) ? 'equipo seleccionado' : 'equipos seleccionados'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div className="relative">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                          {settings?.currency_symbol || '$'}
+                        </span>
+                        <input
+                          type="number"
+                          value={unitPrice === 0 ? '' : unitPrice}
+                          placeholder="45000"
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
+                            setUnitPrice(val);
+                            const count = Math.max(1, selectedEquipmentIds.length);
+                            setBasePrice(val * count);
+                          }}
+                          className="w-full pl-7 pr-2.5 py-1.5 bg-white border border-cyan-300 rounded-lg text-slate-900 text-sm font-mono font-bold focus:border-cyan-600 focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-end gap-1.5 text-xs font-mono font-bold text-cyan-900 bg-white/70 px-2.5 py-1.5 rounded-lg border border-cyan-200">
+                        <span>{settings?.currency_symbol || '$'}{unitPrice.toLocaleString()}</span>
+                        <span>×</span>
+                        <span>{Math.max(1, selectedEquipmentIds.length)}</span>
+                        <span>=</span>
+                        <span className="text-cyan-800 text-sm font-extrabold underline decoration-cyan-400">
+                          {settings?.currency_symbol || '$'}{(unitPrice * Math.max(1, selectedEquipmentIds.length)).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Input de Monto con sobreescritura automática de 0 (NK-051) */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
@@ -721,9 +790,9 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                         <DollarSign className="w-4 h-4 text-emerald-600" />
                         {applyTax 
                           ? (taxMode === 'included' 
-                              ? `Monto a Cobrar (IVA Incluido)` 
-                              : `Monto Neto (Antes de IVA)`)
-                          : `Monto a Cobrar (Exento de IVA)`}
+                              ? `Monto Total a Cobrar (IVA Incluido)` 
+                              : `Monto Total Neto (Antes de IVA)`)
+                          : `Monto Total a Cobrar (Exento de IVA)`}
                       </label>
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-white border border-slate-200 font-mono text-slate-500 font-medium">
                         {settings?.currency_symbol || '$'} {settings?.currency_code || 'CLP'}
@@ -739,8 +808,10 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                         placeholder="0"
                         onFocus={(e) => e.target.select()}
                         onChange={(e) => {
-                          const val = e.target.value;
-                          setBasePrice(val === '' ? 0 : Math.max(0, parseInt(val, 10) || 0));
+                          const val = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
+                          setBasePrice(val);
+                          const count = Math.max(1, selectedEquipmentIds.length);
+                          setUnitPrice(Math.round(val / count));
                         }}
                         className="w-full pl-8 pr-3 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 text-lg font-mono font-bold focus:border-cyan-500 focus:outline-none shadow-inner transition-colors"
                       />

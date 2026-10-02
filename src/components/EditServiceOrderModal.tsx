@@ -147,6 +147,23 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
   const [resolution, setResolution] = useState(order?.resolution || '');
 
   // Billing & Payment (NK-050 & NK-051)
+  // NK-077: Precio unitario y cálculo automático por equipo
+  const getServiceBaseUnitPrice = useCallback((type: ServiceType) => {
+    if (type === 'mantencion_preventiva' || (type as any) === 'mantenimiento_preventivo') {
+      return settings?.standard_maintenance_price || 45000;
+    }
+    if (type === 'instalacion') return 130000;
+    if (type === 'visita_tecnica') return 30000;
+    if (type === 'recarga_gas') return 65000;
+    return 45000;
+  }, [settings?.standard_maintenance_price]);
+
+  const [unitPrice, setUnitPrice] = useState<number>(() => {
+    const eqCount = Math.max(1, (order?.equipment_ids && order.equipment_ids.length > 0) ? order.equipment_ids.length : 1);
+    const totalAmt = order?.tax_mode === 'plus' ? (order?.subtotal || 0) : (order?.total || 0);
+    return totalAmt > 0 ? Math.round(totalAmt / eqCount) : getServiceBaseUnitPrice(order?.service_type || 'mantencion_preventiva');
+  });
+
   const [applyTax, setApplyTax] = useState<boolean>(order?.apply_tax ?? true);
   const [taxMode, setTaxMode] = useState<'included' | 'plus'>(() => 
     order?.tax_mode === 'plus' ? 'plus' : 'included'
@@ -194,7 +211,10 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
       setResolution(order.resolution || '');
       setApplyTax(order.apply_tax ?? true);
       setTaxMode(order.tax_mode === 'plus' ? 'plus' : 'included');
-      setBaseAmount(order.tax_mode === 'plus' ? (order.subtotal || 0) : (order.total || 0));
+      const totalAmt = order.tax_mode === 'plus' ? (order.subtotal || 0) : (order.total || 0);
+      setBaseAmount(totalAmt);
+      const eqCount = Math.max(1, initEqIds.length);
+      setUnitPrice(totalAmt > 0 ? Math.round(totalAmt / eqCount) : getServiceBaseUnitPrice(order.service_type || 'mantencion_preventiva'));
       setPaymentStatus(order.payment_status || 'pendiente');
       setPaymentMethod(order.payment_method || 'transferencia');
       setPaymentReference(order.payment_reference || '');
@@ -353,6 +373,9 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
       ? `${chosenEquipments.length} equipo(s): ${chosenEquipments.map(e => `${e.brand} ${e.btu ? `${e.btu} BTU` : ''} (${e.location_in_property || 'Ubicación n/d'})`.trim()).join(', ')}`
       : undefined;
 
+    const eqCount = Math.max(1, selectedEquipmentIds.length);
+    const itemUnitPrice = total > 0 ? Math.round(total / eqCount) : unitPrice;
+
     onUpdateOrder(order.id, {
       customer_id: customerId,
       equipment_id: selectedEquipmentIds[0] || undefined,
@@ -379,6 +402,16 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
       paid_amount: paidAmount,
       payment_notes: paymentNotes,
       calendar_color: calendarColor,
+      items: [
+        {
+          id: order.items?.[0]?.id || `it-${Date.now()}`,
+          description: `Servicio de ${serviceType.replace('_', ' ')} (${eqCount} ${eqCount === 1 ? 'aire / equipo' : 'aires / equipos'})`,
+          quantity: eqCount,
+          unit_price: itemUnitPrice,
+          total: total,
+          type: 'servicio',
+        }
+      ],
       subtotal,
       tax,
       total,
@@ -1132,6 +1165,50 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                         </div>
                       </div>
 
+                      {/* NK-077: Desglose y multiplicador de precio por equipo */}
+                      <div className="p-3 bg-cyan-50/80 border border-cyan-200/90 rounded-xl space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-bold text-cyan-950 flex items-center gap-1.5">
+                            <Wrench className="w-3.5 h-3.5 text-cyan-700" />
+                            Precio Unitario por Equipo
+                          </span>
+                          <span className="text-[11px] font-mono text-cyan-800 font-bold bg-white px-2 py-0.5 rounded border border-cyan-200">
+                            {selectedEquipmentIds.length || 1} {(selectedEquipmentIds.length === 1 || selectedEquipmentIds.length === 0) ? 'equipo seleccionado' : 'equipos seleccionados'}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div className="relative">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                              {settings?.currency_symbol || '$'}
+                            </span>
+                            <input
+                              type="number"
+                              value={unitPrice === 0 ? '' : unitPrice}
+                              placeholder="45000"
+                              onFocus={(e) => e.target.select()}
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
+                                setUnitPrice(val);
+                                const count = Math.max(1, selectedEquipmentIds.length);
+                                setBaseAmount(val * count);
+                              }}
+                              className="w-full pl-7 pr-2.5 py-1.5 bg-white border border-cyan-300 rounded-lg text-slate-900 text-sm font-mono font-bold focus:border-cyan-600 focus:outline-none"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-end gap-1.5 text-xs font-mono font-bold text-cyan-900 bg-white/70 px-2.5 py-1.5 rounded-lg border border-cyan-200">
+                            <span>{settings?.currency_symbol || '$'}{unitPrice.toLocaleString()}</span>
+                            <span>×</span>
+                            <span>{Math.max(1, selectedEquipmentIds.length)}</span>
+                            <span>=</span>
+                            <span className="text-cyan-800 text-sm font-extrabold underline decoration-cyan-400">
+                              {settings?.currency_symbol || '$'}{(unitPrice * Math.max(1, selectedEquipmentIds.length)).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
                       {/* Header Monto y Comprobante */}
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
@@ -1158,8 +1235,10 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                             placeholder="0"
                             onFocus={(e) => e.target.select()}
                             onChange={(e) => {
-                              const val = e.target.value;
-                              setBaseAmount(val === '' ? 0 : Math.max(0, parseInt(val, 10) || 0));
+                              const val = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
+                              setBaseAmount(val);
+                              const count = Math.max(1, selectedEquipmentIds.length);
+                              setUnitPrice(Math.round(val / count));
                             }}
                             className="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-900 font-mono font-black text-lg focus:border-cyan-500 focus:outline-none transition-colors"
                           />
