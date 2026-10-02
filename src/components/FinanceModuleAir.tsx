@@ -2315,7 +2315,7 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
             <div className="pt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200">
               <button
                 type="button"
-                onClick={generateWhatsAppFinanceReport}
+                onClick={handleShareExecutiveWhatsApp}
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors cursor-pointer shadow-xs"
               >
                 <Share2 className="w-4 h-4" />

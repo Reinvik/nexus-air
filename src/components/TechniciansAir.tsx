@@ -376,7 +376,7 @@ export const TechniciansAir: React.FC<TechniciansAirProps> = ({
     setEditRut(t.rut);
     setEditPhone(t.phone);
     setEditEmail(t.email || '');
-    setEditRole(t.role || 'tecnico');
+    setEditRole(t.role === 'ayudante' ? 'ayudante' : 'tecnico');
     setEditSecCertified(Boolean(t.sec_certified));
     setEditCertNumber(t.certification_number || '');
     setEditStatus(t.status || 'disponible');

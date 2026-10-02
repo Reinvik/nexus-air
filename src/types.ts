@@ -115,6 +115,7 @@ export interface AirEquipment {
   installation_date?: string;
   last_maintenance_date?: string;
   next_maintenance_date: string; // 6 meses después del último mantenimiento o instalación
+  status?: string;
   notes?: string;
 }
 
@@ -471,6 +472,7 @@ export interface AirSettings {
   enable_staff_payroll?: boolean; // NK-062: Módulo activable de gestión de sueldos y pagos del personal
   staff_payroll_title?: string;   // NK-062: Nombre configurable de la sección
   role_permissions?: Record<string, ViewTab[]>; // NK-067: Permisos de acceso a módulos por rol
+  finance_settings?: any;
   landing_config?: LandingPageConfig;
 }
 

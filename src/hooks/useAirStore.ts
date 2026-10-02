@@ -1331,10 +1331,12 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
               updated_at: new Date().toISOString()
             })
             .in('id', targetEqIds)
-            .then(({ error: eqErr }) => {
-              if (eqErr) console.warn('[useAirStore] Error updating equipments in cloud:', eqErr);
-            })
-            .catch(err => console.warn('[useAirStore] Exception updating equipments in cloud:', err));
+            .then(
+              ({ error: eqErr }: any) => {
+                if (eqErr) console.warn('[useAirStore] Error updating equipments in cloud:', eqErr);
+              },
+              (err: any) => console.warn('[useAirStore] Exception updating equipments in cloud:', err)
+            );
         }
       }
 

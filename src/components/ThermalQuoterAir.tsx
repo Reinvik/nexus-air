@@ -475,7 +475,7 @@ export const ThermalQuoterAir: React.FC<ThermalQuoterAirProps> = ({
                   type="number"
                   min="0"
                   disabled={!includeInstallation}
-                  value={customInstallationPrice !== null ? (customInstallationPrice === 0 ? '' : customInstallationPrice) : (defaultInstallationBasePrice === 0 ? '' : defaultInstallationBasePrice)}
+                  value={customInstallationPrice !== null ? (customInstallationPrice === 0 ? '' : customInstallationPrice) : defaultInstallationBasePrice}
                   onFocus={(e) => e.target.select()}
                   onChange={(e) => setCustomInstallationPrice(e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value) || 0))}
                   className="w-24 text-right px-2 py-0.5 border rounded border-slate-300 font-mono font-bold text-xs text-cyan-800 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-cyan-500"
@@ -504,7 +504,7 @@ export const ThermalQuoterAir: React.FC<ThermalQuoterAirProps> = ({
                   type="number"
                   min="0"
                   disabled={!includeCondensatePump}
-                  value={customPumpPrice !== null ? (customPumpPrice === 0 ? '' : customPumpPrice) : (defaultPumpPrice === 0 ? '' : defaultPumpPrice)}
+                  value={customPumpPrice !== null ? (customPumpPrice === 0 ? '' : customPumpPrice) : defaultPumpPrice}
                   onFocus={(e) => e.target.select()}
                   onChange={(e) => setCustomPumpPrice(e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value) || 0))}
                   className="w-24 text-right px-2 py-0.5 border rounded border-slate-300 font-mono font-bold text-xs text-cyan-800 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-cyan-500"
