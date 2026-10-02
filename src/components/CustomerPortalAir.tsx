@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
-import { formatAirPrice } from '../lib/countries';
+import { formatAirPrice, getCountryPlaceholders } from '../lib/countries';
 import { parseVideoUrl } from '../lib/videoUtils';
 import { calculateLiveRouteETA, getCustomerCoordinates, RouteETA } from '../lib/routingService';
 import { generateReceiptPdfAir } from '../lib/pdfServiceAir';
@@ -201,6 +201,8 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
   onBackToApp,
   onOpenBooking,
 }) => {
+  const placeholders = useMemo(() => getCountryPlaceholders(settings?.country_code), [settings?.country_code]);
+
   // Helper to normalize RUT / strings for robust matching
   const cleanDoc = (val?: string) => (val || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -352,7 +354,7 @@ export const CustomerPortalAir: React.FC<CustomerPortalAirProps> = ({
                       setInputRut(e.target.value);
                       if (hasSearched) setHasSearched(false);
                     }}
-                    placeholder="Ej: 17.257.060-7 o +56 9 1234 5678"
+                    placeholder={placeholders.combinedPlaceholder}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-semibold text-slate-900 focus:bg-white focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none transition-all"
                     autoFocus
                   />

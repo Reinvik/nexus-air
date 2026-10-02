@@ -1823,7 +1823,9 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       return null;
     }
 
-    const price = customPrice || settings.standard_maintenance_price || 45000;
+    const eqCount = Math.max(1, schedule.equipment_ids?.length || 1);
+    const unitPrice = settings.standard_maintenance_price || 45000;
+    const price = customPrice || (unitPrice * eqCount);
     const taxRate = settings?.tax_rate !== undefined ? Number(settings.tax_rate) : 0.19;
     const isTaxApplied = settings?.default_apply_tax !== false;
     const taxMode = settings?.default_tax_mode || 'included';
@@ -1847,6 +1849,8 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     const newOrder = await addOrder({
       customer_id: schedule.customer_id,
       equipment_id: schedule.equipment_ids[0] || undefined,
+      equipment_ids: schedule.equipment_ids,
+      equipments_summary: schedule.equipments_summary,
       service_type: 'mantencion_preventiva',
       status: 'ingresado',
       scheduled_date: scheduledDate,
@@ -1860,8 +1864,8 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         {
           id: `it-${Date.now()}`,
           description: `Mantenimiento periódico preventivo (${schedule.equipments_summary})`,
-          quantity: 1,
-          unit_price: total,
+          quantity: eqCount,
+          unit_price: Math.round(total / eqCount),
           total: total,
           type: 'servicio'
         }

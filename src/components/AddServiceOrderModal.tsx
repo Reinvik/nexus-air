@@ -61,7 +61,6 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
 
   const [customerId, setCustomerId] = useState(customers[0]?.id || '');
   const [equipmentId, setEquipmentId] = useState('');
-  const [selectedEquipmentIds, setSelectedEquipmentIds] = useState<string[]>([]);
   const [serviceType, setServiceType] = useState<ServiceType>('mantencion_preventiva');
   const [calendarColor, setCalendarColor] = useState<string>(() => 
     settings?.service_type_colors?.['mantencion_preventiva'] || SERVICE_TYPE_DEFAULT_COLORS['mantencion_preventiva'] || '#0284c7'
@@ -87,6 +86,12 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
   const [taxMode, setTaxMode] = useState<'included' | 'plus'>(() => 
     settings?.default_tax_mode === 'plus' ? 'plus' : 'included'
   );
+  // NK-077: Lista de equipos del cliente seleccionado
+  const clientEquipments = useMemo(() => 
+    equipments.filter(e => e.customer_id === customerId),
+    [equipments, customerId]
+  );
+
   // NK-077: Precio unitario base según servicio y configuración
   const getServiceBaseUnitPrice = useCallback((type: ServiceType) => {
     if (type === 'mantencion_preventiva' || (type as any) === 'mantenimiento_preventivo') {
@@ -101,9 +106,21 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
   const [unitPrice, setUnitPrice] = useState<number>(() => {
     return settings?.standard_maintenance_price || 45000;
   });
-  const [basePrice, setBasePrice] = useState<number>(() => {
-    return settings?.standard_maintenance_price || 45000;
+
+  const [selectedEquipmentIds, setSelectedEquipmentIds] = useState<string[]>(() => {
+    const initCust = customers[0]?.id;
+    if (!initCust) return [];
+    return equipments.filter(e => e.customer_id === initCust).map(e => e.id);
   });
+
+  const [basePrice, setBasePrice] = useState<number>(() => {
+    const unit = settings?.standard_maintenance_price || 45000;
+    const initCust = customers[0]?.id;
+    const initialEqs = initCust ? equipments.filter(e => e.customer_id === initCust) : [];
+    const count = Math.max(1, initialEqs.length);
+    return unit * count;
+  });
+
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
   // NK-053: Mantenimiento Periódico Acordado con el Cliente
   const [isRecurringConfirmed, setIsRecurringConfirmed] = useState(false);
@@ -135,51 +152,54 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
     }
   }, [basePrice, applyTax, taxMode, taxRate]);
 
-  // NK-077: Al cambiar cantidad de equipos seleccionados o precio unitario, multiplicar automáticamente
-  useEffect(() => {
-    const count = Math.max(1, selectedEquipmentIds.length);
+  // NK-077: Cambio de cliente sincroniza equipos y suma automática inmediata
+  const handleCustomerChange = (newCustId: string) => {
+    setCustomerId(newCustId);
+    setEquipmentId('');
+    const newEqs = equipments.filter(e => e.customer_id === newCustId);
+    const newIds = newEqs.map(e => e.id);
+    setSelectedEquipmentIds(newIds);
+    const count = Math.max(1, newIds.length);
     setBasePrice(unitPrice * count);
-  }, [selectedEquipmentIds.length, unitPrice]);
+  };
 
   const handleCustomerCreated = (newCust: Customer, newEq?: AirEquipment) => {
     setCustomerId(newCust.id);
     if (newEq) {
       setEquipmentId(newEq.id);
       setSelectedEquipmentIds([newEq.id]);
+      setBasePrice(unitPrice * 1);
     }
     if (!description) {
       setDescription(`Servicio de ${serviceType.replace('_', ' ')} para ${newCust.name}`);
     }
   };
 
-  const clientEquipments = equipments.filter(e => e.customer_id === customerId);
-
-  // NK-077: Mantener selección múltiple sincronizada al cambiar de cliente
-  useEffect(() => {
-    if (clientEquipments.length > 0) {
-      setSelectedEquipmentIds(prev => {
-        const stillValid = prev.filter(id => clientEquipments.some(e => e.id === id));
-        if (stillValid.length > 0) return stillValid;
-        // Por defecto, preseleccionar todos los equipos del cliente
-        return clientEquipments.map(e => e.id);
-      });
-    } else {
-      setSelectedEquipmentIds([]);
-    }
-  }, [customerId, clientEquipments.length]);
-
+  // NK-077: Handlers directos de selección con suma automática instantánea
   const toggleEquipmentSelection = (id: string) => {
-    setSelectedEquipmentIds(prev => 
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+    setSelectedEquipmentIds(prev => {
+      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+      const count = Math.max(1, next.length);
+      setBasePrice(unitPrice * count);
+      return next;
+    });
   };
 
   const selectAllEquipments = () => {
-    setSelectedEquipmentIds(clientEquipments.map(e => e.id));
+    const allIds = clientEquipments.map(e => e.id);
+    setSelectedEquipmentIds(allIds);
+    const count = Math.max(1, allIds.length);
+    setBasePrice(unitPrice * count);
   };
 
   const deselectAllEquipments = () => {
     setSelectedEquipmentIds([]);
+    setBasePrice(unitPrice * 1);
+  };
+
+  const handleRecalculateSum = () => {
+    const count = Math.max(1, selectedEquipmentIds.length);
+    setBasePrice(unitPrice * count);
   };
 
   // Auto-cargar comisión pactada según el tipo de servicio y colaborador (NK-012)
@@ -355,10 +375,7 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                     </div>
                     <select
                       value={customerId}
-                      onChange={(e) => {
-                        setCustomerId(e.target.value);
-                        setEquipmentId('');
-                      }}
+                      onChange={(e) => handleCustomerChange(e.target.value)}
                       className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:border-cyan-500 focus:outline-none transition-colors"
                       required
                     >
@@ -419,6 +436,24 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                         </div>
                       )}
                     </div>
+
+                    {/* NK-077: Indicador de suma automática en vivo al seleccionar equipos */}
+                    {clientEquipments.length > 0 && (
+                      <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 text-xs flex items-center justify-between shadow-2xs">
+                        <span className="font-medium text-[11px] text-emerald-800 flex items-center gap-1">
+                          <span>⚡</span> <span>Suma automática:</span>
+                        </span>
+                        <div className="flex items-center gap-1.5 font-mono font-bold text-xs">
+                          <span>{selectedEquipmentIds.length} {selectedEquipmentIds.length === 1 ? 'aire' : 'aires'}</span>
+                          <span>×</span>
+                          <span>{settings?.currency_symbol || '$'}{unitPrice.toLocaleString()}</span>
+                          <span>=</span>
+                          <span className="bg-emerald-600 text-white px-2 py-0.5 rounded font-black text-xs">
+                            {settings?.currency_symbol || '$'}{(unitPrice * Math.max(1, selectedEquipmentIds.length)).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
                     {clientEquipments.length > 0 ? (
                       <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">

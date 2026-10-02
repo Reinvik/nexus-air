@@ -277,3 +277,56 @@ export function formatAirPrice(amount: number, currencySymbol: string = '₡', c
   const formatted = new Intl.NumberFormat(locale).format(amount);
   return `${currencySymbol}${formatted}`;
 }
+
+export interface CountryPlaceholders {
+  taxPlaceholder: string;
+  phonePlaceholder: string;
+  combinedPlaceholder: string;
+  defaultPhonePrefix: string;
+}
+
+export function getCountryPlaceholders(countryCodeOrName?: string): CountryPlaceholders {
+  const country = findCountry(countryCodeOrName);
+  const code = (country?.code || '').toUpperCase();
+
+  let taxPlaceholder = '12.345.678-9';
+  let phonePlaceholder = `${country?.phone_prefix || '+56'} 1234 5678`;
+  let defaultPhonePrefix = `${country?.phone_prefix || '+56'} `;
+
+  if (code === 'CR') {
+    taxPlaceholder = '3-101-123456';
+    phonePlaceholder = '+506 8888 8888';
+    defaultPhonePrefix = '+506 ';
+  } else if (code === 'VE') {
+    taxPlaceholder = 'J-12345678-0';
+    phonePlaceholder = '+58 412 123 4567';
+    defaultPhonePrefix = '+58 ';
+  } else if (code === 'CL') {
+    taxPlaceholder = '12.345.678-9';
+    phonePlaceholder = '+56 9 1234 5678';
+    defaultPhonePrefix = '+56 9 ';
+  } else if (code === 'CO') {
+    taxPlaceholder = '900.123.456-1';
+    phonePlaceholder = '+57 300 123 4567';
+    defaultPhonePrefix = '+57 ';
+  } else if (code === 'PE') {
+    taxPlaceholder = '20123456789';
+    phonePlaceholder = '+51 987 654 321';
+    defaultPhonePrefix = '+51 ';
+  } else if (code === 'MX') {
+    taxPlaceholder = 'ABC010203XYZ';
+    phonePlaceholder = '+52 55 1234 5678';
+    defaultPhonePrefix = '+52 ';
+  } else if (code === 'AR') {
+    taxPlaceholder = '30-12345678-9';
+    phonePlaceholder = '+54 9 11 1234 5678';
+    defaultPhonePrefix = '+54 9 ';
+  }
+
+  return {
+    taxPlaceholder,
+    phonePlaceholder,
+    combinedPlaceholder: `Ej: ${taxPlaceholder} o ${phonePlaceholder}`,
+    defaultPhonePrefix,
+  };
+}

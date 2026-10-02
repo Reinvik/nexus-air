@@ -15,6 +15,7 @@ import {
   Layers
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { findCountry, getCountryPlaceholders } from '../lib/countries';
 
 interface QuickCreateCustomerModalProps {
   isOpen: boolean;
@@ -33,9 +34,11 @@ export const QuickCreateCustomerModal: React.FC<QuickCreateCustomerModalProps> =
   onAddEquipment,
   onCustomerCreated,
 }) => {
-  const defaultCity = settings?.country_code === 'CR' ? 'San José' : 'Santiago';
-  const defaultPhone = settings?.country_code === 'CR' ? '+506 ' : '+56 9 ';
-  const defaultCommune = settings?.country_code === 'CR' ? 'Central' : 'Las Condes';
+  const country = findCountry(settings?.country_code);
+  const placeholders = getCountryPlaceholders(settings?.country_code);
+  const defaultCity = country?.sample_cities?.[0] || (settings?.country_code === 'CR' ? 'San José' : 'Santiago');
+  const defaultPhone = placeholders.defaultPhonePrefix;
+  const defaultCommune = settings?.country_code === 'CR' ? 'Central' : settings?.country_code === 'VE' ? 'Chacao' : 'Las Condes';
 
   // Customer Form State
   const [name, setName] = useState('');
