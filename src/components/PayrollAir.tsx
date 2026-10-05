@@ -96,6 +96,10 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
       commissionEarned: number;
     }[];
   } | null>(null);
+  const [viewingPayoutsList, setViewingPayoutsList] = useState<{
+    staff: Technician;
+    payouts: TechnicianPayout[];
+  } | null>(null);
 
   // Form State para Registrar / Aprobar Liquidación
   const [payWorkingDays, setPayWorkingDays] = useState<number>(30);
@@ -149,6 +153,7 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
         setPayingStaff(null);
         setViewingReceipt(null);
         setViewingOrdersDetail(null);
+        setViewingPayoutsList(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -282,53 +287,72 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
   const staffPayrollList = useMemo(() => {
     return technicians.map(tech => {
       const commData = techCommissionsMap.get(tech.id) || { completedCount: 0, totalCommission: 0, services: [] };
-      const existing = getExistingPayout(tech.id, selectedMonth);
       const allPayouts = getStaffPayouts(tech.id, selectedMonth);
+      const existing = allPayouts.find(p => p.payout_type !== 'adelanto') || allPayouts[allPayouts.length - 1];
+
+      // Payouts divididos por tipo
       const adelantosPrevios = allPayouts
         .filter(p => p.payout_type === 'adelanto')
         .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
+      const liquidacionesPrevias = allPayouts
+        .filter(p => p.payout_type !== 'adelanto')
+        .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+      // Órdenes ya liquidadas en pagos previos
+      const paidOrderIds = new Set(
+        allPayouts
+          .filter(p => p.payout_type !== 'adelanto')
+          .flatMap(p => p.order_ids || [])
+      );
+
+      const unpaidServices = commData.services.filter(s => !paidOrderIds.has(s.order.id));
+      const paidServices = commData.services.filter(s => paidOrderIds.has(s.order.id));
+      const pendingCommission = unpaidServices.reduce((sum, s) => sum + s.commissionEarned, 0);
+
       const mode: SalaryMode = existing?.salary_mode || tech.salary_mode || ((tech.role === 'ayudante' || tech.role === 'administracion') ? 'fixed' : 'commission');
       
-      let baseSalary = 0;
-      let commissionAmount = 0;
-      let bonusAmount = 0;
-      let deductionAmount = 0;
-      let workingDays = tech.working_days_default || 30;
-      let netPayable = 0;
-      let isPaid = false;
-
-      if (existing && existing.payout_type !== 'adelanto') {
-        isPaid = true;
-        baseSalary = existing.base_salary !== undefined ? existing.base_salary : (mode === 'commission' ? 0 : (tech.base_salary || 0));
-        commissionAmount = existing.commission_amount !== undefined ? existing.commission_amount : (mode === 'fixed' ? 0 : commData.totalCommission);
-        bonusAmount = existing.bonus_amount || 0;
-        deductionAmount = (existing.deduction_amount !== undefined ? existing.deduction_amount : 0) + adelantosPrevios;
-        workingDays = existing.working_days || workingDays;
-        netPayable = existing.amount;
-      } else {
-        isPaid = false;
-        baseSalary = mode === 'commission' ? 0 : (tech.base_salary || 0);
-        commissionAmount = mode === 'fixed' ? 0 : commData.totalCommission;
-        bonusAmount = 0;
-        deductionAmount = adelantosPrevios;
-        netPayable = Math.max(0, (baseSalary + commissionAmount + bonusAmount) - deductionAmount);
-      }
+      const baseSalary = mode === 'commission' ? 0 : (tech.base_salary || 0);
+      const commissionAmount = mode === 'fixed' ? 0 : commData.totalCommission;
+      const bonusAmount = allPayouts.reduce((sum, p) => sum + (Number(p.bonus_amount) || 0), 0);
+      const deductionAmount = adelantosPrevios + allPayouts.reduce((sum, p) => sum + (Number(p.deduction_amount) || 0), 0);
+      const workingDays = existing?.working_days || tech.working_days_default || 30;
 
       const totalEarnings = baseSalary + commissionAmount + bonusAmount;
       const totalDeductions = deductionAmount;
+      const netEarnedMonth = Math.max(0, totalEarnings - totalDeductions);
+
+      // Saldo pendiente de pago real:
+      // Si el colaborador es de comisión, el saldo pendiente corresponde a las órdenes no liquidadas
+      const pendingBalance = mode === 'commission' 
+        ? pendingCommission 
+        : Math.max(0, netEarnedMonth - liquidacionesPrevias);
+
+      // Determinar si está completamente pagado o tiene saldo pendiente
+      const isPaid = pendingBalance === 0 && (liquidacionesPrevias > 0 || totalEarnings === 0);
+      const isPartial = liquidacionesPrevias > 0 && pendingBalance > 0;
+
+      // Líquido mostrable: si hay saldo pendiente se exhibe el saldo pendiente, si está pagado el total liquidado
+      const netPayable = pendingBalance > 0 ? pendingBalance : (liquidacionesPrevias > 0 ? liquidacionesPrevias : netEarnedMonth);
 
       return {
         tech,
         mode,
         isPaid,
+        isPartial,
         existingPayout: existing,
+        allPayouts,
         baseSalary,
         commissionAmount,
         bonusAmount,
         deductionAmount,
         totalEarnings,
         totalDeductions,
+        liquidacionesPrevias,
+        pendingBalance,
+        pendingCommission,
+        unpaidServices,
+        paidServices,
         netPayable,
         workingDays,
         vacationDays: 0,
@@ -378,13 +402,13 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
     let countAdmin = 0;
 
     staffPayrollList.forEach(item => {
-      totalPayroll += item.netPayable;
+      totalPayroll += item.totalEarnings;
+      totalPaid += item.liquidacionesPrevias;
+      totalPending += item.pendingBalance;
       if (item.isPaid) {
-        totalPaid += item.netPayable;
         countPaid += 1;
       } else {
-        totalPending += item.netPayable;
-        if (item.netPayable > 0 || item.servicesCount > 0) {
+        if (item.pendingBalance > 0 || item.servicesCount > 0) {
           countPending += 1;
         }
       }
@@ -429,14 +453,24 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
   const handleOpenPayModal = (item: typeof staffPayrollList[0]) => {
     setPayingStaff(item.tech);
     setPayWorkingDays(item.workingDays);
-    setPayBaseSalary(item.baseSalary);
-    setPayCommissionAmount(item.commissionAmount);
-    setPayBonusAmount(item.bonusAmount);
-    setPayDeductionAmount(item.deductionAmount);
-    setPayDate(item.existingPayout?.payment_date || format(new Date(), 'yyyy-MM-dd'));
-    setPayMethod((item.existingPayout?.payment_method as any) || 'transferencia');
-    setPayReference(item.existingPayout?.payment_reference || '');
-    setPayNotes(item.existingPayout?.notes || `Liquidación de sueldo y honorarios correspondiente a ${selectedMonth}.`);
+    // Si ya tuvo liquidaciones previas en el mes, el sueldo base se asume ya liquidado
+    const remainingBaseSalary = item.liquidacionesPrevias > 0 ? 0 : item.baseSalary;
+    setPayBaseSalary(remainingBaseSalary);
+    // Si tiene comisiones pendientes específicas, usar ese monto; de lo contrario su saldo pendiente
+    const commissionToPay = item.pendingCommission > 0 
+      ? item.pendingCommission 
+      : (item.pendingBalance > 0 ? item.pendingBalance : item.commissionAmount);
+    setPayCommissionAmount(commissionToPay);
+    setPayBonusAmount(0);
+    setPayDeductionAmount(0);
+    setPayDate(format(new Date(), 'yyyy-MM-dd'));
+    setPayMethod('transferencia');
+    setPayReference('');
+    setPayNotes(
+      item.liquidacionesPrevias > 0
+        ? `Liquidación de saldo pendiente (${item.unpaidServices.length} órdenes) correspondiente a ${selectedMonth}.`
+        : `Liquidación de sueldo y honorarios correspondiente a ${selectedMonth}.`
+    );
   };
 
   // Confirmar Pago / Liquidación
@@ -445,13 +479,22 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
     if (!payingStaff || !onAddTechnicianPayout) return;
 
     const commData = techCommissionsMap.get(payingStaff.id) || { completedCount: 0, totalCommission: 0, services: [] };
+    const allPayouts = getStaffPayouts(payingStaff.id, selectedMonth);
+    const paidOrderIds = new Set(
+      allPayouts
+        .filter(p => p.payout_type !== 'adelanto')
+        .flatMap(p => p.order_ids || [])
+    );
+    const unpaidServices = commData.services.filter(s => !paidOrderIds.has(s.order.id));
     const netAmount = Math.max(0, (payBaseSalary + payCommissionAmount + payBonusAmount) - payDeductionAmount);
+    const isPartial = allPayouts.some(p => p.payout_type !== 'adelanto');
 
     await onAddTechnicianPayout({
       technician_id: payingStaff.id,
       technician_name: payingStaff.name,
       technician_role: payingStaff.role || 'tecnico',
       salary_mode: payingStaff.salary_mode || 'commission',
+      payout_type: isPartial ? 'parcial' : 'liquidacion',
       base_salary: Number(payBaseSalary) || 0,
       commission_amount: Number(payCommissionAmount) || 0,
       bonus_amount: Number(payBonusAmount) || 0,
@@ -463,7 +506,7 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
       payment_method: payMethod,
       payment_reference: payReference.trim(),
       notes: payNotes.trim(),
-      order_ids: commData.services.map(s => s.order.id)
+      order_ids: unpaidServices.length > 0 ? unpaidServices.map(s => s.order.id) : commData.services.map(s => s.order.id)
     });
 
     setPayingStaff(null);
@@ -473,7 +516,7 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
   const handleOpenAddStaff = () => {
     setStaffName('');
     setStaffRut('');
-    setStaffPhone(settings?.phone || '+56 9 ');
+    setStaffPhone(settings?.phone || (countryCode === 'CR' ? '+506 ' : (countryCode === 'VE' ? '+58 ' : '+56 9 ')));
     setStaffEmail('');
     setStaffRole('tecnico');
     setStaffCustomTitle('');
@@ -481,7 +524,7 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
     setStaffBaseSalary(0);
     setStaffWorkingDays(30);
     setStaffSecCertified(true);
-    setStaffCertNumber('SEC-HVAC-');
+    setStaffCertNumber(countryCode === 'CR' ? 'CFIA-HVAC-' : 'SEC-HVAC-');
     setCommMantVal(20000);
     setCommInstVal(35000);
     setCommRepVal(15000);
@@ -1043,22 +1086,28 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
                   </div>
                 </div>
 
-                {/* Recuadro Destacado: LÍQUIDO A PAGAR (idéntico a nk062_2.png) */}
+                {/* Recuadro Destacado: LÍQUIDO A PAGAR / SALDO PENDIENTE */}
                 <div className={`p-4 rounded-xl border flex items-center justify-between ${
-                  isPaid
-                    ? 'bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 border-emerald-500/30'
-                    : 'bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-emerald-200'
+                  item.pendingBalance > 0
+                    ? 'bg-gradient-to-r from-amber-50 via-emerald-50 to-teal-50 border-emerald-300'
+                    : 'bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 border-emerald-500/30'
                 }`}>
                   <div>
                     <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">
-                      LÍQUIDO A PAGAR
+                      {item.pendingBalance > 0 
+                        ? (item.isPartial ? 'SALDO PENDIENTE A LIQUIDAR' : 'LÍQUIDO A PAGAR') 
+                        : 'TOTAL PAGADO AL DÍA'}
                     </span>
                     <span className="text-[10px] text-slate-500">
-                      {isPaid ? `Liquidado el ${existingPayout?.payment_date}` : 'Monto neto a transferir al colaborador'}
+                      {item.pendingBalance > 0
+                        ? (item.isPartial 
+                            ? `Liquidado previo: ${formatAirPrice(item.liquidacionesPrevias, currencySymbol, countryCode)} (${item.allPayouts.filter(p => p.payout_type !== 'adelanto').length} pago(s)) • ${item.unpaidServices.length} orden(es) por liquidar`
+                            : 'Monto neto a transferir al colaborador')
+                        : `Liquidado el ${item.existingPayout?.payment_date || selectedMonth} (${item.allPayouts.length} pago(s))`}
                     </span>
                   </div>
                   <div className="text-right">
-                    <span className="text-2xl font-black font-mono text-emerald-600 tracking-tight">
+                    <span className={`text-2xl font-black font-mono tracking-tight ${item.pendingBalance > 0 ? 'text-emerald-700' : 'text-emerald-600'}`}>
                       {formatAirPrice(item.netPayable, currencySymbol, countryCode)}
                     </span>
                   </div>
@@ -1068,10 +1117,15 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-1">
                   {/* Badge de Estado */}
                   <div>
-                    {isPaid ? (
+                    {item.isPaid ? (
                       <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 text-xs font-bold border border-emerald-300">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Pagado • {existingPayout?.payment_method?.toUpperCase()}</span>
+                        <span>Al Día • {item.allPayouts.length} Pago(s)</span>
+                      </div>
+                    ) : item.isPartial ? (
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-900 text-xs font-bold border border-amber-300">
+                        <Clock className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Liquidación Parcial • Saldo Pendiente</span>
                       </div>
                     ) : (
                       <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-800 text-xs font-bold border border-amber-300">
@@ -1082,7 +1136,7 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
                   </div>
 
                   {/* Acciones */}
-                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
                     {/* Botón WhatsApp */}
                     <button
                       type="button"
@@ -1093,28 +1147,25 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
                       <Share2 className="w-4 h-4" />
                     </button>
 
-                    {isPaid ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => setViewingReceipt({ staff: tech, payout: existingPayout! })}
-                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
-                          title="Ver o imprimir comprobante formal de liquidación"
-                        >
-                          <FileText className="w-3.5 h-3.5 text-cyan-400" />
-                          <span>Comprobante</span>
-                        </button>
+                    {item.allPayouts.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (item.allPayouts.length === 1) {
+                            setViewingReceipt({ staff: tech, payout: item.allPayouts[0] });
+                          } else {
+                            setViewingPayoutsList({ staff: tech, payouts: item.allPayouts });
+                          }
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                        title="Ver o imprimir comprobante(s) formal(es) de liquidación"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>{item.allPayouts.length > 1 ? `Comprobantes (${item.allPayouts.length})` : 'Comprobante'}</span>
+                      </button>
+                    )}
 
-                        <button
-                          type="button"
-                          onClick={() => handleOpenPayModal(item)}
-                          className="px-2.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
-                          title="Ajustar o editar liquidación ya registrada"
-                        >
-                          <span>Ajustar</span>
-                        </button>
-                      </>
-                    ) : (
+                    {item.pendingBalance > 0 ? (
                       <button
                         type="button"
                         onClick={() => handleOpenPayModal(item)}
@@ -1122,7 +1173,16 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
                         title="Aprobar liquidación y registrar egreso en el negocio"
                       >
                         <CreditCard className="w-4 h-4" />
-                        <span>Aprobar & Pagar</span>
+                        <span>{item.isPartial ? `Liquidar Saldo (${formatAirPrice(item.pendingBalance, currencySymbol, countryCode)})` : 'Aprobar & Pagar'}</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenPayModal(item)}
+                        className="px-2.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                        title="Ajustar o editar liquidación ya registrada"
+                      >
+                        <span>Ajustar</span>
                       </button>
                     )}
                   </div>
@@ -1571,6 +1631,85 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
         </div>
       )}
 
+      {/* Modal: Lista de Liquidaciones del Colaborador en el Mes */}
+      {viewingPayoutsList && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setViewingPayoutsList(null);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xl my-6 cursor-default"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">
+                  Comprobantes de {viewingPayoutsList.staff.name}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Período {selectedMonth} • {viewingPayoutsList.payouts.length} liquidaciones registradas
+                </p>
+              </div>
+              <button
+                onClick={() => setViewingPayoutsList(null)}
+                className="text-slate-400 hover:text-slate-700 cursor-pointer p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
+              {viewingPayoutsList.payouts.map((p, idx) => (
+                <div key={p.id || idx} className="py-3 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-xs text-slate-900">{p.payout_number}</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-600 border border-slate-200">
+                        {p.payout_type || 'Liquidación'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Fecha: <strong className="text-slate-600 font-mono">{p.payment_date}</strong> • Método: <span className="capitalize">{p.payment_method}</span>
+                      {p.payment_reference ? ` • Ref: ${p.payment_reference}` : ''}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-mono font-black text-sm text-emerald-700">
+                      {formatAirPrice(p.amount, currencySymbol, countryCode)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setViewingReceipt({ staff: viewingPayoutsList.staff, payout: p });
+                        setViewingPayoutsList(null);
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Ver comprobante formal"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Ver</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+              <span className="font-bold text-slate-700 text-xs">TOTAL LIQUIDADO EN EL MES:</span>
+              <span className="font-mono font-black text-emerald-800 text-base">
+                {formatAirPrice(
+                  viewingPayoutsList.payouts.reduce((sum, p) => sum + (Number(p.amount) || 0), 0),
+                  currencySymbol,
+                  countryCode
+                )}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 7. Modal: Detalle de Servicios Realizados (Auditoría de Comisiones) */}
       {viewingOrdersDetail && (
         <div
@@ -1601,25 +1740,39 @@ export const PayrollAir: React.FC<PayrollAirProps> = ({
             </div>
 
             <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 text-xs">
-              {viewingOrdersDetail.services.map((item, idx) => (
-                <div key={idx} className="py-2.5 flex items-center justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-mono font-bold text-cyan-800">
-                        {item.order.ticket_number}
-                      </span>
-                      <span className="text-slate-500">•</span>
-                      <span className="font-medium text-slate-800">{item.serviceName}</span>
+              {viewingOrdersDetail.services.map((item, idx) => {
+                const isServicePaid = (technicianPayouts || []).some(
+                  p => p.technician_id === viewingOrdersDetail.staff.id && (p.order_ids || []).includes(item.order.id)
+                );
+                return (
+                  <div key={idx} className="py-2.5 flex items-center justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono font-bold text-cyan-800">
+                          {item.order.ticket_number}
+                        </span>
+                        <span className="text-slate-500">•</span>
+                        <span className="font-medium text-slate-800">{item.serviceName}</span>
+                        {isServicePaid ? (
+                          <span className="px-1.5 py-0.2 rounded text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold">
+                            ✓ Liquidada
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.2 rounded text-[10px] bg-amber-100 text-amber-800 border border-amber-300 font-bold">
+                            ⏱️ Pendiente de Liquidar
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        Cliente: {item.order.customer?.name || 'Cliente Particular'} • Fecha: {item.order.completed_at?.split('T')[0] || item.order.scheduled_date}
+                      </p>
                     </div>
-                    <p className="text-[11px] text-slate-400">
-                      Cliente: {item.order.customer?.name || 'Cliente Particular'} • Fecha: {item.order.completed_at?.split('T')[0] || item.order.scheduled_date}
-                    </p>
+                    <span className="font-mono font-black text-emerald-700 text-sm shrink-0">
+                      +{formatAirPrice(item.commissionEarned, currencySymbol, countryCode)}
+                    </span>
                   </div>
-                  <span className="font-mono font-black text-emerald-700 text-sm shrink-0">
-                    +{formatAirPrice(item.commissionEarned, currencySymbol, countryCode)}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between">

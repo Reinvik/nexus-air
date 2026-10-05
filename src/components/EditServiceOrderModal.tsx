@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   ServiceOrder, 
   Technician, 
+  TechnicianPayout,
   OrderStatus, 
   ServiceType, 
   AirSettings, 
@@ -12,6 +13,7 @@ import {
   getOrderCalendarColor,
   formatServiceType
 } from '../types';
+import { format } from 'date-fns';
 import { 
   X, 
   Save, 
@@ -58,6 +60,8 @@ interface EditServiceOrderModalProps {
   equipments?: AirEquipment[];
   settings?: AirSettings;
   currentUserProfile?: any;
+  technicianPayouts?: TechnicianPayout[];
+  onAddTechnicianPayout?: (data: Omit<TechnicianPayout, 'id' | 'company_id' | 'created_at'>) => Promise<void> | void;
   onUpdateOrder: (id: string, updates: Partial<ServiceOrder>) => void;
   onDeleteOrder: (id: string) => void;
   onOpenReceipt?: (order: ServiceOrder) => void;
@@ -75,6 +79,8 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
   equipments,
   settings,
   currentUserProfile,
+  technicianPayouts = [],
+  onAddTechnicianPayout,
   onUpdateOrder,
   onDeleteOrder,
   onOpenReceipt,
@@ -290,6 +296,44 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
         ? Math.round((total * assistantPayoutValue) / 100) 
         : assistantPayoutValue)
     : 0;
+
+  const isOrderTechPaid = Boolean(order?.id && (technicianPayouts || []).some(p => (p.order_ids || []).includes(order.id)));
+
+  const handleQuickPayTechnician = async () => {
+    if (!order || !technicianId || !onAddTechnicianPayout) return;
+    const tech = technicians.find(t => t.id === technicianId);
+    if (!tech) return;
+
+    if (calculatedTechPayout <= 0) {
+      toast.error('El monto de honorario para este técnico es 0');
+      return;
+    }
+
+    try {
+      await onAddTechnicianPayout({
+        technician_id: tech.id,
+        technician_name: tech.name,
+        technician_role: tech.role || 'tecnico',
+        salary_mode: tech.salary_mode || 'commission',
+        payout_type: 'parcial',
+        base_salary: 0,
+        commission_amount: calculatedTechPayout,
+        bonus_amount: 0,
+        deduction_amount: 0,
+        working_days: 30,
+        period_month: format(new Date(), 'yyyy-MM'),
+        amount: calculatedTechPayout,
+        payment_date: format(new Date(), 'yyyy-MM-dd'),
+        payment_method: 'transferencia',
+        payment_reference: `Orden ${order.ticket_number}`,
+        notes: `Liquidación directa de honorario desde orden ${order.ticket_number}.`,
+        order_ids: [order.id]
+      });
+      toast.success(`Honorario de ${settings?.currency_symbol || '$'} ${calculatedTechPayout.toLocaleString()} liquidado a ${tech.name}`);
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al registrar el pago al técnico');
+    }
+  };
 
   // Direct WhatsApp & Phone
   const customerPhone = selectedCustomer?.phone || order.customer?.phone || order.customer_phone;
@@ -1008,14 +1052,45 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                   </div>
 
                   {/* Resumen Payout */}
-                  <div className="p-2.5 rounded-lg bg-cyan-50/80 border border-cyan-200 text-xs flex flex-wrap items-center justify-between gap-2 text-cyan-950 font-medium">
-                    <span>Pago Técnico: <strong>{settings?.currency_symbol || '$'} {calculatedTechPayout.toLocaleString()}</strong></span>
-                    {assistantId && (
-                      <span>Pago Ayudante: <strong>{settings?.currency_symbol || '$'} {calculatedAssistantPayout.toLocaleString()}</strong></span>
+                  <div className="p-3 rounded-xl bg-gradient-to-r from-cyan-50 to-blue-50 border border-cyan-200 text-xs space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-cyan-950 font-medium">
+                      <span>Pago Técnico: <strong>{settings?.currency_symbol || '$'} {calculatedTechPayout.toLocaleString()}</strong></span>
+                      {assistantId && (
+                        <span>Pago Ayudante: <strong>{settings?.currency_symbol || '$'} {calculatedAssistantPayout.toLocaleString()}</strong></span>
+                      )}
+                      <span className="font-bold text-blue-900">
+                        Total Mano de Obra: {settings?.currency_symbol || '$'} {(calculatedTechPayout + calculatedAssistantPayout).toLocaleString()}
+                      </span>
+                    </div>
+
+                    {technicianId && calculatedTechPayout > 0 && (
+                      <div className="pt-2 border-t border-cyan-200/60 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
+                          {isOrderTechPaid ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold border border-emerald-300">
+                              <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                              Honorario Técnico Liquidado
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 text-[11px] font-bold border border-amber-300">
+                              <Clock className="w-3.5 h-3.5 text-amber-700" />
+                              Honorario Pendiente de Pago
+                            </span>
+                          )}
+                        </div>
+
+                        {!isOrderTechPaid && onAddTechnicianPayout && (
+                          <button
+                            type="button"
+                            onClick={handleQuickPayTechnician}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                          >
+                            <DollarSign className="w-3.5 h-3.5" />
+                            Pagar Técnico Ahora ({settings?.currency_symbol || '$'} {calculatedTechPayout.toLocaleString()})
+                          </button>
+                        )}
+                      </div>
                     )}
-                    <span className="font-bold text-blue-900">
-                      Total Mano de Obra: {settings?.currency_symbol || '$'} {(calculatedTechPayout + calculatedAssistantPayout).toLocaleString()}
-                    </span>
                   </div>
                 </div>
 
@@ -1362,6 +1437,47 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                         className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs focus:border-cyan-500 focus:outline-none"
                       />
                     </div>
+
+                    {/* Honorario del Técnico Asignado */}
+                    {technicianId && (
+                      <div className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Honorario del Técnico</div>
+                          <div className="text-xs font-semibold text-slate-800">
+                            {technicians.find(t => t.id === technicianId)?.name || 'Técnico Asignado'}:{' '}
+                            <span className="font-bold text-cyan-700 font-mono">
+                              {settings?.currency_symbol || '$'} {calculatedTechPayout.toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {isOrderTechPaid ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold border border-emerald-300">
+                              <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                              Honorario Liquidado
+                            </span>
+                          ) : (
+                            <>
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 text-[11px] font-bold border border-amber-300">
+                                <Clock className="w-3.5 h-3.5 text-amber-700" />
+                                Honorario Pendiente
+                              </span>
+                              {onAddTechnicianPayout && calculatedTechPayout > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={handleQuickPayTechnician}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                                >
+                                  <DollarSign className="w-3.5 h-3.5" />
+                                  Pagar Técnico Ahora
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

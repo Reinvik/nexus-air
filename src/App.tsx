@@ -659,6 +659,7 @@ export default function App() {
           <SalesAir 
             orders={orders} 
             settings={effectiveSettings}
+            technicians={technicians}
             technicianPayouts={technicianPayouts}
             expenses={expenses}
             onUpdateOrder={updateOrder}
@@ -666,6 +667,8 @@ export default function App() {
             onDeletePayout={deleteTechnicianPayout}
             onAddExpense={addExpense}
             onDeleteExpense={deleteExpense}
+            onAddTechnicianPayout={addTechnicianPayout}
+            onNavigateToPayroll={() => setActiveTab('payroll')}
           />
         )}
 
@@ -777,6 +780,8 @@ export default function App() {
           customers={customers}
           equipments={equipments}
           settings={tenantSettings || settings}
+          technicianPayouts={technicianPayouts}
+          onAddTechnicianPayout={addTechnicianPayout}
           onOpenReceipt={(ord) => {
             setIsEditOrderModalOpen(false);
             setReceiptOrder(ord);

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ServiceOrder, AirSettings, TechnicianPayout, Expense, ExpenseCategory, formatServiceType } from '../types';
+import { ServiceOrder, AirSettings, Technician, TechnicianPayout, Expense, ExpenseCategory, formatServiceType } from '../types';
 import { formatAirPrice, getCountryPlaceholders } from '../lib/countries';
 import { 
   TrendingUp, 
@@ -53,16 +53,48 @@ import {
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+// Helper para calcular honorarios de comisiones técnicas
+export const calculateOrderTechnicianPayout = (
+  order: ServiceOrder,
+  technician?: Technician
+): number => {
+  if (order.technician_payout_value !== undefined && order.technician_payout_value > 0) {
+    if (order.technician_payout_type === 'percentage') {
+      return Math.round(((order.total || 0) * order.technician_payout_value) / 100);
+    }
+    return order.technician_payout_value;
+  }
+  if (!technician) return 0;
+  const sType = order.service_type || 'mantencion_preventiva';
+  const orderTotal = order.total || 0;
+  if (sType === 'instalacion') {
+    const pType = technician.commission_instalacion_type || 'fixed';
+    const val = technician.commission_instalacion_value ?? 35000;
+    return pType === 'percentage' ? Math.round((orderTotal * val) / 100) : val;
+  } else if (sType === 'mantencion_preventiva' || sType === 'mantenimiento_preventivo' || sType === 'recaptacion') {
+    const pType = technician.commission_mantencion_type || 'fixed';
+    const val = technician.commission_mantencion_value ?? 20000;
+    return pType === 'percentage' ? Math.round((orderTotal * val) / 100) : val;
+  } else {
+    const pType = technician.commission_reparacion_type || technician.default_commission_type || 'fixed';
+    const val = technician.commission_reparacion_value ?? technician.default_commission_value ?? 15000;
+    return pType === 'percentage' ? Math.round((orderTotal * val) / 100) : val;
+  }
+};
+
 interface SalesAirProps {
   orders: ServiceOrder[];
   settings?: AirSettings;
+  technicians?: Technician[];
   technicianPayouts?: TechnicianPayout[];
   expenses?: Expense[];
   onUpdateOrder?: (orderId: string, updates: Partial<ServiceOrder>) => void;
   onDeleteOrder?: (orderId: string) => void;
   onDeletePayout?: (payoutId: string) => void;
+  onAddTechnicianPayout?: (data: Omit<TechnicianPayout, 'id' | 'company_id' | 'created_at'>) => Promise<void> | void;
   onAddExpense?: (data: Omit<Expense, 'id' | 'created_at'>) => void;
   onDeleteExpense?: (id: string) => void;
+  onNavigateToPayroll?: () => void;
 }
 
 type DatePreset = 'all' | 'today' | 'yesterday' | 'this_week' | 'last_week' | 'this_month' | 'last_30_days' | 'custom';
@@ -71,13 +103,16 @@ type ProgressViewMode = 'weekly' | 'daily';
 export const SalesAir: React.FC<SalesAirProps> = ({ 
   orders, 
   settings, 
+  technicians = [],
   technicianPayouts = [], 
   expenses = [],
   onUpdateOrder,
   onDeleteOrder,
   onDeletePayout,
+  onAddTechnicianPayout,
   onAddExpense,
-  onDeleteExpense
+  onDeleteExpense,
+  onNavigateToPayroll
 }) => {
   const currencySymbol = settings?.currency_symbol || '₡';
   const countryCode = settings?.country_code || 'CR';
@@ -115,6 +150,68 @@ export const SalesAir: React.FC<SalesAirProps> = ({
   const [payDate, setPayDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [payNotes, setPayNotes] = useState('');
   const [payProofUrl, setPayProofUrl] = useState('');
+
+  // Estado para Liquidar Honorarios a Técnico directamente desde Ventas
+  const [payingTechOrder, setPayingTechOrder] = useState<ServiceOrder | null>(null);
+  const [payingTechStaff, setPayingTechStaff] = useState<Technician | null>(null);
+  const [payTechAmount, setPayTechAmount] = useState<number>(0);
+  const [payTechMethod, setPayTechMethod] = useState<'transferencia' | 'efectivo' | 'cheque' | 'otro'>('transferencia');
+  const [payTechReference, setPayTechReference] = useState('');
+  const [payTechNotes, setPayTechNotes] = useState('');
+  const [payTechDate, setPayTechDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [isSubmittingTechPayout, setIsSubmittingTechPayout] = useState(false);
+
+  // Estado para pagar comisión simultáneamente al registrar cobro del cliente
+  const [payTechnicianAlso, setPayTechnicianAlso] = useState(false);
+
+  const handleOpenPayTechModal = (order: ServiceOrder, tech?: Technician, initialAmount?: number) => {
+    const staff = tech || (technicians || []).find(t => t.id === order.assigned_technician_id);
+    const amount = initialAmount !== undefined ? initialAmount : (staff ? calculateOrderTechnicianPayout(order, staff) : 0);
+    setPayingTechOrder(order);
+    setPayingTechStaff(staff || null);
+    setPayTechAmount(amount);
+    setPayTechMethod('transferencia');
+    setPayTechReference('');
+    setPayTechNotes(`Liquidación directa de comisión por orden ${order.ticket_number}.`);
+    setPayTechDate(format(new Date(), 'yyyy-MM-dd'));
+  };
+
+  const handleConfirmPayTech = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!payingTechOrder || !payingTechStaff || !onAddTechnicianPayout) {
+      toast.error('Faltan datos para procesar el pago al técnico');
+      return;
+    }
+    try {
+      setIsSubmittingTechPayout(true);
+      await onAddTechnicianPayout({
+        technician_id: payingTechStaff.id,
+        technician_name: payingTechStaff.name,
+        technician_role: payingTechStaff.role || 'tecnico',
+        salary_mode: payingTechStaff.salary_mode || 'commission',
+        payout_type: 'parcial',
+        base_salary: 0,
+        commission_amount: payTechAmount,
+        bonus_amount: 0,
+        deduction_amount: 0,
+        working_days: 30,
+        period_month: format(new Date(), 'yyyy-MM'),
+        amount: payTechAmount,
+        payment_date: payTechDate,
+        payment_method: payTechMethod,
+        payment_reference: payTechReference.trim(),
+        notes: payTechNotes.trim(),
+        order_ids: [payingTechOrder.id]
+      });
+      toast.success(`Honorario de ${formatAirPrice(payTechAmount, currencySymbol, countryCode)} liquidado a ${payingTechStaff.name}`);
+      setPayingTechOrder(null);
+      setPayingTechStaff(null);
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al registrar el pago al técnico');
+    } finally {
+      setIsSubmittingTechPayout(false);
+    }
+  };
 
   // Payment Reminder WhatsApp Modal State (NK-044)
   const [selectedOrderForReminder, setSelectedOrderForReminder] = useState<ServiceOrder | null>(null);
@@ -194,9 +291,12 @@ export const SalesAir: React.FC<SalesAirProps> = ({
     setPayDate(order.payment_date || format(new Date(), 'yyyy-MM-dd'));
     setPayNotes(order.payment_notes || '');
     setPayProofUrl(order.payment_proof_url || '');
+    setPayTechnicianAlso(false);
+    setPayTechMethod('transferencia');
+    setPayTechReference('');
   };
 
-  const handleSavePayment = (e: React.FormEvent) => {
+  const handleSavePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedOrderForPayment) return;
 
@@ -210,6 +310,37 @@ export const SalesAir: React.FC<SalesAirProps> = ({
         payment_notes: payNotes.trim(),
         payment_proof_url: payProofUrl.trim() || undefined,
       });
+    }
+
+    // Si seleccionó liquidar comisión al técnico al mismo tiempo
+    if (payTechnicianAlso && selectedOrderForPayment.assigned_technician_id && onAddTechnicianPayout) {
+      const tech = (technicians || []).find(t => t.id === selectedOrderForPayment.assigned_technician_id);
+      const isAlreadyPaid = technicianPayouts.some(p => (p.order_ids || []).includes(selectedOrderForPayment.id));
+      if (tech && !isAlreadyPaid) {
+        const comm = calculateOrderTechnicianPayout(selectedOrderForPayment, tech);
+        try {
+          await onAddTechnicianPayout({
+            technician_id: tech.id,
+            technician_name: tech.name,
+            technician_role: tech.role || 'tecnico',
+            salary_mode: tech.salary_mode || 'commission',
+            payout_type: 'parcial',
+            base_salary: 0,
+            commission_amount: comm,
+            bonus_amount: 0,
+            deduction_amount: 0,
+            working_days: 30,
+            period_month: format(new Date(), 'yyyy-MM'),
+            amount: comm,
+            payment_date: payDate,
+            payment_method: payTechMethod,
+            payment_reference: payTechReference.trim(),
+            notes: `Liquidación simultánea al confirmar cobro de orden ${selectedOrderForPayment.ticket_number}.`,
+            order_ids: [selectedOrderForPayment.id]
+          });
+          toast.success(`Honorario de ${formatAirPrice(comm, currencySymbol, countryCode)} liquidado a ${tech.name}`);
+        } catch {}
+      }
     }
 
     toast.success(`Cobro de orden ${selectedOrderForPayment.ticket_number} guardado`);
@@ -337,6 +468,15 @@ export const SalesAir: React.FC<SalesAirProps> = ({
       }
     });
   }, [technicianPayouts, selectedPreset, customStartDate, customEndDate]);
+
+  // Órdenes con comisiones pendientes de liquidar a técnicos
+  const pendingOrdersWithTechCommission = useMemo(() => {
+    return filteredOrders.filter(o => {
+      if (o.status === 'cancelado' || !o.assigned_technician_id) return false;
+      const isPaid = technicianPayouts.some(p => (p.order_ids || []).includes(o.id));
+      return !isPaid;
+    });
+  }, [filteredOrders, technicianPayouts]);
 
   // Filtrar egresos operativos del negocio por fecha (NK-045)
   const filteredExpenses = useMemo(() => {
@@ -1282,6 +1422,68 @@ export const SalesAir: React.FC<SalesAirProps> = ({
           </div>
         </div>
 
+        {/* Banner de Órdenes con Honorarios Pendientes de Pago a Técnicos (NK-062) */}
+        {(transactionTab === 'honorarios' || transactionTab === 'todos') && pendingOrdersWithTechCommission.length > 0 && (
+          <div className="p-4 mx-6 my-4 bg-gradient-to-r from-amber-50 via-orange-50/50 to-amber-50 border border-amber-200 rounded-2xl space-y-3 shadow-2xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                  <Clock className="w-4 h-4 text-amber-600" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-xs text-slate-900">
+                    Comisiones de Terreno Pendientes de Liquidar ({pendingOrdersWithTechCommission.length})
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    Servicios completados con técnico asignado cuyo honorario aún no ha sido pagado
+                  </p>
+                </div>
+              </div>
+
+              {onNavigateToPayroll && (
+                <button
+                  type="button"
+                  onClick={onNavigateToPayroll}
+                  className="px-3 py-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition-colors shadow-2xs"
+                >
+                  Ir a Nómina de Sueldos →
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
+              {pendingOrdersWithTechCommission.map(ord => {
+                const tech = (technicians || []).find(t => t.id === ord.assigned_technician_id);
+                const comm = calculateOrderTechnicianPayout(ord, tech);
+                return (
+                  <div key={`pend-${ord.id}`} className="p-3 bg-white border border-amber-200/90 rounded-xl flex items-center justify-between gap-2 shadow-2xs">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono font-bold text-xs text-slate-900">{ord.ticket_number}</span>
+                        <span className="text-[11px] font-bold text-slate-800 truncate">{tech?.name || 'Técnico'}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 truncate">
+                        {ord.customer?.name} • {formatServiceType(ord.service_type)}
+                      </div>
+                      <div className="font-mono font-black text-xs text-emerald-700 mt-0.5">
+                        Honorario: {formatAirPrice(comm, currencySymbol, countryCode)}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleOpenPayTechModal(ord, tech, comm)}
+                      className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shrink-0 cursor-pointer shadow-xs transition-all"
+                    >
+                      Pagar
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
@@ -1308,6 +1510,10 @@ export const SalesAir: React.FC<SalesAirProps> = ({
                   if (item.type === 'order') {
                     const o = item.data;
                     const isCanceled = o.status === 'cancelado';
+                    const assignedTech = (technicians || []).find(t => t.id === o.assigned_technician_id);
+                    const orderTechCommission = calculateOrderTechnicianPayout(o, assignedTech);
+                    const isOrderTechPaid = technicianPayouts.some(p => (p.order_ids || []).includes(o.id));
+
                     return (
                       <tr key={`ord-${o.id}`} className={`hover:bg-slate-50/80 transition-colors ${isCanceled ? 'bg-slate-50/50 opacity-60' : ''}`}>
                         <td className="py-3 px-4 font-mono font-bold text-cyan-700">
@@ -1332,7 +1538,7 @@ export const SalesAir: React.FC<SalesAirProps> = ({
                           </span>
                         </td>
                         <td className="py-3 px-4">
-                          <div className="space-y-0.5">
+                          <div className="space-y-1">
                             <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold capitalize ${
                               o.payment_status === 'pagado' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
                               o.payment_status === 'abono' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
@@ -1343,6 +1549,23 @@ export const SalesAir: React.FC<SalesAirProps> = ({
                             {o.payment_reference && (
                               <div className="text-[9px] font-mono text-slate-500 font-medium truncate max-w-[120px]" title={o.payment_reference}>
                                 Ref: {o.payment_reference}
+                              </div>
+                            )}
+
+                            {/* Estado del Honorario al Técnico */}
+                            {o.assigned_technician_id && !isCanceled && (
+                              <div className="pt-0.5">
+                                {isOrderTechPaid ? (
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded" title="Honorario del técnico ya liquidado">
+                                    <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                                    <span>Téc: Pagado</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded" title="Honorario del técnico pendiente de pago">
+                                    <Clock className="w-2.5 h-2.5 text-amber-600" />
+                                    <span>Téc: {formatAirPrice(orderTechCommission, currencySymbol, countryCode)}</span>
+                                  </span>
+                                )}
                               </div>
                             )}
                           </div>
@@ -1356,7 +1579,7 @@ export const SalesAir: React.FC<SalesAirProps> = ({
                           )}
                         </td>
                         <td className="py-3 px-4 text-center">
-                          <div className="flex items-center justify-center gap-1.5">
+                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
                             {/* Botón WhatsApp de Recordatorio de Cobro (NK-044) */}
                             {o.payment_status !== 'pagado' && !isCanceled && (
                               <button
@@ -1384,6 +1607,19 @@ export const SalesAir: React.FC<SalesAirProps> = ({
                               <CreditCard className="w-3.5 h-3.5" />
                               <span>{o.payment_status === 'pagado' ? 'Ver Pago' : 'Registrar Cobro'}</span>
                             </button>
+
+                            {/* Botón Liquidar Comisión a Técnico si está asignado y pendiente */}
+                            {o.assigned_technician_id && !isCanceled && !isOrderTechPaid && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenPayTechModal(o, assignedTech, orderTechCommission)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-2xs cursor-pointer transition-all"
+                                title={`Pagar comisión a ${assignedTech?.name || 'Técnico'} (${formatAirPrice(orderTechCommission, currencySymbol, countryCode)})`}
+                              >
+                                <Wallet className="w-3.5 h-3.5" />
+                                <span>Pagar Técnico</span>
+                              </button>
+                            )}
 
                             {/* Botón Eliminar Orden o Anular Cobro con Clave Admin (NK-052) */}
                             <button
@@ -1750,6 +1986,89 @@ export const SalesAir: React.FC<SalesAirProps> = ({
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 leading-relaxed focus:bg-white focus:border-cyan-500 focus:outline-none"
                 />
               </div>
+
+              {/* Sección: Liquidación de Comisión a Técnico Asignado */}
+              {(() => {
+                if (!selectedOrderForPayment.assigned_technician_id) return null;
+                const assignedTech = (technicians || []).find(t => t.id === selectedOrderForPayment.assigned_technician_id);
+                if (!assignedTech) return null;
+                const comm = calculateOrderTechnicianPayout(selectedOrderForPayment, assignedTech);
+                if (comm <= 0) return null;
+                const isPaid = technicianPayouts.some(p => (p.order_ids || []).includes(selectedOrderForPayment.id));
+
+                return (
+                  <div className={`p-3.5 rounded-xl border transition-all ${
+                    isPaid 
+                      ? 'bg-emerald-50/70 border-emerald-200' 
+                      : 'bg-gradient-to-r from-amber-50 to-orange-50/50 border-amber-200'
+                  }`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-white border border-amber-200 flex items-center justify-center text-amber-700 shadow-2xs">
+                          <Users className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="font-bold text-xs text-slate-900">
+                            Comisión Técnico: <span className="text-cyan-800">{assignedTech.name}</span>
+                          </div>
+                          <div className="text-[10px] text-slate-500">
+                            Honorario por orden: <strong className="font-mono text-emerald-700">{formatAirPrice(comm, currencySymbol, countryCode)}</strong>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        {isPaid ? (
+                          <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-300 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            <span>Honorario Pagado</span>
+                          </span>
+                        ) : (
+                          <label className="flex items-center gap-1.5 cursor-pointer bg-white px-2.5 py-1.5 rounded-xl border border-amber-300 shadow-2xs">
+                            <input
+                              type="checkbox"
+                              checked={payTechnicianAlso}
+                              onChange={(e) => setPayTechnicianAlso(e.target.checked)}
+                              className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                            />
+                            <span className="text-[11px] font-bold text-slate-800 select-none">
+                              Liquidar al técnico ahora
+                            </span>
+                          </label>
+                        )}
+                      </div>
+                    </div>
+
+                    {!isPaid && payTechnicianAlso && (
+                      <div className="mt-2.5 pt-2 border-t border-amber-200/80 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                        <div>
+                          <span className="text-slate-500 block mb-0.5 font-medium">Método Pago al Técnico:</span>
+                          <select
+                            value={payTechMethod}
+                            onChange={(e) => setPayTechMethod(e.target.value as any)}
+                            className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-semibold focus:outline-none"
+                          >
+                            <option value="transferencia">Transferencia Bancaria</option>
+                            <option value="efectivo">Efectivo</option>
+                            <option value="sinpe_movil">SINPE Móvil</option>
+                            <option value="otro">Otro</option>
+                          </select>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 block mb-0.5 font-medium">Ref / Voucher Técnico:</span>
+                          <input
+                            type="text"
+                            placeholder="Ej: Transf. N° 98124"
+                            value={payTechReference}
+                            onChange={(e) => setPayTechReference(e.target.value)}
+                            className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               <div className="pt-3 flex items-center justify-between gap-2.5 border-t border-slate-100">
                 {selectedOrderForPayment.payment_status !== 'pendiente' ? (
@@ -2553,6 +2872,162 @@ export const SalesAir: React.FC<SalesAirProps> = ({
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>{isDeletingMovement ? 'Procesando...' : (movementToDelete.type === 'expense' ? 'Eliminar Gasto' : (deleteMode === 'cancel_payment' ? 'Confirmar Anulación' : 'Confirmar Eliminación'))}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para Liquidar Honorario a Técnico Directamente desde Ventas */}
+      {payingTechOrder && payingTechStaff && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setPayingTechOrder(null);
+              setPayingTechStaff(null);
+            }
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 space-y-4 my-auto cursor-default text-slate-900"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-500/30 text-emerald-600 flex items-center justify-center shadow-xs">
+                  <Wallet className="w-5 h-5 stroke-[2.2]" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
+                    Liquidar Comisión a Técnico
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200 font-mono font-bold">
+                      {payingTechOrder.ticket_number}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Colaborador: <strong className="text-slate-800">{payingTechStaff.name}</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPayingTechOrder(null);
+                  setPayingTechStaff(null);
+                }}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Resumen del Servicio */}
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs">
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Cliente:</span>
+                <strong className="text-slate-800">{payingTechOrder.customer?.name}</strong>
+              </div>
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Servicio:</span>
+                <span className="capitalize font-medium text-slate-700">{formatServiceType(payingTechOrder.service_type)}</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Total Facturado a Cliente:</span>
+                <span className="font-mono font-bold text-slate-800">{formatAirPrice(payingTechOrder.total, currencySymbol, countryCode)}</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleConfirmPayTech} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-700 font-bold block mb-1">Monto de Comisión a Liquidar ({currencySymbol}) *</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 font-bold text-slate-400">{currencySymbol}</span>
+                    <input
+                      type="number"
+                      value={payTechAmount === 0 ? '' : payTechAmount}
+                      placeholder="0"
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => setPayTechAmount(parseFloat(e.target.value) || 0)}
+                      className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-black text-sm focus:bg-white focus:border-cyan-500 focus:outline-none"
+                      required
+                      min="1"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-slate-700 font-bold block mb-1">Método de Pago *</label>
+                  <select
+                    value={payTechMethod}
+                    onChange={(e) => setPayTechMethod(e.target.value as any)}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:bg-white focus:border-cyan-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value="transferencia">Transferencia Bancaria</option>
+                    <option value="efectivo">Efectivo en Terreno</option>
+                    <option value="sinpe_movil">SINPE Móvil / Pago Móvil</option>
+                    <option value="cheque">Cheque</option>
+                    <option value="otro">Otro</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-700 font-semibold block mb-1">N° Comprobante / Referencia Transferencia:</label>
+                  <input
+                    type="text"
+                    placeholder="Ej: Transf. N° 98124"
+                    value={payTechReference}
+                    onChange={(e) => setPayTechReference(e.target.value)}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:border-cyan-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-700 font-semibold block mb-1">Fecha de Pago al Técnico:</label>
+                  <input
+                    type="date"
+                    value={payTechDate}
+                    onChange={(e) => setPayTechDate(e.target.value)}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:bg-white focus:border-cyan-500 focus:outline-none"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-700 font-semibold block mb-1">Observaciones / Notas de la Liquidación:</label>
+                <textarea
+                  rows={2}
+                  value={payTechNotes}
+                  onChange={(e) => setPayTechNotes(e.target.value)}
+                  placeholder="Detalles de la transferencia o pago..."
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 leading-relaxed focus:bg-white focus:border-cyan-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={isSubmittingTechPayout}
+                  onClick={() => {
+                    setPayingTechOrder(null);
+                    setPayingTechStaff(null);
+                  }}
+                  className="px-4 py-2 rounded-xl text-slate-500 hover:text-slate-800 text-xs font-semibold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingTechPayout || payTechAmount <= 0}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 disabled:opacity-50 transition-all cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{isSubmittingTechPayout ? 'Registrando...' : 'Confirmar Pago a Técnico'}</span>
                 </button>
               </div>
             </form>
