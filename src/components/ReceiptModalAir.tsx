@@ -28,7 +28,8 @@ import {
   Layers,
   Download,
   Copy,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Camera
 } from 'lucide-react';
 
 interface ReceiptModalAirProps {
@@ -480,6 +481,71 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Evidencia Fotográfica Antes y Después (Muestra del Trabajo Realizado) */}
+          {((order.checklist?.photos_before?.length || 0) > 0 || (order.checklist?.photos_after?.length || 0) > 0) && (
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 uppercase tracking-wide">
+                  <Camera className="w-3.5 h-3.5 text-cyan-600" />
+                  <span>Registro Fotográfico del Servicio • Muestra del Trabajo</span>
+                </div>
+                <span className="text-[10px] text-slate-500 font-medium">
+                  Evidencia visual de estado inicial y entrega
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Columna Antes */}
+                <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 pb-1 border-b border-slate-100">
+                    <span>🔍 Estado Inicial (Antes)</span>
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      {(order.checklist?.photos_before || []).length} {((order.checklist?.photos_before || []).length === 1) ? 'foto' : 'fotos'}
+                    </span>
+                  </div>
+                  {(order.checklist?.photos_before || []).length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {(order.checklist?.photos_before || []).slice(0, 4).map((url, i) => (
+                        <div key={`rec-pb-${i}`} className="relative w-20 h-14 rounded-lg overflow-hidden border border-slate-200 bg-slate-900 group shrink-0">
+                          <img src={url} alt={`Antes ${i + 1}`} className="w-full h-full object-cover" />
+                          <span className="absolute bottom-0.5 right-0.5 bg-black/70 text-white text-[8px] px-1 rounded font-mono font-bold">
+                            A{i + 1}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-400 italic py-2 text-center">Sin fotos iniciales</p>
+                  )}
+                </div>
+
+                {/* Columna Después */}
+                <div className="p-2.5 rounded-xl bg-emerald-50/50 border border-emerald-200 space-y-2">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-emerald-800 pb-1 border-b border-emerald-100">
+                    <span>✨ Resultado Final (Después)</span>
+                    <span className="text-[10px] text-emerald-600 font-normal">
+                      {(order.checklist?.photos_after || []).length} {((order.checklist?.photos_after || []).length === 1) ? 'foto' : 'fotos'}
+                    </span>
+                  </div>
+                  {(order.checklist?.photos_after || []).length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {(order.checklist?.photos_after || []).slice(0, 4).map((url, i) => (
+                        <div key={`rec-pa-${i}`} className="relative w-20 h-14 rounded-lg overflow-hidden border border-emerald-300 bg-slate-900 group shrink-0">
+                          <img src={url} alt={`Después ${i + 1}`} className="w-full h-full object-cover" />
+                          <span className="absolute bottom-0.5 right-0.5 bg-emerald-800/80 text-white text-[8px] px-1 rounded font-mono font-bold">
+                            D{i + 1}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-emerald-700/60 italic py-2 text-center">Sin fotos de entrega final</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Financial Breakdown Table (NK-039: Selectable IVA) */}
           {(() => {

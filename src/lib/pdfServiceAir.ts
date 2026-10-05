@@ -36,10 +36,17 @@ async function waitForImages(container: HTMLElement): Promise<void> {
   const imgs = Array.from(container.querySelectorAll('img'));
   await Promise.all(
     imgs.map((img) => {
-      if (img.complete) return Promise.resolve();
+      if (img.complete && img.naturalHeight !== 0) return Promise.resolve();
       return new Promise<void>((resolve) => {
-        img.onload = () => resolve();
-        img.onerror = () => resolve();
+        const timer = setTimeout(() => resolve(), 3500);
+        img.onload = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+        img.onerror = () => {
+          clearTimeout(timer);
+          resolve();
+        };
       });
     })
   );
@@ -314,6 +321,12 @@ export function buildReceiptHtml(order: ServiceOrder, settings: AirSettings): st
   const psiLowFinal = order.checklist?.psi_low_final ? `${order.checklist.psi_low_final} PSI` : (order.checklist?.suction_pressure_psi ? `${order.checklist.suction_pressure_psi} PSI` : '—');
   const deltaT = order.checklist?.delta_t_celsius ? `${order.checklist.delta_t_celsius}°C` : (order.checklist?.capacitance_mfd ? `${order.checklist.capacitance_mfd} µF` : 'Conforme');
 
+  const photosBefore = (Array.isArray(order.checklist?.photos_before) ? order.checklist.photos_before : [])
+    .filter(url => typeof url === 'string' && url.trim().length > 0);
+  const photosAfter = (Array.isArray(order.checklist?.photos_after) ? order.checklist.photos_after : [])
+    .filter(url => typeof url === 'string' && url.trim().length > 0);
+  const hasWorkPhotos = photosBefore.length > 0 || photosAfter.length > 0;
+
   const statusBadgeLabel = order.payment_status === 'pagado' ? 'PAGADO ✓' : (order.payment_status === 'abono' ? 'ABONO PARCIAL' : 'PENDIENTE');
   const statusBadgeStyle = order.payment_status === 'pagado' 
     ? 'background: #dcfce7; color: #166534; border: 1px solid #86efac;'
@@ -566,6 +579,98 @@ export function buildReceiptHtml(order: ServiceOrder, settings: AirSettings): st
           </table>
         </div>
       </div>
+
+      <!-- REGISTRO FOTOGRÁFICO ANTES Y DESPUÉS (MUESTRA DEL TRABAJO REALIZADO) -->
+      ${hasWorkPhotos ? `
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 8px 12px; margin-bottom: 12px; box-sizing: border-box;">
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 6px;">
+            <tr>
+              <td style="font-size: 9.5px; font-weight: 800; color: #334155; text-transform: uppercase;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px; display: inline-block;">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                  <circle cx="12" cy="13" r="4"/>
+                </svg>
+                <span style="vertical-align: middle;">REGISTRO FOTOGRÁFICO • MUESTRA DEL TRABAJO REALIZADO</span>
+              </td>
+              <td style="text-align: right; font-size: 8.5px; font-weight: 700; color: #0284c7; text-transform: uppercase;">
+                Control de Calidad HVAC
+              </td>
+            </tr>
+          </table>
+
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <!-- Columna Antes -->
+              <td style="width: 50%; vertical-align: top; padding-right: 5px;">
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 6px 8px; box-sizing: border-box;">
+                  <table style="width: 100%; border-collapse: collapse; margin-bottom: 5px;">
+                    <tr>
+                      <td style="font-size: 8.5px; font-weight: 800; color: #475569; text-transform: uppercase;">
+                        🔍 ESTADO INICIAL (ANTES)
+                      </td>
+                      <td style="text-align: right; font-size: 8px; font-weight: 700; color: #94a3b8;">
+                        ${photosBefore.length} ${photosBefore.length === 1 ? 'FOTO' : 'FOTOS'}
+                      </td>
+                    </tr>
+                  </table>
+                  ${photosBefore.length > 0 ? `
+                    <table style="border-collapse: separate; border-spacing: 5px; margin: 0 auto 0 0;">
+                      <tr>
+                        ${photosBefore.slice(0, 4).map((url, idx) => `
+                          <td style="padding: 0; vertical-align: top;">
+                            <div style="width: 74px; height: 54px; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e1; background: #0f172a; position: relative;">
+                              <img crossorigin="anonymous" src="${url}" alt="Antes ${idx + 1}" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+                              <div style="position: absolute; bottom: 1.5px; right: 1.5px; background: rgba(15,23,42,0.75); color: #ffffff; font-size: 7px; font-weight: 800; padding: 0.5px 3px; border-radius: 3px; font-family: monospace;">A${idx + 1}</div>
+                            </div>
+                          </td>
+                        `).join('')}
+                      </tr>
+                    </table>
+                  ` : `
+                    <div style="font-size: 8px; color: #94a3b8; font-style: italic; padding: 16px 0; text-align: center;">
+                      Sin fotografías de estado inicial
+                    </div>
+                  `}
+                </div>
+              </td>
+
+              <!-- Columna Después -->
+              <td style="width: 50%; vertical-align: top; padding-left: 5px;">
+                <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 6px 8px; box-sizing: border-box;">
+                  <table style="width: 100%; border-collapse: collapse; margin-bottom: 5px;">
+                    <tr>
+                      <td style="font-size: 8.5px; font-weight: 800; color: #166534; text-transform: uppercase;">
+                        ✨ RESULTADO FINAL (DESPUÉS)
+                      </td>
+                      <td style="text-align: right; font-size: 8px; font-weight: 700; color: #15803d;">
+                        ${photosAfter.length} ${photosAfter.length === 1 ? 'FOTO' : 'FOTOS'}
+                      </td>
+                    </tr>
+                  </table>
+                  ${photosAfter.length > 0 ? `
+                    <table style="border-collapse: separate; border-spacing: 5px; margin: 0 auto 0 0;">
+                      <tr>
+                        ${photosAfter.slice(0, 4).map((url, idx) => `
+                          <td style="padding: 0; vertical-align: top;">
+                            <div style="width: 74px; height: 54px; border-radius: 6px; overflow: hidden; border: 1px solid #86efac; background: #0f172a; position: relative;">
+                              <img crossorigin="anonymous" src="${url}" alt="Después ${idx + 1}" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+                              <div style="position: absolute; bottom: 1.5px; right: 1.5px; background: rgba(22,101,52,0.85); color: #ffffff; font-size: 7px; font-weight: 800; padding: 0.5px 3px; border-radius: 3px; font-family: monospace;">D${idx + 1}</div>
+                            </div>
+                          </td>
+                        `).join('')}
+                      </tr>
+                    </table>
+                  ` : `
+                    <div style="font-size: 8px; color: #15803d; font-style: italic; padding: 16px 0; text-align: center;">
+                      Sin fotografías de entrega final
+                    </div>
+                  `}
+                </div>
+              </td>
+            </tr>
+          </table>
+        </div>
+      ` : ''}
 
       <!-- TABLA DE CONCEPTOS Y VALORES (CARD ELEGANTE IMAGEN 2) -->
       <div style="border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; margin-bottom: 12px; background: #ffffff;">
