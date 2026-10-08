@@ -784,9 +784,15 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
             email: t.email,
             role: t.role || local.role || 'tecnico',
             custom_role_title: t.custom_role_title || local.custom_role_title,
-            salary_mode: t.salary_mode || local.salary_mode || ((t.role === 'ayudante' || t.role === 'administracion') ? 'fixed' : 'commission'),
-            base_salary: t.base_salary !== undefined ? Number(t.base_salary) : (local.base_salary !== undefined ? Number(local.base_salary) : (t.role === 'ayudante' ? 600000 : (t.role === 'administracion' ? 750000 : 0))),
-            working_days_default: t.working_days_default || local.working_days_default || 30,
+            salary_mode: t.salary_mode || local.salary_mode || (t.role === 'administracion' ? 'fixed' : 'commission'),
+            base_salary: (t.salary_mode === 'commission' || local.salary_mode === 'commission')
+              ? 0
+              : (t.base_salary !== null && t.base_salary !== undefined 
+                  ? Number(t.base_salary) 
+                  : (local.base_salary !== null && local.base_salary !== undefined 
+                      ? Number(local.base_salary) 
+                      : (t.role === 'administracion' ? 750000 : 0))),
+            working_days_default: t.working_days_default !== null && t.working_days_default !== undefined ? Number(t.working_days_default) : (local.working_days_default || 30),
             sec_certified: t.sec_certified ?? true,
             status: t.active ? 'disponible' : 'inactivo',
             default_commission_type: t.default_commission_type || 'fixed',
@@ -2198,8 +2204,10 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       status: techData.status || 'disponible',
       role: techData.role || 'tecnico',
       custom_role_title: techData.custom_role_title,
-      salary_mode: techData.salary_mode || ((techData.role === 'ayudante' || techData.role === 'administracion') ? 'fixed' : 'commission'),
-      base_salary: techData.base_salary !== undefined ? Number(techData.base_salary) : (techData.role === 'ayudante' ? 600000 : (techData.role === 'administracion' ? 750000 : 0)),
+      salary_mode: techData.salary_mode || (techData.role === 'administracion' ? 'fixed' : 'commission'),
+      base_salary: (techData.salary_mode === 'commission') 
+        ? 0 
+        : (techData.base_salary !== undefined ? Number(techData.base_salary) : (techData.role === 'administracion' ? 750000 : 0)),
       working_days_default: techData.working_days_default || 30,
       default_commission_type: techData.default_commission_type || 'fixed',
       default_commission_value: techData.default_commission_value !== undefined ? Number(techData.default_commission_value) : 20000,
@@ -2230,6 +2238,10 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         phone: techData.phone,
         rut: techData.rut,
         role: newTech.role,
+        custom_role_title: newTech.custom_role_title || null,
+        salary_mode: newTech.salary_mode || 'commission',
+        base_salary: newTech.base_salary ?? 0,
+        working_days_default: newTech.working_days_default ?? 30,
         sec_certified: techData.sec_certified ?? (newTech.role === 'tecnico'),
         active: true,
         default_commission_type: newTech.default_commission_type,
@@ -2265,6 +2277,12 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       if (updates.email !== undefined) dbUpdates.email = updates.email;
       if (updates.rut !== undefined) dbUpdates.rut = updates.rut;
       if (updates.role !== undefined) dbUpdates.role = updates.role;
+      if (updates.custom_role_title !== undefined) dbUpdates.custom_role_title = updates.custom_role_title || null;
+      if (updates.salary_mode !== undefined) dbUpdates.salary_mode = updates.salary_mode;
+      if (updates.base_salary !== undefined) {
+        dbUpdates.base_salary = updates.salary_mode === 'commission' ? 0 : Number(updates.base_salary);
+      }
+      if (updates.working_days_default !== undefined) dbUpdates.working_days_default = Number(updates.working_days_default);
       if (updates.sec_certified !== undefined) dbUpdates.sec_certified = updates.sec_certified;
       if (updates.status !== undefined) dbUpdates.active = updates.status === 'disponible';
       if (updates.default_commission_type !== undefined) dbUpdates.default_commission_type = updates.default_commission_type;
