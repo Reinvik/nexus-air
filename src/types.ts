@@ -556,7 +556,9 @@ export type ExpenseCategory =
   | 'servicios_basicos' 
   | 'marketing' 
   | 'impuestos_tasas' 
-  | 'otro';
+  | 'proveedores'
+  | 'otro'
+  | (string & {});
 
 export interface Expense {
   id: string;

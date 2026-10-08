@@ -49,7 +49,8 @@ import {
   RefreshCw,
   Globe,
   Eye,
-  Info
+  Info,
+  Tag
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -67,7 +68,7 @@ interface FinanceModuleAirProps {
   onUpdateFinanceSettings: (newSettings: Partial<FinanceSettings>) => void;
 }
 
-const CATEGORY_LABELS: Record<ExpenseCategory, { label: string; icon: React.ElementType; color: string }> = {
+const CATEGORY_LABELS: Record<string, { label: string; icon: React.ElementType; color: string }> = {
   combustible: { label: 'Combustible & Vehículos', icon: Truck, color: 'text-amber-500 bg-amber-500/10' },
   repuestos_insumos: { label: 'Repuestos & Tuberías', icon: Wrench, color: 'text-cyan-500 bg-cyan-500/10' },
   herramientas: { label: 'Herramientas & Manómetros', icon: Snowflake, color: 'text-blue-500 bg-blue-500/10' },
@@ -76,6 +77,7 @@ const CATEGORY_LABELS: Record<ExpenseCategory, { label: string; icon: React.Elem
   servicios_basicos: { label: 'Servicios Básicos (Luz/Agua)', icon: Flame, color: 'text-rose-500 bg-rose-500/10' },
   marketing: { label: 'Marketing & Publicidad', icon: Sparkles, color: 'text-pink-500 bg-pink-500/10' },
   impuestos_tasas: { label: 'Impuestos & Patentes', icon: Receipt, color: 'text-slate-400 bg-slate-500/10' },
+  proveedores: { label: 'Pago a Proveedores', icon: Building2, color: 'text-indigo-600 bg-indigo-500/10' },
   otro: { label: 'Otros Gastos Operativos', icon: HelpCircle, color: 'text-indigo-400 bg-indigo-500/10' },
 };
 
@@ -152,6 +154,60 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
   // Filtros de egresos
   const [expenseSearch, setExpenseSearch] = useState('');
   const [expenseCategoryFilter, setExpenseCategoryFilter] = useState<string>('all');
+
+  // Categorías personalizadas creadas por el usuario (NK-112)
+  const [customCategories, setCustomCategories] = useState<{ id: string; label: string }[]>(() => {
+    try {
+      const saved = localStorage.getItem(`nexus_air_custom_categories_${settings.id || 'default'}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [newCategoryLabel, setNewCategoryLabel] = useState('');
+
+  const handleAddNewCategory = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = newCategoryLabel.trim();
+    if (!trimmed) {
+      toast.error('Ingresa el nombre de la categoría');
+      return;
+    }
+    const slug = trimmed.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9_]/g, "_");
+    
+    // Si ya existe
+    if (CATEGORY_LABELS[slug] || customCategories.some(c => c.id === slug)) {
+      setExpCategory(slug);
+      setIsCreatingCategory(false);
+      setNewCategoryLabel('');
+      toast.success(`Categoría "${trimmed}" seleccionada`);
+      return;
+    }
+
+    const updated = [...customCategories, { id: slug, label: trimmed }];
+    setCustomCategories(updated);
+    try {
+      localStorage.setItem(`nexus_air_custom_categories_${settings.id || 'default'}`, JSON.stringify(updated));
+    } catch {}
+
+    setExpCategory(slug);
+    setIsCreatingCategory(false);
+    setNewCategoryLabel('');
+    toast.success(`Nueva categoría "${trimmed}" agregada`);
+  };
+
+  const getCategoryDetails = (cat: string) => {
+    if (CATEGORY_LABELS[cat]) {
+      return CATEGORY_LABELS[cat];
+    }
+    const custom = customCategories.find(c => c.id === cat);
+    return {
+      label: custom ? custom.label : cat.charAt(0).toUpperCase() + cat.slice(1).replace(/_/g, ' '),
+      icon: Tag,
+      color: 'text-cyan-700 bg-cyan-50 border border-cyan-200'
+    };
+  };
 
   // Modal de configuración de país / tipo de cambio (NK-049)
   const [showCountrySettingsModal, setShowCountrySettingsModal] = useState(false);
@@ -522,6 +578,8 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
     setExpInvoiceNumber('');
     setExpIsFixed(false);
     setExpStatus('pagado');
+    setIsCreatingCategory(false);
+    setNewCategoryLabel('');
     setShowAddExpenseModal(true);
   };
 
@@ -536,6 +594,8 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
     setExpInvoiceNumber(exp.invoice_number || '');
     setExpIsFixed(Boolean(exp.is_fixed));
     setExpStatus(exp.status);
+    setIsCreatingCategory(false);
+    setNewCategoryLabel('');
     setShowAddExpenseModal(true);
   };
 
@@ -1355,12 +1415,21 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
               <select
                 value={expenseCategoryFilter}
                 onChange={(e) => setExpenseCategoryFilter(e.target.value)}
-                className="text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-cyan-500"
+                className="text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-cyan-500 font-medium"
               >
                 <option value="all">Todas las categorías</option>
-                {Object.entries(CATEGORY_LABELS).map(([catKey, catInfo]) => (
-                  <option key={catKey} value={catKey}>{catInfo.label}</option>
-                ))}
+                <optgroup label="Categorías Estándar">
+                  {Object.entries(CATEGORY_LABELS).map(([catKey, catInfo]) => (
+                    <option key={catKey} value={catKey}>{catInfo.label}</option>
+                  ))}
+                </optgroup>
+                {customCategories.length > 0 && (
+                  <optgroup label="Mis Categorías Personalizadas">
+                    {customCategories.map((c) => (
+                      <option key={c.id} value={c.id}>{c.label}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </div>
           </div>
@@ -1384,7 +1453,7 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                 <tbody className="divide-y divide-slate-100">
                   {filteredExpenses.length > 0 ? (
                     filteredExpenses.map((exp) => {
-                      const catInfo = CATEGORY_LABELS[exp.category] || CATEGORY_LABELS.otro;
+                      const catInfo = getCategoryDetails(exp.category);
                       const IconComp = catInfo.icon;
 
                       return (
@@ -1393,7 +1462,7 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                             {exp.date}
                           </td>
                           <td className="p-3.5">
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${catInfo.color}`}>
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${catInfo.color}`}>
                               <IconComp className="w-3 h-3" />
                               {catInfo.label}
                             </span>
@@ -1749,16 +1818,77 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
             <div className="space-y-3 text-xs max-h-[65vh] overflow-y-auto pr-1">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Categoría HVAC</label>
-                  <select
-                    value={expCategory}
-                    onChange={(e) => setExpCategory(e.target.value as ExpenseCategory)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium"
-                  >
-                    {Object.entries(CATEGORY_LABELS).map(([catKey, catInfo]) => (
-                      <option key={catKey} value={catKey}>{catInfo.label}</option>
-                    ))}
-                  </select>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-slate-700">Categoría HVAC</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCreatingCategory(!isCreatingCategory);
+                        setNewCategoryLabel('');
+                      }}
+                      className="text-[10px] font-bold text-cyan-600 hover:text-cyan-800 flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>{isCreatingCategory ? 'Volver al listado' : '+ Nueva'}</span>
+                    </button>
+                  </div>
+
+                  {isCreatingCategory ? (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          placeholder="Ej: Pago Proveedores, Extra..."
+                          value={newCategoryLabel}
+                          onChange={(e) => setNewCategoryLabel(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddNewCategory();
+                            }
+                          }}
+                          className="w-full p-2 bg-slate-50 border border-cyan-400 rounded-xl text-slate-900 font-medium text-xs focus:outline-none"
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddNewCategory}
+                          className="px-2.5 py-2 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-xl text-xs shrink-0 cursor-pointer shadow-xs"
+                        >
+                          Crear
+                        </button>
+                      </div>
+                      <span className="text-[9px] text-slate-400 block leading-tight">
+                        Crea y asigna la categoría inmediatamente.
+                      </span>
+                    </div>
+                  ) : (
+                    <select
+                      value={expCategory}
+                      onChange={(e) => {
+                        if (e.target.value === '__new__') {
+                          setIsCreatingCategory(true);
+                        } else {
+                          setExpCategory(e.target.value);
+                        }
+                      }}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium"
+                    >
+                      <optgroup label="Categorías Estándar">
+                        {Object.entries(CATEGORY_LABELS).map(([catKey, catInfo]) => (
+                          <option key={catKey} value={catKey}>{catInfo.label}</option>
+                        ))}
+                      </optgroup>
+                      {customCategories.length > 0 && (
+                        <optgroup label="Mis Categorías Personalizadas">
+                          {customCategories.map((c) => (
+                            <option key={c.id} value={c.id}>{c.label}</option>
+                          ))}
+                        </optgroup>
+                      )}
+                      <option value="__new__">+ Crear nueva categoría...</option>
+                    </select>
+                  )}
                 </div>
 
                 <div>
