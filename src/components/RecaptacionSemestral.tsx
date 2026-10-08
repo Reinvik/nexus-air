@@ -22,6 +22,9 @@ import {
   Copy,
   ExternalLink,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Layers,
   Settings as SettingsIcon,
   X
 } from 'lucide-react';
@@ -29,6 +32,20 @@ import { format, parseISO, differenceInDays } from 'date-fns';
 import { toast } from 'react-hot-toast';
 
 export type RecaptacionTab = 'preventive' | 'quality' | 'recovery';
+
+export interface GroupedCustomerReminder {
+  key: string;
+  customer_id: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_email?: string;
+  customer_address: string;
+  customer_commune: string;
+  items: RecaptacionReminder[];
+  mostUrgentItem: RecaptacionReminder;
+  consolidatedStatus: 'vencido' | 'por_vencer' | 'contactado' | 'al_dia';
+  totalEquipments: number;
+}
 
 interface RecaptacionSemestralProps {
   reminders: RecaptacionReminder[];
@@ -123,7 +140,93 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
     };
   }, [reminders, settings.maintenance_interval_months, settings.quality_control_days, settings.inactive_recovery_months]);
 
-  // Lista activa según pestaña
+  // Estado de expansión de acordeón de clientes con múltiples equipos (NK-111)
+  const [expandedCustomerKeys, setExpandedCustomerKeys] = useState<Set<string>>(new Set());
+
+  const toggleExpandCustomer = (key: string) => {
+    setExpandedCustomerKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  // Agrupación de recordatorios por cliente para no repetir filas (NK-111)
+  const groupedCustomers = useMemo(() => {
+    let list = categorized[activeTab] || [];
+
+    // Agrupar por customer_id o customer_name
+    const map = new Map<string, RecaptacionReminder[]>();
+    for (const item of list) {
+      const key = (item.customer_id && item.customer_id.trim() !== '')
+        ? item.customer_id
+        : item.customer_name.trim().toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, []);
+      }
+      map.get(key)!.push(item);
+    }
+
+    const groups: GroupedCustomerReminder[] = [];
+
+    map.forEach((items, key) => {
+      // Ordenar equipos dentro del cliente: el más próximo / urgente primero (menor days_until_due)
+      items.sort((a, b) => a.days_until_due - b.days_until_due);
+      const mostUrgent = items[0];
+
+      let consolidatedStatus: 'vencido' | 'por_vencer' | 'contactado' | 'al_dia' = 'al_dia';
+      if (items.some(i => i.status === 'vencido')) {
+        consolidatedStatus = 'vencido';
+      } else if (items.some(i => i.status === 'por_vencer')) {
+        consolidatedStatus = 'por_vencer';
+      } else if (items.some(i => i.status === 'contactado')) {
+        consolidatedStatus = 'contactado';
+      }
+
+      groups.push({
+        key,
+        customer_id: mostUrgent.customer_id,
+        customer_name: mostUrgent.customer_name,
+        customer_phone: mostUrgent.customer_phone,
+        customer_email: mostUrgent.customer_email,
+        customer_address: mostUrgent.customer_address,
+        customer_commune: mostUrgent.customer_commune,
+        items,
+        mostUrgentItem: mostUrgent,
+        consolidatedStatus,
+        totalEquipments: items.length,
+      });
+    });
+
+    let filtered = groups;
+
+    // Filtro por estado en pestaña preventiva
+    if (activeTab === 'preventive' && filterStatus !== 'all') {
+      filtered = filtered.filter(g => g.items.some(i => i.status === filterStatus));
+    }
+
+    // Filtro por búsqueda
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(g =>
+        g.customer_name.toLowerCase().includes(term) ||
+        g.customer_commune.toLowerCase().includes(term) ||
+        g.customer_address.toLowerCase().includes(term) ||
+        g.items.some(i =>
+          i.equipment_brand.toLowerCase().includes(term) ||
+          i.equipment_location.toLowerCase().includes(term)
+        )
+      );
+    }
+
+    // Ordenar clientes por urgencia del equipo más próximo
+    filtered.sort((a, b) => a.mostUrgentItem.days_until_due - b.mostUrgentItem.days_until_due);
+
+    return filtered;
+  }, [categorized, activeTab, filterStatus, searchTerm]);
+
+  // Lista activa según pestaña (referencia plana)
   const currentList = useMemo(() => {
     let list = categorized[activeTab] || [];
 
@@ -194,11 +297,55 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
     return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
   };
 
+  // WhatsApp para clientes con múltiples equipos (NK-111)
+  const buildWhatsAppUrlForGroup = (group: GroupedCustomerReminder, stage: RecaptacionTab) => {
+    if (group.totalEquipments === 1) {
+      return buildWhatsAppUrlForStage(group.mostUrgentItem, stage);
+    }
+
+    const cleanPhone = group.customer_phone.replace(/[^0-9]/g, '');
+    const companyName = settings.fantasy_name || settings.company_name || 'Nexus Air';
+    const equiposTexto = group.items
+      .map(i => `• ${i.equipment_brand} ${i.equipment_btu ? `${i.equipment_btu.toLocaleString()} BTU` : ''} (${i.equipment_location || 'Ubicación'})`)
+      .join('\n');
+
+    let text = '';
+    if (stage === 'quality') {
+      text = `Hola ${group.customer_name}, te saludamos de *${companyName}* ❄️\n\n` +
+        `Queríamos confirmar cómo han estado funcionando tus equipos tras las visitas técnicas recientes:\n` +
+        `${equiposTexto}\n\n` +
+        `¿Están enfriando a la perfección? Queremos asegurarnos de que el servicio haya sido de 5 estrellas ⭐️⭐️⭐️⭐️⭐️.\n\n` +
+        `¡Quedamos atentos a cualquier consulta!`;
+    } else if (stage === 'recovery') {
+      const recMonths = settings.inactive_recovery_months || 9;
+      text = `Hola ${group.customer_name}, te escribimos de *${companyName}* ❄️\n\n` +
+        `Revisando nuestros registros notamos que tus equipos llevan más de ${recMonths} meses sin su mantenimiento periódico:\n` +
+        `${equiposTexto}\n\n` +
+        `Para cuidar el rendimiento y ahorrar electricidad, tenemos un *15% de descuento especial por mantenimiento de flota/múltiples equipos* durante esta semana.\n\n` +
+        `¿Te gustaría que coordinemos la visita de nuestros técnicos?`;
+    } else {
+      text = `Hola ${group.customer_name}, te saludamos de *${companyName}* ❄️\n\n` +
+        `Te escribimos para recordarte que corresponde coordinar el mantenimiento preventivo de tus equipos de climatización:\n` +
+        `${equiposTexto}\n\n` +
+        `El equipo con vencimiento más próximo es *${group.mostUrgentItem.equipment_brand}* (${group.mostUrgentItem.equipment_location}), programado para *${group.mostUrgentItem.next_maintenance_due}*.\n\n` +
+        `Podemos realizar el servicio a todos tus equipos en una sola visita para tu mayor comodidad. ¿Qué día te acomodaría agendar?`;
+    }
+
+    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
+  };
+
   const handleOpenWhatsApp = (reminder: RecaptacionReminder) => {
     const url = buildWhatsAppUrlForStage(reminder, activeTab);
     window.open(url, '_blank');
     onMarkContacted(reminder.equipment_id);
     toast.success('WhatsApp abierto y contacto registrado');
+  };
+
+  const handleOpenWhatsAppGroup = (group: GroupedCustomerReminder) => {
+    const url = buildWhatsAppUrlForGroup(group, activeTab);
+    window.open(url, '_blank');
+    group.items.forEach(i => onMarkContacted(i.equipment_id));
+    toast.success(`WhatsApp abierto para ${group.customer_name} (${group.totalEquipments} equipos) y contacto registrado`);
   };
 
   return (
@@ -496,144 +643,303 @@ export const RecaptacionSemestral: React.FC<RecaptacionSemestralProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {currentList.length === 0 ? (
+              {groupedCustomers.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-slate-400">
                     No se encontraron registros para esta etapa de recaptación.
                   </td>
                 </tr>
               ) : (
-                currentList.map((r) => {
+                groupedCustomers.map((group) => {
+                  const isExpanded = expandedCustomerKeys.has(group.key);
                   const intervalDays = (settings.maintenance_interval_months || 6) * 30;
-                  const daysSinceService = Math.max(0, intervalDays - r.days_until_due);
+                  const daysSinceService = Math.max(0, intervalDays - group.mostUrgentItem.days_until_due);
+
                   return (
-                    <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
-                      {/* Cliente */}
-                      <td className="py-3.5 px-4">
-                        <div className="font-bold text-slate-900 text-sm">{r.customer_name}</div>
-                        <div className="text-[11px] text-slate-500 truncate max-w-[200px]">
-                          {r.customer_address}, {r.customer_commune}
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-mono">{r.customer_phone}</div>
-                      </td>
-
-                      {/* Equipo */}
-                      <td className="py-3.5 px-4">
-                        <div className="font-bold text-cyan-700">
-                          {r.equipment_brand} {r.equipment_btu.toLocaleString()} BTU
-                        </div>
-                        <div className="text-[11px] text-slate-500 flex items-center gap-1">
-                          <span>📍 {r.equipment_location}</span>
-                        </div>
-                      </td>
-
-                      {/* Último Servicio */}
-                      <td className="py-3.5 px-4 text-slate-700 font-mono">
-                        <div className="font-semibold">{r.last_service_date}</div>
-                        <span className="text-[10px] text-slate-400 capitalize">
-                          {r.last_service_type.replace('_', ' ')}
-                        </span>
-                      </td>
-
-                      {/* Vencimiento / Días */}
-                      <td className="py-3.5 px-4 font-mono">
-                        {activeTab === 'quality' ? (
-                          <div>
-                            <span className="font-bold text-amber-700">{daysSinceService} días transcurridos</span>
-                            <div className="text-[10px] text-slate-400">Momento óptimo para feedback</div>
+                    <React.Fragment key={group.key}>
+                      <tr className={`hover:bg-slate-50/80 transition-colors ${isExpanded ? 'bg-cyan-50/20' : ''}`}>
+                        {/* Cliente & Contacto */}
+                        <td className="py-3.5 px-4">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-bold text-slate-900 text-sm">{group.customer_name}</span>
+                            {group.totalEquipments > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => toggleExpandCustomer(group.key)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-50 hover:bg-cyan-100 text-cyan-800 border border-cyan-200 cursor-pointer transition-colors"
+                                title="Clic para desplegar u ocultar equipos"
+                              >
+                                <Layers className="w-3 h-3 text-cyan-600" />
+                                <span>{group.totalEquipments} equipos</span>
+                                {isExpanded ? <ChevronUp className="w-3 h-3 text-cyan-700" /> : <ChevronDown className="w-3 h-3 text-cyan-700" />}
+                              </button>
+                            )}
                           </div>
-                        ) : activeTab === 'recovery' ? (
-                          <div>
-                            <span className="font-bold text-rose-700">{Math.abs(r.days_until_due)} días de retraso</span>
-                            <div className="text-[10px] text-slate-400">Más de {settings.inactive_recovery_months || 9} meses sin servicio</div>
+                          <div className="text-[11px] text-slate-500 truncate max-w-[200px]">
+                            {group.customer_address}, {group.customer_commune}
                           </div>
-                        ) : (
-                          <div>
-                            <div className="text-slate-900 font-bold">{r.next_maintenance_due}</div>
-                            <div className="text-[10px] text-slate-400">{intervalDays} días ({settings.maintenance_interval_months || 6}M)</div>
-                          </div>
-                        )}
-                      </td>
+                          <div className="text-[10px] text-slate-400 font-mono">{group.customer_phone}</div>
+                        </td>
 
-                      {/* Estado & Objetivo */}
-                      <td className="py-3.5 px-4">
-                        {activeTab === 'quality' && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                            <Star className="w-3 h-3 text-amber-500" />
-                            Encuesta de Calidad & Reseña
+                        {/* Equipo & Ubicación */}
+                        <td className="py-3.5 px-4">
+                          {group.totalEquipments === 1 ? (
+                            <>
+                              <div className="font-bold text-cyan-700">
+                                {group.mostUrgentItem.equipment_brand} {group.mostUrgentItem.equipment_btu ? `${group.mostUrgentItem.equipment_btu.toLocaleString()} BTU` : ''}
+                              </div>
+                              <div className="text-[11px] text-slate-500 flex items-center gap-1">
+                                <span>📍 {group.mostUrgentItem.equipment_location}</span>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="space-y-1">
+                              <div className="font-bold text-cyan-800 flex items-center gap-1.5">
+                                <span>⭐ Próximo: {group.mostUrgentItem.equipment_brand} {group.mostUrgentItem.equipment_btu ? `${group.mostUrgentItem.equipment_btu.toLocaleString()} BTU` : ''}</span>
+                              </div>
+                              <div className="text-[11px] text-slate-500 flex items-center gap-1">
+                                <span>📍 {group.mostUrgentItem.equipment_location}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => toggleExpandCustomer(group.key)}
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-cyan-700 hover:text-cyan-900 bg-cyan-50/80 hover:bg-cyan-100 border border-cyan-200/80 px-2 py-0.5 rounded-md transition-colors cursor-pointer mt-0.5"
+                              >
+                                {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                <span>{isExpanded ? 'Ocultar equipos' : `Ver todos (${group.totalEquipments})`}</span>
+                              </button>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Último Servicio */}
+                        <td className="py-3.5 px-4 text-slate-700 font-mono">
+                          <div className="font-semibold">{group.mostUrgentItem.last_service_date}</div>
+                          <span className="text-[10px] text-slate-400 capitalize">
+                            {group.mostUrgentItem.last_service_type.replace('_', ' ')}
                           </span>
-                        )}
-                        {activeTab === 'recovery' && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                            <RotateCcw className="w-3 h-3" />
-                            Reactivar con 15% Descuento
-                          </span>
-                        )}
-                        {activeTab === 'preventive' && (
-                          <>
-                            {r.status === 'vencido' && (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
-                                <AlertTriangle className="w-3 h-3" />
-                                Vencido hace {Math.abs(r.days_until_due)} días
-                              </span>
-                            )}
-                            {r.status === 'por_vencer' && (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                <Clock className="w-3 h-3" />
-                                Vence en {r.days_until_due} días
-                              </span>
-                            )}
-                            {r.status === 'contactado' && (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">
-                                <Check className="w-3 h-3" />
-                                Contactado {r.contacted_at ? `(${r.contacted_at.split(' ')[0]})` : ''}
-                              </span>
-                            )}
-                            {r.status === 'al_dia' && (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                <CheckCircle2 className="w-3 h-3" />
-                                Al día ({r.days_until_due} días)
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </td>
+                        </td>
 
-                      {/* Acciones */}
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleOpenWhatsApp(r)}
-                            title={
-                              activeTab === 'quality'
-                                ? 'Enviar encuesta de calidad por WhatsApp'
-                                : activeTab === 'recovery'
-                                ? 'Enviar oferta de recuperación por WhatsApp'
-                                : 'Enviar recordatorio preventivo por WhatsApp'
-                            }
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-xs transition-all cursor-pointer ${
-                              activeTab === 'quality'
-                                ? 'bg-amber-500 hover:bg-amber-600 text-white'
-                                : activeTab === 'recovery'
-                                ? 'bg-rose-600 hover:bg-rose-700 text-white'
-                                : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                            }`}
-                          >
-                            <MessageCircle className="w-3.5 h-3.5" />
-                            <span>WhatsApp</span>
-                          </button>
+                        {/* Vencimiento / Días */}
+                        <td className="py-3.5 px-4 font-mono">
+                          {activeTab === 'quality' ? (
+                            <div>
+                              <span className="font-bold text-amber-700">{daysSinceService} días transcurridos</span>
+                              <div className="text-[10px] text-slate-400">Momento óptimo para feedback</div>
+                            </div>
+                          ) : activeTab === 'recovery' ? (
+                            <div>
+                              <span className="font-bold text-rose-700">{Math.abs(group.mostUrgentItem.days_until_due)} días de retraso</span>
+                              <div className="text-[10px] text-slate-400">Más de {settings.inactive_recovery_months || 9} meses sin servicio</div>
+                            </div>
+                          ) : (
+                            <div>
+                              <div className="text-slate-900 font-bold">{group.mostUrgentItem.next_maintenance_due}</div>
+                              <div className="text-[10px] text-slate-400">
+                                {group.totalEquipments > 1 ? 'Fecha más próxima' : `${intervalDays} días (${settings.maintenance_interval_months || 6}M)`}
+                              </div>
+                            </div>
+                          )}
+                        </td>
 
-                          <button
-                            onClick={() => onScheduleService(r)}
-                            title="Crear Orden en el Tablero"
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-300 text-xs font-bold transition-all cursor-pointer"
-                          >
-                            <CalendarPlus className="w-3.5 h-3.5" />
-                            <span>Agendar (1-Clic)</span>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                        {/* Estado & Objetivo */}
+                        <td className="py-3.5 px-4">
+                          {activeTab === 'quality' && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                              <Star className="w-3 h-3 text-amber-500" />
+                              Encuesta de Calidad
+                            </span>
+                          )}
+                          {activeTab === 'recovery' && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                              <RotateCcw className="w-3 h-3" />
+                              Reactivar con 15% DCTO
+                            </span>
+                          )}
+                          {activeTab === 'preventive' && (
+                            <div className="space-y-1">
+                              {group.consolidatedStatus === 'vencido' && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  Vencido hace {Math.abs(group.mostUrgentItem.days_until_due)} días
+                                </span>
+                              )}
+                              {group.consolidatedStatus === 'por_vencer' && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                  <Clock className="w-3 h-3" />
+                                  Vence en {group.mostUrgentItem.days_until_due} días
+                                </span>
+                              )}
+                              {group.consolidatedStatus === 'contactado' && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">
+                                  <Check className="w-3 h-3" />
+                                  Contactado
+                                </span>
+                              )}
+                              {group.consolidatedStatus === 'al_dia' && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  Al día ({group.mostUrgentItem.days_until_due} días)
+                                </span>
+                              )}
+
+                              {group.totalEquipments > 1 && (
+                                <div className="text-[10px] text-slate-400">
+                                  {group.totalEquipments} equipos en monitoreo
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Acciones */}
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleOpenWhatsAppGroup(group)}
+                              title={
+                                group.totalEquipments > 1
+                                  ? `Enviar WhatsApp resumiendo sus ${group.totalEquipments} equipos`
+                                  : 'Enviar WhatsApp al cliente'
+                              }
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-xs transition-all cursor-pointer ${
+                                activeTab === 'quality'
+                                  ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                                  : activeTab === 'recovery'
+                                  ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                                  : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                              }`}
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                              <span>WhatsApp</span>
+                            </button>
+
+                            <button
+                              onClick={() => onScheduleService(group.mostUrgentItem)}
+                              title={group.totalEquipments > 1 ? "Crear Orden (Equipo más próximo)" : "Crear Orden en el Tablero"}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-300 text-xs font-bold transition-all cursor-pointer"
+                            >
+                              <CalendarPlus className="w-3.5 h-3.5" />
+                              <span>Agendar (1-Clic)</span>
+                            </button>
+
+                            {group.totalEquipments > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => toggleExpandCustomer(group.key)}
+                                className="p-1.5 rounded-xl border border-slate-200 hover:border-cyan-400 hover:bg-cyan-50 text-slate-500 hover:text-cyan-700 transition-colors cursor-pointer"
+                                title={isExpanded ? 'Ocultar desglose de equipos' : 'Ver desglose de equipos'}
+                              >
+                                {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Sub-fila de Acordeón: Detalle de todos los equipos del cliente (NK-111) */}
+                      {isExpanded && group.totalEquipments > 1 && (
+                        <tr className="bg-slate-50/70 border-b border-cyan-200/50 animate-in fade-in duration-150">
+                          <td colSpan={6} className="py-3 px-4 sm:px-8 border-l-4 border-l-cyan-500 bg-cyan-50/15">
+                            <div className="space-y-2.5 max-w-5xl">
+                              <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                                <span className="flex items-center gap-1.5 text-cyan-950">
+                                  <Layers className="w-3.5 h-3.5 text-cyan-600" />
+                                  Detalle de equipos instalados para {group.customer_name} ({group.totalEquipments} equipos):
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExpandCustomer(group.key)}
+                                  className="text-[11px] text-cyan-700 hover:text-cyan-900 underline font-semibold cursor-pointer"
+                                >
+                                  Ocultar desglose ▲
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-1 divide-y divide-slate-200 bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
+                                {group.items.map((item, idx) => (
+                                  <div 
+                                    key={item.id || item.equipment_id || idx} 
+                                    className="p-3 flex flex-wrap items-center justify-between gap-3 text-xs hover:bg-slate-50/90 transition-colors"
+                                  >
+                                    {/* Identificador y equipo */}
+                                    <div className="flex items-center gap-2.5 min-w-[220px]">
+                                      <div className="w-6 h-6 rounded-lg bg-cyan-100 text-cyan-800 font-bold text-[11px] flex items-center justify-center shrink-0">
+                                        #{idx + 1}
+                                      </div>
+                                      <div>
+                                        <div className="font-bold text-slate-900">
+                                          {item.equipment_brand} {item.equipment_btu ? `${item.equipment_btu.toLocaleString()} BTU` : ''}
+                                        </div>
+                                        <div className="text-[11px] text-slate-500 flex items-center gap-1">
+                                          <span>📍 {item.equipment_location || 'Sin ubicación'}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Fechas de Servicio y Vencimiento */}
+                                    <div className="text-[11px] space-y-0.5 min-w-[150px] font-mono">
+                                      <div className="text-slate-500">Último: <strong className="text-slate-800">{item.last_service_date}</strong></div>
+                                      <div className="text-slate-500">Vencimiento: <strong className="text-cyan-800">{item.next_maintenance_due}</strong></div>
+                                    </div>
+
+                                    {/* Estado Individual */}
+                                    <div className="min-w-[130px]">
+                                      {item.status === 'vencido' && (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
+                                          <AlertTriangle className="w-3 h-3" />
+                                          Vencido ({Math.abs(item.days_until_due)}d)
+                                        </span>
+                                      )}
+                                      {item.status === 'por_vencer' && (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                          <Clock className="w-3 h-3" />
+                                          Vence en {item.days_until_due}d
+                                        </span>
+                                      )}
+                                      {item.status === 'contactado' && (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">
+                                          <Check className="w-3 h-3" />
+                                          Contactado
+                                        </span>
+                                      )}
+                                      {item.status === 'al_dia' && (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                          <CheckCircle2 className="w-3 h-3" />
+                                          Al día ({item.days_until_due}d)
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {/* Acciones individuales */}
+                                    <div className="flex items-center gap-2 ml-auto">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenWhatsApp(item)}
+                                        className="p-1 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+                                        title={`Enviar WhatsApp específico de este equipo (${item.equipment_brand})`}
+                                      >
+                                        <MessageCircle className="w-3 h-3" />
+                                        <span>WhatsApp</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => onScheduleService(item)}
+                                        className="p-1 px-2.5 rounded-lg bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-300 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+                                        title={`Agendar visita para este equipo (${item.equipment_brand})`}
+                                      >
+                                        <CalendarPlus className="w-3 h-3" />
+                                        <span>Agendar</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })
               )}
