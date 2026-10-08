@@ -16,6 +16,8 @@ export type ServiceType =
   | 'mantenimiento_correctivo'
   | 'visita_tecnica' 
   | 'recarga_gas'
+  | 'bomba_condensado'
+  | 'otro_trabajo'
   | 'reparacion'
   | 'recaptacion'
   | 'pruebas_qa';
@@ -35,6 +37,10 @@ export function formatServiceType(type?: string): string {
       return 'Visita Técnica de Diagnóstico';
     case 'recarga_gas':
       return 'Recarga de Gas Refrigerante';
+    case 'bomba_condensado':
+      return 'Bomba de Condensado';
+    case 'otro_trabajo':
+      return 'Trabajo Adicional / Extra';
     case 'reparacion':
       return 'Reparación General';
     case 'recaptacion':
@@ -296,6 +302,8 @@ export interface ServiceOrder {
   equipment_ids?: string[]; // NK-077: Múltiples equipos intervenidos en la orden
   equipments_summary?: string; // NK-077: Resumen descriptivo de los equipos
   service_type: ServiceType;
+  service_types?: (ServiceType | string)[]; // NK-113: Lista de múltiples trabajos seleccionados en la orden
+  service_types_summary?: string; // NK-113: Resumen descriptivo de los trabajos (ej: "2× Mantenimiento + 1× Instalación")
   status: OrderStatus;
   scheduled_date: string;
   scheduled_time_slot: string; // ej: "09:00 - 11:00"

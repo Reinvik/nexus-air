@@ -814,10 +814,12 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                       >
                         <option value="mantencion_preventiva">Mantenimiento Preventivo (6M)</option>
                         <option value="instalacion">Instalación Nueva</option>
+                        <option value="bomba_condensado">Bomba de Condensado</option>
                         <option value="mantencion_correctiva">Reparación / Fuga</option>
                         <option value="reparacion">Reparación General</option>
                         <option value="visita_tecnica">Visita Técnica / Diagnóstico</option>
                         <option value="recarga_gas">Recarga Gas Refrigerante</option>
+                        <option value="otro_trabajo">Trabajo Especial / Adicional</option>
                         <option value="pruebas_qa">Pruebas QA & Medición</option>
                       </select>
                     </div>

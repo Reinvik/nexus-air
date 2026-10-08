@@ -10,11 +10,30 @@ import {
   SERVICE_TYPE_DEFAULT_COLORS,
   formatServiceType
 } from '../types';
-import { X, Plus, Calendar, Clock, User, Wrench, UserCheck, Users, Percent, DollarSign, AlertTriangle, UserPlus, Palette, Check, CheckSquare, Square, Snowflake } from 'lucide-react';
+import { X, Plus, Calendar, Clock, User, Wrench, UserCheck, Users, Percent, DollarSign, AlertTriangle, UserPlus, Palette, Check, CheckSquare, Square, Snowflake, Trash2, Layers } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import { QuickCreateCustomerModal } from './QuickCreateCustomerModal';
 import { TimeSlotPicker } from './TimeSlotPicker';
+
+// NK-113: Modelo para soportar múltiples trabajos en un solo ticket
+export interface OrderJobItem {
+  id: string;
+  type: ServiceType | string;
+  title: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+export const AVAILABLE_JOB_TYPES: { type: ServiceType; title: string; defaultColor: string }[] = [
+  { type: 'mantencion_preventiva', title: 'Mantenimiento Preventivo (6M)', defaultColor: '#0284c7' },
+  { type: 'instalacion', title: 'Instalación de Equipo', defaultColor: '#10b981' },
+  { type: 'bomba_condensado', title: 'Bomba de Condensado', defaultColor: '#06b6d4' },
+  { type: 'mantencion_correctiva', title: 'Reparación / Fuga', defaultColor: '#ef4444' },
+  { type: 'recarga_gas', title: 'Recarga Gas Refrigerante', defaultColor: '#14b8a6' },
+  { type: 'visita_tecnica', title: 'Visita Técnica / Diagnóstico', defaultColor: '#8b5cf6' },
+  { type: 'otro_trabajo', title: 'Trabajo Especial / Adicional', defaultColor: '#f59e0b' },
+];
 
 interface AddServiceOrderModalProps {
   isOpen: boolean;
@@ -92,16 +111,19 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
     [equipments, customerId]
   );
 
-  // NK-077: Precio unitario base según servicio y configuración
-  const getServiceBaseUnitPrice = useCallback((type: ServiceType) => {
+  // NK-077 & NK-113: Precio unitario base según servicio y configuración
+  const getServiceBaseUnitPrice = useCallback((type: ServiceType | string) => {
     if (type === 'mantencion_preventiva' || (type as any) === 'mantenimiento_preventivo') {
       return settings?.standard_maintenance_price || 45000;
     }
-    if (type === 'instalacion') return 130000;
+    if (type === 'instalacion') return settings?.standard_installation_price || 130000;
+    if (type === 'bomba_condensado') return 35000;
+    if (type === 'mantencion_correctiva' || (type as any) === 'mantenimiento_correctivo') return 55000;
     if (type === 'visita_tecnica') return 30000;
     if (type === 'recarga_gas') return 65000;
+    if (type === 'otro_trabajo') return 40000;
     return 45000;
-  }, [settings?.standard_maintenance_price]);
+  }, [settings?.standard_maintenance_price, settings?.standard_installation_price]);
 
   const [unitPrice, setUnitPrice] = useState<number>(() => {
     return settings?.standard_maintenance_price || 45000;
@@ -113,6 +135,23 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
     return equipments.filter(e => e.customer_id === initCust).map(e => e.id);
   });
 
+  // NK-113: Múltiples trabajos / servicios en una sola orden
+  const [jobItems, setJobItems] = useState<OrderJobItem[]>(() => {
+    const initPrice = settings?.standard_maintenance_price || 45000;
+    const initCust = customers[0]?.id;
+    const initialEqs = initCust ? equipments.filter(e => e.customer_id === initCust) : [];
+    const count = Math.max(1, initialEqs.length);
+    return [
+      {
+        id: 'job-1',
+        type: 'mantencion_preventiva',
+        title: 'Mantenimiento Preventivo (6M)',
+        quantity: count,
+        unitPrice: initPrice,
+      }
+    ];
+  });
+
   const [basePrice, setBasePrice] = useState<number>(() => {
     const unit = settings?.standard_maintenance_price || 45000;
     const initCust = customers[0]?.id;
@@ -120,6 +159,62 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
     const count = Math.max(1, initialEqs.length);
     return unit * count;
   });
+
+  const handleAddJobItem = (type: ServiceType = 'mantencion_preventiva') => {
+    const jobConfig = AVAILABLE_JOB_TYPES.find(j => j.type === type);
+    const title = jobConfig?.title || formatServiceType(type);
+    const price = getServiceBaseUnitPrice(type);
+    setJobItems(prev => {
+      const next = [
+        ...prev,
+        {
+          id: `job-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          type,
+          title,
+          quantity: 1,
+          unitPrice: price,
+        }
+      ];
+      const newTotal = next.reduce((sum, j) => sum + (Number(j.unitPrice) * Math.max(1, Number(j.quantity))), 0);
+      setBasePrice(newTotal);
+      return next;
+    });
+  };
+
+  const handleUpdateJobItem = (id: string, updates: Partial<OrderJobItem>) => {
+    setJobItems(prev => {
+      const next = prev.map(job => {
+        if (job.id === id) {
+          const updated = { ...job, ...updates };
+          if (updates.type && updates.type !== job.type) {
+            const cfg = AVAILABLE_JOB_TYPES.find(j => j.type === updates.type);
+            updated.title = cfg?.title || formatServiceType(updates.type);
+            if (updates.unitPrice === undefined) {
+              updated.unitPrice = getServiceBaseUnitPrice(updates.type);
+            }
+          }
+          return updated;
+        }
+        return job;
+      });
+      const newTotal = next.reduce((sum, j) => sum + (Number(j.unitPrice) * Math.max(1, Number(j.quantity))), 0);
+      setBasePrice(newTotal);
+      return next;
+    });
+  };
+
+  const handleRemoveJobItem = (id: string) => {
+    setJobItems(prev => {
+      if (prev.length <= 1) {
+        toast.error('Debe haber al menos un trabajo en la orden');
+        return prev;
+      }
+      const next = prev.filter(job => job.id !== id);
+      const newTotal = next.reduce((sum, j) => sum + (Number(j.unitPrice) * Math.max(1, Number(j.quantity))), 0);
+      setBasePrice(newTotal);
+      return next;
+    });
+  };
 
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
   // NK-053: Mantenimiento Periódico Acordado con el Cliente
@@ -152,6 +247,23 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
     }
   }, [basePrice, applyTax, taxMode, taxRate]);
 
+  const syncJobItemsWithEquipments = (eqCount: number) => {
+    const validCount = Math.max(1, eqCount);
+    setJobItems(prev => {
+      let foundMaint = false;
+      const next = prev.map((j) => {
+        if (!foundMaint && (j.type === 'mantencion_preventiva' || (j.type as any) === 'mantenimiento_preventivo')) {
+          foundMaint = true;
+          return { ...j, quantity: validCount };
+        }
+        return j;
+      });
+      const newTotal = next.reduce((sum, j) => sum + (Number(j.unitPrice) * Math.max(1, Number(j.quantity))), 0);
+      setBasePrice(newTotal);
+      return next;
+    });
+  };
+
   // NK-077: Cambio de cliente sincroniza equipos y suma automática inmediata
   const handleCustomerChange = (newCustId: string) => {
     setCustomerId(newCustId);
@@ -159,8 +271,7 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
     const newEqs = equipments.filter(e => e.customer_id === newCustId);
     const newIds = newEqs.map(e => e.id);
     setSelectedEquipmentIds(newIds);
-    const count = Math.max(1, newIds.length);
-    setBasePrice(unitPrice * count);
+    syncJobItemsWithEquipments(newIds.length);
   };
 
   const handleCustomerCreated = (newCust: Customer, newEq?: AirEquipment) => {
@@ -168,10 +279,10 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
     if (newEq) {
       setEquipmentId(newEq.id);
       setSelectedEquipmentIds([newEq.id]);
-      setBasePrice(unitPrice * 1);
+      syncJobItemsWithEquipments(1);
     }
     if (!description) {
-      setDescription(`Servicio de ${serviceType.replace('_', ' ')} para ${newCust.name}`);
+      setDescription(`Servicio para ${newCust.name}`);
     }
   };
 
@@ -179,8 +290,7 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
   const toggleEquipmentSelection = (id: string) => {
     setSelectedEquipmentIds(prev => {
       const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
-      const count = Math.max(1, next.length);
-      setBasePrice(unitPrice * count);
+      syncJobItemsWithEquipments(next.length);
       return next;
     });
   };
@@ -188,18 +298,17 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
   const selectAllEquipments = () => {
     const allIds = clientEquipments.map(e => e.id);
     setSelectedEquipmentIds(allIds);
-    const count = Math.max(1, allIds.length);
-    setBasePrice(unitPrice * count);
+    syncJobItemsWithEquipments(allIds.length);
   };
 
   const deselectAllEquipments = () => {
     setSelectedEquipmentIds([]);
-    setBasePrice(unitPrice * 1);
+    syncJobItemsWithEquipments(1);
   };
 
   const handleRecalculateSum = () => {
     const count = Math.max(1, selectedEquipmentIds.length);
-    setBasePrice(unitPrice * count);
+    syncJobItemsWithEquipments(count);
   };
 
   // Auto-cargar comisión pactada según el tipo de servicio y colaborador (NK-012)
@@ -267,15 +376,31 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
       ? `${chosenEquipments.length} equipo(s): ${chosenEquipments.map(e => `${e.brand} ${e.btu ? `${e.btu} BTU` : ''} (${e.location_in_property || 'Ubicación n/d'})`.trim()).join(', ')}`
       : undefined;
 
-    const eqCount = Math.max(1, selectedEquipmentIds.length);
-    const itemUnitPrice = calculatedFinancials.total > 0 ? Math.round(calculatedFinancials.total / eqCount) : unitPrice;
+    // NK-113: Soporte para múltiples trabajos en un solo ticket
+    const primaryServiceType = (jobItems[0]?.type as ServiceType) || serviceType;
+    const serviceTypesList = jobItems.map(j => j.type);
+    const serviceTypesSummary = jobItems
+      .map(j => `${Number(j.quantity) > 1 ? `${j.quantity}× ` : ''}${j.title}`)
+      .join(' + ');
+
+    // Si hay múltiples trabajos, creamos un ítem desglosado por cada uno
+    const detailedItems = jobItems.map((job, idx) => ({
+      id: `it-${Date.now()}-${idx}`,
+      description: `${job.title} (${job.quantity} ${Number(job.quantity) === 1 ? 'servicio' : 'servicios'})`,
+      quantity: Math.max(1, Number(job.quantity)),
+      unit_price: Number(job.unitPrice),
+      total: Math.max(1, Number(job.quantity)) * Number(job.unitPrice),
+      type: 'servicio' as const,
+    }));
 
     onAddOrder({
       customer_id: selectedCust.id,
       equipment_id: selectedEquipmentIds[0] || (clientEquipments[0]?.id),
       equipment_ids: selectedEquipmentIds.length > 0 ? selectedEquipmentIds : (clientEquipments[0]?.id ? [clientEquipments[0].id] : []),
       equipments_summary: summary,
-      service_type: serviceType,
+      service_type: primaryServiceType,
+      service_types: serviceTypesList,
+      service_types_summary: serviceTypesSummary,
       status: 'ingresado',
       scheduled_date: scheduledDate,
       scheduled_time_slot: scheduledSlot,
@@ -285,17 +410,8 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
       technician_payout_value: techPayoutValue,
       assistant_payout_type: assistantPayoutType,
       assistant_payout_value: assistantPayoutValue,
-      description: description || `Servicio de ${serviceType.replace('_', ' ')} para ${selectedCust.name}`,
-      items: [
-        {
-          id: `it-${Date.now()}`,
-          description: `Servicio de ${serviceType.replace('_', ' ')} (${eqCount} ${eqCount === 1 ? 'aire / equipo' : 'aires / equipos'})`,
-          quantity: eqCount,
-          unit_price: itemUnitPrice,
-          total: calculatedFinancials.total,
-          type: 'servicio',
-        }
-      ],
+      description: description || `${serviceTypesSummary} para ${selectedCust.name}`,
+      items: detailedItems,
       subtotal: calculatedFinancials.subtotal,
       tax: calculatedFinancials.tax,
       total: calculatedFinancials.total,
@@ -518,30 +634,194 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                   </div>
                 </div>
 
-                {/* Tipo de Servicio & Programación */}
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                  <div className="space-y-1.5">
-                    <label className="font-semibold text-slate-700">Tipo de Servicio</label>
-                    <select
-                      value={serviceType}
-                      onChange={(e) => {
-                        const val = e.target.value as ServiceType;
-                        setServiceType(val);
-                        const newUnit = getServiceBaseUnitPrice(val);
-                        setUnitPrice(newUnit);
-                        const count = Math.max(1, selectedEquipmentIds.length);
-                        setBasePrice(newUnit * count);
-                        const suggestedCol = settings?.service_type_colors?.[val] || SERVICE_TYPE_DEFAULT_COLORS[val] || '#0284c7';
-                        setCalendarColor(suggestedCol);
-                      }}
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:border-cyan-500 focus:outline-none transition-colors font-medium"
-                    >
-                      <option value="mantencion_preventiva">Mantenimiento Preventivo (6 Meses)</option>
-                      <option value="instalacion">Instalación Nueva de Equipo</option>
-                      <option value="mantencion_correctiva">Reparación / Falla / Fuga</option>
-                      <option value="visita_tecnica">Visita Técnica de Diagnóstico</option>
-                      <option value="recarga_gas">Recarga Gas Refrigerante R410A/R32</option>
-                    </select>
+                {/* NK-113: Trabajos & Servicios Múltiples en un solo Ticket */}
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Layers className="w-4 h-4 text-cyan-600" />
+                        <label className="font-bold text-sm text-slate-800">
+                          Trabajos a Realizar en este Ticket
+                        </label>
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-800 border border-cyan-200">
+                          {jobItems.length} {jobItems.length === 1 ? 'trabajo' : 'trabajos'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Agrega varios servicios en esta misma orden (ej: Mantención + Instalación + Bomba de condensado)
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Lista de Trabajos Dinámicos */}
+                  <div className="space-y-2.5">
+                    {jobItems.map((job, index) => {
+                      const itemSubtotal = (Number(job.unitPrice) || 0) * Math.max(1, Number(job.quantity) || 1);
+                      return (
+                        <div 
+                          key={job.id} 
+                          className="p-3 bg-white border border-slate-200 rounded-xl shadow-2xs space-y-2.5 transition-all hover:border-cyan-300"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 font-mono font-bold text-xs flex items-center justify-center shrink-0">
+                              {index + 1}
+                            </span>
+                            <div className="flex-1">
+                              <select
+                                value={job.type}
+                                onChange={(e) => {
+                                  const newType = e.target.value as ServiceType;
+                                  handleUpdateJobItem(job.id, { type: newType });
+                                  if (index === 0) {
+                                    setServiceType(newType);
+                                    const suggestedCol = settings?.service_type_colors?.[newType] || SERVICE_TYPE_DEFAULT_COLORS[newType] || '#0284c7';
+                                    setCalendarColor(suggestedCol);
+                                  }
+                                }}
+                                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:bg-white focus:border-cyan-500 focus:outline-none"
+                              >
+                                {AVAILABLE_JOB_TYPES.map(jt => (
+                                  <option key={jt.type} value={jt.type}>
+                                    {jt.title}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            {jobItems.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveJobItem(job.id)}
+                                title="Quitar este trabajo"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-12 gap-2 items-center pt-1 border-t border-slate-100">
+                            {/* Control de Cantidad */}
+                            <div className="col-span-5 sm:col-span-4 flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateJobItem(job.id, { quantity: Math.max(1, (Number(job.quantity) || 1) - 1) })}
+                                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-xs transition-colors cursor-pointer"
+                              >
+                                -
+                              </button>
+                              <input
+                                type="number"
+                                min={1}
+                                value={job.quantity}
+                                onChange={(e) => handleUpdateJobItem(job.id, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                                className="w-12 py-1 px-1.5 bg-slate-50 border border-slate-200 rounded-lg text-center text-xs font-bold font-mono focus:bg-white focus:border-cyan-500 focus:outline-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateJobItem(job.id, { quantity: (Number(job.quantity) || 1) + 1 })}
+                                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-xs transition-colors cursor-pointer"
+                              >
+                                +
+                              </button>
+                              <span className="text-[10px] text-slate-400 font-medium ml-0.5">cant.</span>
+                            </div>
+
+                            {/* Control de Precio Unitario */}
+                            <div className="col-span-4 sm:col-span-5 flex items-center gap-1">
+                              <span className="text-xs font-bold text-slate-400 font-mono">
+                                {settings?.currency_symbol || '$'}
+                              </span>
+                              <input
+                                type="number"
+                                value={job.unitPrice === 0 ? '' : job.unitPrice}
+                                placeholder="Precio unitario"
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => {
+                                  const val = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
+                                  handleUpdateJobItem(job.id, { unitPrice: val });
+                                }}
+                                className="w-full py-1 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold font-mono focus:bg-white focus:border-cyan-500 focus:outline-none"
+                              />
+                            </div>
+
+                            {/* Subtotal del Trabajo */}
+                            <div className="col-span-3 text-right">
+                              <span className="text-[10px] text-slate-400 block leading-tight">Subtotal</span>
+                              <span className="font-mono font-bold text-xs text-cyan-800">
+                                {settings?.currency_symbol || '$'}{itemSubtotal.toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Botones de un clic para agregar más trabajos */}
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[11px] font-semibold text-slate-600 block">
+                      + Agregar otro trabajo a esta orden:
+                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleAddJobItem('mantencion_preventiva')}
+                        className="px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 text-xs font-bold flex items-center gap-1 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3 text-sky-600" />
+                        <span>Mantenimiento (6M)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddJobItem('instalacion')}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3 text-emerald-600" />
+                        <span>Instalación de Aire</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddJobItem('bomba_condensado')}
+                        className="px-2.5 py-1 rounded-lg bg-cyan-50 hover:bg-cyan-100 text-cyan-800 border border-cyan-200 text-xs font-bold flex items-center gap-1 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3 text-cyan-600" />
+                        <span>Bomba de Condensado</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddJobItem('recarga_gas')}
+                        className="px-2.5 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-bold flex items-center gap-1 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3 text-teal-600" />
+                        <span>Recarga de Gas</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddJobItem('mantencion_correctiva')}
+                        className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-bold flex items-center gap-1 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3 text-rose-600" />
+                        <span>Reparación / Fuga</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddJobItem('otro_trabajo')}
+                        className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold flex items-center gap-1 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3 text-amber-600" />
+                        <span>Trabajo Especial</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Resumen Combinado de Trabajos */}
+                  <div className="p-2.5 bg-slate-100/90 rounded-xl border border-slate-200 text-xs flex items-center justify-between">
+                    <span className="font-medium text-slate-600 truncate mr-2">
+                      📋 Resumen: <span className="font-bold text-slate-800">{jobItems.map(j => `${Number(j.quantity) > 1 ? `${j.quantity}× ` : ''}${j.title}`).join(' + ')}</span>
+                    </span>
+                    <span className="font-mono font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200 shrink-0">
+                      Subtotal: {settings?.currency_symbol || '$'}{basePrice.toLocaleString()}
+                    </span>
                   </div>
 
                   {/* NK-061: Clasificación cromática en agendamiento */}

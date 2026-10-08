@@ -74,6 +74,8 @@ export const KanbanCardAir: React.FC<KanbanCardAirProps> = ({
     reparacion: { label: 'Reparación', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
     visita_tecnica: { label: 'Diagnóstico', bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
     recarga_gas: { label: 'Carga Gas', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+    bomba_condensado: { label: 'Bomba Condensado', bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200' },
+    otro_trabajo: { label: 'Trabajo Extra', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
     pruebas_qa: { label: 'Pruebas QA', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
   };
 
@@ -88,6 +90,8 @@ export const KanbanCardAir: React.FC<KanbanCardAirProps> = ({
   const customerPhone = order.customer?.phone || order.customer_phone;
   const whatsappUrl = getWhatsAppUrl(customerPhone, customerName, order.ticket_number);
 
+  const hasMultipleJobs = (order.service_types && order.service_types.length > 1) || (order.service_types_summary && order.service_types_summary.includes('+'));
+
   return (
     <div className="bg-white border border-slate-200/90 hover:border-cyan-400 rounded-xl p-3 shadow-2xs hover:shadow-md transition-all space-y-2 group">
       {/* 1. Header: Ticket # & Servicio & Botón WSP */}
@@ -99,6 +103,14 @@ export const KanbanCardAir: React.FC<KanbanCardAirProps> = ({
           <span className={`text-[9.5px] px-1.5 py-0.2 rounded font-bold border truncate ${sType.bg} ${sType.text} ${sType.border}`}>
             {sType.label}
           </span>
+          {hasMultipleJobs && (
+            <span 
+              title={order.service_types_summary || 'Múltiples trabajos combinados'}
+              className="text-[9px] px-1.5 py-0.2 rounded font-extrabold bg-cyan-100 text-cyan-800 border border-cyan-200 cursor-help whitespace-nowrap shrink-0"
+            >
+              +{((order.service_types?.length || 1) - 1) > 0 ? `${(order.service_types?.length || 1) - 1} más` : 'combo'}
+            </span>
+          )}
         </div>
 
         {/* Botón WhatsApp directo */}
