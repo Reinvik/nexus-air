@@ -407,12 +407,34 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
   // Total de Costos Fijos
   const totalFixedCosts = Math.max(structuralFixedCosts, monthRegisteredFixedExpenses > 0 ? (structuralFixedCosts + monthRegisteredFixedExpenses) : structuralFixedCosts);
 
-  // 4. Margen de Contribución Promedio (%)
+  // 4. Margen de Contribución Promedio (%) para el Punto de Equilibrio
+  // En climatización (HVAC), el margen estructural estándar es de 40% a 55%.
+  // Si las compras de insumos/herramientas se adelantan a las ventas en el mes, el margen contable
+  // temporal no debe distorsionar el cálculo del punto de equilibrio a cifras astronómicas irreales.
   const calculatedMarginPct = useMemo(() => {
-    if (monthSalesTotal <= 0) return 42; // Estándar promedio de la industria HVAC
-    const margin = ((monthSalesTotal - totalVariableCosts) / monthSalesTotal) * 100;
-    return Math.max(5, Math.min(95, Math.round(margin)));
-  }, [monthSalesTotal, totalVariableCosts]);
+    // Si no hay ventas registradas en el mes, usar estándar de la industria HVAC (45%)
+    if (monthSalesTotal <= 0) return 45;
+
+    // Margen contable bruto del mes
+    const rawMargin = ((monthSalesTotal - totalVariableCosts) / monthSalesTotal) * 100;
+
+    // Si el margen del mes está dentro del rango operativo normal (30% a 85%), lo usamos
+    if (rawMargin >= 30 && rawMargin <= 85) {
+      return Math.round(rawMargin);
+    }
+
+    // Si el margen da menor a 30% (típico cuando al inicio del mes se compran insumos o stock
+    // antes de facturar todas las órdenes), calculamos el margen directo de las órdenes del mes:
+    if (monthEstimatedCommissionsTotal > 0 && monthSalesTotal > 0) {
+      const commRatio = Math.min(50, Math.round((monthEstimatedCommissionsTotal / monthSalesTotal) * 100));
+      // Insumos directos promedio consumidos por servicio (aprox. 12%)
+      const estimatedDirectMargin = Math.max(35, 100 - commRatio - 12);
+      return Math.min(85, estimatedDirectMargin);
+    }
+
+    // Margen estructural estándar para talleres de climatización
+    return 45;
+  }, [monthSalesTotal, totalVariableCosts, monthEstimatedCommissionsTotal]);
 
   const effectiveMarginPct = financeSettings?.manual_margin_pct != null
     ? financeSettings.manual_margin_pct
@@ -918,9 +940,16 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
                 <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">
                   Margen Contribución
                 </span>
-                <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-cyan-50 text-cyan-700 border border-cyan-200 group-hover:bg-cyan-600 group-hover:text-white transition-colors">
-                  {effectiveMarginPct}%
-                </span>
+                <div className="flex items-center gap-1.5">
+                  {financeSettings?.manual_margin_pct != null && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                      Fijo
+                    </span>
+                  )}
+                  <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-cyan-50 text-cyan-700 border border-cyan-200 group-hover:bg-cyan-600 group-hover:text-white transition-colors">
+                    {effectiveMarginPct}%
+                  </span>
+                </div>
               </div>
               <div className="mt-2 space-y-1">
                 <div className="text-xs text-slate-700 flex justify-between">
@@ -2296,14 +2325,75 @@ export const FinanceModuleAir: React.FC<FinanceModuleAirProps> = ({
             </div>
 
             {/* Bloque 3: Margen de Contribución y Costos Variables */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-cyan-50/50 border border-cyan-200/80 space-y-2.5 text-xs text-slate-700">
-              <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
-                <PieChart className="w-4 h-4 text-cyan-600" />
-                <span>¿Cómo funciona el Margen de Contribución del {effectiveMarginPct}%?</span>
+            <div className="p-4 sm:p-5 rounded-2xl bg-cyan-50/50 border border-cyan-200/80 space-y-3 text-xs text-slate-700">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-cyan-200/60 pb-2">
+                <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
+                  <PieChart className="w-4 h-4 text-cyan-600" />
+                  <span>¿Cómo funciona el Margen de Contribución del {effectiveMarginPct}%?</span>
+                </div>
+                <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border ${
+                  financeSettings?.manual_margin_pct != null
+                    ? 'bg-purple-50 text-purple-800 border-purple-200'
+                    : 'bg-cyan-50 text-cyan-800 border-cyan-200'
+                }`}>
+                  {financeSettings?.manual_margin_pct != null ? 'Fijado manualmente' : 'Automático / Estándar HVAC'}
+                </span>
               </div>
+
               <p className="leading-relaxed text-slate-600">
                 Por cada <strong>{formatAirPrice(100000, settings.currency_symbol, countryCode)}</strong> que facturas en climatización, aproximadamente un <strong>{100 - effectiveMarginPct}%</strong> se consume en costos directos de la operación (comisión del técnico instalador, refrigerante, cañería, soldadura y traslados). El <strong>{effectiveMarginPct}%</strong> restante ({formatAirPrice(Math.round(100000 * (effectiveMarginPct / 100)), settings.currency_symbol, countryCode)}) es lo que efectivamente entra a pagar la estructura fija del taller hasta llegar al punto de equilibrio.
               </p>
+
+              {/* Selector interactivo de Margen de Contribución */}
+              <div className="p-3 bg-white rounded-xl border border-cyan-200/70 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 text-[11px] flex items-center gap-1.5">
+                    <Sliders className="w-3.5 h-3.5 text-cyan-600" />
+                    Ajustar Margen de Contribución para el Punto de Equilibrio:
+                  </span>
+                  {financeSettings?.manual_margin_pct != null && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onUpdateFinanceSettings({ manual_margin_pct: null });
+                      }}
+                      className="text-[10px] text-cyan-600 hover:text-cyan-800 underline font-semibold cursor-pointer"
+                    >
+                      Restaurar automático ({calculatedMarginPct}%)
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {[
+                    { pct: 35, label: '35% (Insumos altos)' },
+                    { pct: 40, label: '40% (Comercial)' },
+                    { pct: 45, label: '45% (Estándar HVAC)' },
+                    { pct: 50, label: '50% (Equilibrado)' },
+                    { pct: 55, label: '55% (Mantenciones)' },
+                    { pct: 60, label: '60% (Alta rentabilidad)' }
+                  ].map((preset) => {
+                    const isSelected = effectiveMarginPct === preset.pct;
+                    return (
+                      <button
+                        key={preset.pct}
+                        type="button"
+                        onClick={() => {
+                          onUpdateFinanceSettings({ manual_margin_pct: preset.pct });
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-cyan-600 text-white shadow-xs'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="flex flex-wrap gap-4 pt-1 font-mono text-[11px] text-slate-600 border-t border-cyan-200/60">
                 <span>Comisiones Técnicos mes: <strong>{formatAirPrice(monthTechCommissionsTotal, settings.currency_symbol, countryCode)}</strong></span>
                 <span>Insumos Variables mes: <strong>{formatAirPrice(monthVariableExpensesTotal, settings.currency_symbol, countryCode)}</strong></span>
