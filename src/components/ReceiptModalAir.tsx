@@ -175,6 +175,11 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
     const equipInfo = order.equipment ? `${order.equipment.brand} (${order.equipment.btu.toLocaleString()} BTU)` : 'Equipo de Climatización';
     const serialInfo = order.equipment?.serial_number ? `\n• N° de Serie / Serial: ${order.equipment.serial_number}` : '';
 
+    const customerIdentifier = order.customer?.rut || order.customer?.phone || order.customer_id || '';
+    const portalUrl = (typeof window !== 'undefined' && customerIdentifier)
+      ? `${window.location.origin}/?rut=${encodeURIComponent(customerIdentifier)}`
+      : '';
+
     const message = 
       `*COMPROBANTE DE ATENCIÓN TÉCNICA* ❄️\n` +
       `*Folio:* REC-${order.ticket_number}\n` +
@@ -190,6 +195,7 @@ export const ReceiptModalAir: React.FC<ReceiptModalAirProps> = ({
       `──────────────────\n` +
       `*TOTAL:* ${formatAirPrice(order.total, currencySymbol, countryCode)}\n` +
       `*Estado de Pago:* ${order.payment_status.toUpperCase()}\n\n` +
+      (portalUrl ? `🌐 *Ficha técnica, fotos y recibo online:*\n${portalUrl}\n\n` : '') +
       `_¡Gracias por confiar en ${settings.fantasy_name || settings.company_name}! Mantén tus ambientes frescos y saludables._`;
 
     const url = `https://wa.me/${rawPhone}?text=${encodeURIComponent(message)}`;
