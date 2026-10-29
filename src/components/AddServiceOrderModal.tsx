@@ -10,7 +10,7 @@ import {
   SERVICE_TYPE_DEFAULT_COLORS,
   formatServiceType
 } from '../types';
-import { X, Plus, Calendar, Clock, User, Wrench, UserCheck, Users, Percent, DollarSign, AlertTriangle, UserPlus, Palette, Check, CheckSquare, Square, Snowflake, Trash2, Layers } from 'lucide-react';
+import { X, Plus, Calendar, Clock, User, Wrench, UserCheck, Users, Percent, DollarSign, AlertTriangle, UserPlus, Palette, Check, CheckSquare, Square, Snowflake, Trash2, Layers, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import { QuickCreateCustomerModal } from './QuickCreateCustomerModal';
@@ -23,6 +23,7 @@ export interface OrderJobItem {
   title: string;
   quantity: number;
   unitPrice: number;
+  isCustom?: boolean;
 }
 
 export const AVAILABLE_JOB_TYPES: { type: ServiceType; title: string; defaultColor: string }[] = [
@@ -32,7 +33,7 @@ export const AVAILABLE_JOB_TYPES: { type: ServiceType; title: string; defaultCol
   { type: 'mantencion_correctiva', title: 'Reparación / Fuga', defaultColor: '#ef4444' },
   { type: 'recarga_gas', title: 'Recarga Gas Refrigerante', defaultColor: '#14b8a6' },
   { type: 'visita_tecnica', title: 'Visita Técnica / Diagnóstico', defaultColor: '#8b5cf6' },
-  { type: 'otro_trabajo', title: 'Trabajo Especial / Adicional', defaultColor: '#f59e0b' },
+  { type: 'otro_trabajo', title: 'Concepto Manual / Trabajo Especial', defaultColor: '#f59e0b' },
 ];
 
 interface AddServiceOrderModalProps {
@@ -160,10 +161,10 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
     return unit * count;
   });
 
-  const handleAddJobItem = (type: ServiceType = 'mantencion_preventiva') => {
+  const handleAddJobItem = (type: ServiceType = 'mantencion_preventiva', customTitle?: string) => {
     const jobConfig = AVAILABLE_JOB_TYPES.find(j => j.type === type);
-    const title = jobConfig?.title || formatServiceType(type);
-    const price = getServiceBaseUnitPrice(type);
+    const title = customTitle || jobConfig?.title || formatServiceType(type);
+    const price = type === 'otro_trabajo' && !customTitle ? 40000 : (customTitle ? 35000 : getServiceBaseUnitPrice(type));
     setJobItems(prev => {
       const next = [
         ...prev,
@@ -173,6 +174,7 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
           title,
           quantity: 1,
           unitPrice: price,
+          isCustom: type === 'otro_trabajo' || !!customTitle,
         }
       ];
       const newTotal = next.reduce((sum, j) => sum + (Number(j.unitPrice) * Math.max(1, Number(j.quantity))), 0);
@@ -188,7 +190,13 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
           const updated = { ...job, ...updates };
           if (updates.type && updates.type !== job.type) {
             const cfg = AVAILABLE_JOB_TYPES.find(j => j.type === updates.type);
-            updated.title = cfg?.title || formatServiceType(updates.type);
+            if (updates.type === 'otro_trabajo') {
+              updated.title = job.type === 'otro_trabajo' ? job.title : 'Concepto Manual';
+              updated.isCustom = true;
+            } else {
+              updated.title = cfg?.title || formatServiceType(updates.type);
+              updated.isCustom = false;
+            }
             if (updates.unitPrice === undefined) {
               updated.unitPrice = getServiceBaseUnitPrice(updates.type);
             }
@@ -687,6 +695,16 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                                 ))}
                               </select>
                             </div>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateJobItem(job.id, { isCustom: !job.isCustom })}
+                              title={job.isCustom ? "Ocultar nombre personalizado" : "Personalizar nombre de este trabajo"}
+                              className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                                job.isCustom ? "bg-amber-100 text-amber-800" : "text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                              }`}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
                             {jobItems.length > 1 && (
                               <button
                                 type="button"
@@ -698,6 +716,23 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                               </button>
                             )}
                           </div>
+
+                          {/* Campo de Concepto Manual / Título Personalizado */}
+                          {(job.type === 'otro_trabajo' || job.isCustom) && (
+                            <div className="p-2.5 bg-amber-50/70 border border-amber-200/90 rounded-xl space-y-1">
+                              <div className="flex items-center justify-between text-[10px] font-bold text-amber-800">
+                                <span className="uppercase tracking-wider">Concepto Manual / Detalle del Trabajo:</span>
+                                <span className="text-[9px] text-amber-600 font-semibold italic">Ej: Desinstalación de aire, Reubicación...</span>
+                              </div>
+                              <input
+                                type="text"
+                                value={job.title}
+                                onChange={(e) => handleUpdateJobItem(job.id, { title: e.target.value })}
+                                placeholder="Escribe el nombre del trabajo (Ej: Desinstalación de aire acondicionado)..."
+                                className="w-full px-2.5 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400 shadow-2xs"
+                              />
+                            </div>
+                          )}
 
                           <div className="grid grid-cols-12 gap-2 items-center pt-1 border-t border-slate-100">
                             {/* Control de Cantidad */}
@@ -805,11 +840,21 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleAddJobItem('otro_trabajo')}
+                        onClick={() => handleAddJobItem('otro_trabajo', 'Desinstalación de Aire')}
                         className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold flex items-center gap-1 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                        title="Desinstalación o retiro de unidad"
                       >
                         <Plus className="w-3 h-3 text-amber-600" />
-                        <span>Trabajo Especial</span>
+                        <span>Desinstalación</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddJobItem('otro_trabajo', 'Concepto Manual')}
+                        className="px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 text-xs font-bold flex items-center gap-1 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                        title="Agregar un concepto o trabajo manual con nombre y precio libre"
+                      >
+                        <Plus className="w-3 h-3 text-purple-600" />
+                        <span>+ Concepto Manual</span>
                       </button>
                     </div>
                   </div>
