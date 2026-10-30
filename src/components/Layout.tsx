@@ -81,7 +81,7 @@ export const Layout: React.FC<LayoutProps> = ({
   ];
 
   const allManageNav: { id: ViewTab; label: string; icon: React.ElementType }[] = [
-    { id: 'inventory', label: 'Equipos & Stock', icon: Boxes },
+    { id: 'inventory', label: 'Inventario & Insumos', icon: Boxes },
     { id: 'customers', label: 'Clientes', icon: Users },
     { id: 'technicians', label: 'Técnicos HVAC', icon: Wrench },
     ...(settings?.enable_staff_payroll !== false ? [

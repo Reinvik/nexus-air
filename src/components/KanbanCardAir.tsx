@@ -11,7 +11,8 @@ import {
   Truck,
   Camera,
   CheckCircle2,
-  FileText
+  FileText,
+  Package
 } from 'lucide-react';
 
 interface KanbanCardAirProps {
@@ -91,12 +92,13 @@ export const KanbanCardAir: React.FC<KanbanCardAirProps> = ({
   const whatsappUrl = getWhatsAppUrl(customerPhone, customerName, order.ticket_number);
 
   const hasMultipleJobs = (order.service_types && order.service_types.length > 1) || (order.service_types_summary && order.service_types_summary.includes('+'));
+  const inventoryItemsCount = (order.items || []).filter(it => it.type === 'repuesto' || it.type === 'insumo' || Boolean(it.part_id)).length;
 
   return (
     <div className="bg-white border border-slate-200/90 hover:border-cyan-400 rounded-xl p-3 shadow-2xs hover:shadow-md transition-all space-y-2 group">
       {/* 1. Header: Ticket # & Servicio & Botón WSP */}
       <div className="flex items-center justify-between gap-1.5 pb-1 border-b border-slate-100">
-        <div className="flex items-center gap-1.5 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
           <span className="font-mono text-[11px] font-bold text-slate-500 whitespace-nowrap">
             {order.ticket_number}
           </span>
@@ -109,6 +111,15 @@ export const KanbanCardAir: React.FC<KanbanCardAirProps> = ({
               className="text-[9px] px-1.5 py-0.2 rounded font-extrabold bg-cyan-100 text-cyan-800 border border-cyan-200 cursor-help whitespace-nowrap shrink-0"
             >
               +{((order.service_types?.length || 1) - 1) > 0 ? `${(order.service_types?.length || 1) - 1} más` : 'combo'}
+            </span>
+          )}
+          {inventoryItemsCount > 0 && (
+            <span
+              title={`${inventoryItemsCount} ${inventoryItemsCount === 1 ? 'repuesto/insumo utilizado' : 'repuestos/insumos utilizados'}`}
+              className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.2 rounded font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0"
+            >
+              <Package className="w-2.5 h-2.5 text-amber-600" />
+              <span>{inventoryItemsCount} {inventoryItemsCount === 1 ? 'insumo' : 'insumos'}</span>
             </span>
           )}
         </div>

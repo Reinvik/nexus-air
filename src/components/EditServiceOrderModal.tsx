@@ -8,11 +8,14 @@ import {
   AirSettings, 
   Customer, 
   AirEquipment,
+  AirPart,
+  OrderItem,
   CALENDAR_COLOR_OPTIONS,
   SERVICE_TYPE_DEFAULT_COLORS,
   getOrderCalendarColor,
   formatServiceType
 } from '../types';
+import { useBrand } from '../lib/brandConfig';
 import { format } from 'date-fns';
 import { 
   X, 
@@ -43,7 +46,13 @@ import {
   Info,
   Palette,
   CheckSquare,
-  Square
+  Square,
+  Package,
+  Plus,
+  Minus,
+  Search,
+  Boxes,
+  RotateCcw
 } from 'lucide-react';
 import { calculateLiveRouteETA, getCustomerCoordinates, RouteETA } from '../lib/routingService';
 import { QuickCreateCustomerModal } from './QuickCreateCustomerModal';
@@ -58,12 +67,14 @@ interface EditServiceOrderModalProps {
   technicians: Technician[];
   customers?: Customer[];
   equipments?: AirEquipment[];
+  parts?: AirPart[];
   settings?: AirSettings;
   currentUserProfile?: any;
   technicianPayouts?: TechnicianPayout[];
   onAddTechnicianPayout?: (data: Omit<TechnicianPayout, 'id' | 'company_id' | 'created_at'>) => Promise<void> | void;
   onUpdateOrder: (id: string, updates: Partial<ServiceOrder>) => void;
   onDeleteOrder: (id: string) => void;
+  onUpdatePart?: (id: string, updates: Partial<AirPart>) => Promise<void> | void;
   onOpenReceipt?: (order: ServiceOrder) => void;
   onOpenInspection?: (order: ServiceOrder) => void;
   onAddCustomer?: (customer: Omit<Customer, 'id' | 'created_at'>) => Promise<Customer | void> | void;
@@ -77,17 +88,20 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
   technicians,
   customers,
   equipments,
+  parts = [],
   settings,
   currentUserProfile,
   technicianPayouts = [],
   onAddTechnicianPayout,
   onUpdateOrder,
   onDeleteOrder,
+  onUpdatePart,
   onOpenReceipt,
   onOpenInspection,
   onAddCustomer,
   onAddEquipment,
 }) => {
+  const { isSolago } = useBrand();
   // NK-047: Ocultar montos a cobrar a los técnicos
   const isTechnician = currentUserProfile?.role === 'tecnico' || currentUserProfile?.role === 'ayudante' || currentUserProfile?.role === 'technician';
   const hideFinancialDetails = isTechnician && (settings?.hide_technician_amounts !== false);
@@ -179,6 +193,41 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
     if (order.tax_mode === 'plus') return order.subtotal || 0;
     return order.total || 0;
   });
+  // Repuestos e Insumos de Inventario (NK-XXX: Control de Stock e Insumos en Terreno)
+  const [inventoryItems, setInventoryItems] = useState<OrderItem[]>(() => {
+    if (!order?.items || !Array.isArray(order.items)) return [];
+    return order.items.filter(it => it.type === 'repuesto' || it.type === 'insumo' || Boolean(it.part_id));
+  });
+
+  // Track de repuestos y cantidades originales que estaban en la orden al abrirla
+  const originalPartsMap = useRef<Map<string, { part_id: string; quantity: number }>>(new Map());
+
+  // Buscador de repuestos
+  const [partSearch, setPartSearch] = useState('');
+  const [isPartDropdownOpen, setIsPartDropdownOpen] = useState(false);
+  const partSearchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (partSearchRef.current && !partSearchRef.current.contains(e.target as Node)) {
+        setIsPartDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredParts = useMemo(() => {
+    if (!parts || parts.length === 0) return [];
+    const term = partSearch.trim().toLowerCase();
+    if (!term) return parts.slice(0, 10);
+    return parts.filter(p => 
+      p.name.toLowerCase().includes(term) || 
+      (p.sku && p.sku.toLowerCase().includes(term)) ||
+      (p.category && p.category.toLowerCase().includes(term))
+    ).slice(0, 12);
+  }, [parts, partSearch]);
+
   const [paymentStatus, setPaymentStatus] = useState<'pendiente' | 'pagado' | 'abono'>(order?.payment_status || 'pendiente');
   const [paymentMethod, setPaymentMethod] = useState<'transferencia' | 'efectivo' | 'tarjeta' | 'webpay'>(order?.payment_method || 'transferencia');
   const [paymentReference, setPaymentReference] = useState(order?.payment_reference || '');
@@ -220,7 +269,32 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
       const totalAmt = order.tax_mode === 'plus' ? (order.subtotal || 0) : (order.total || 0);
       setBaseAmount(totalAmt);
       const eqCount = Math.max(1, initEqIds.length);
-      setUnitPrice(totalAmt > 0 ? Math.round(totalAmt / eqCount) : getServiceBaseUnitPrice(order.service_type || 'mantencion_preventiva'));
+      
+      const srvItem = (order.items || []).find(it => it.type === 'servicio');
+      if (srvItem && Number(srvItem.unit_price) > 0) {
+        setUnitPrice(Number(srvItem.unit_price));
+      } else {
+        setUnitPrice(totalAmt > 0 ? Math.round(totalAmt / eqCount) : getServiceBaseUnitPrice(order.service_type || 'mantencion_preventiva'));
+      }
+
+      // Inicializar y mapear repuestos existentes en la orden
+      const itemsList = Array.isArray(order.items) ? order.items : [];
+      const partsOnly = itemsList.filter(it => it.type === 'repuesto' || it.type === 'insumo' || Boolean(it.part_id));
+      setInventoryItems(partsOnly);
+
+      const origMap = new Map<string, { part_id: string; quantity: number }>();
+      partsOnly.forEach(it => {
+        const pId = it.part_id || it.id;
+        if (pId) {
+          const prev = origMap.get(pId);
+          origMap.set(pId, {
+            part_id: pId,
+            quantity: (prev?.quantity || 0) + Number(it.quantity || 1)
+          });
+        }
+      });
+      originalPartsMap.current = origMap;
+
       setPaymentStatus(order.payment_status || 'pendiente');
       setPaymentMethod(order.payment_method || 'transferencia');
       setPaymentReference(order.payment_reference || '');
@@ -287,6 +361,132 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
   const subtotal = calculatedFinancials.subtotal;
   const tax = calculatedFinancials.tax;
   const total = calculatedFinancials.total;
+
+  const laborAmount = useMemo(() => {
+    const eqCount = Math.max(1, selectedEquipmentIds.length);
+    return unitPrice * eqCount;
+  }, [unitPrice, selectedEquipmentIds.length]);
+
+  const partsAmount = useMemo(() => {
+    return inventoryItems.reduce((acc, it) => acc + (Number(it.unit_price || 0) * Number(it.quantity || 1)), 0);
+  }, [inventoryItems]);
+
+  const handleAddInventoryPart = (part: AirPart) => {
+    setInventoryItems(prev => {
+      const existingIdx = prev.findIndex(it => (it.part_id && it.part_id === part.id) || it.id === part.id);
+      let updated: OrderItem[];
+      if (existingIdx >= 0) {
+        updated = prev.map((it, idx) => {
+          if (idx === existingIdx) {
+            const nextQty = Number(it.quantity || 1) + 1;
+            return {
+              ...it,
+              quantity: nextQty,
+              total: nextQty * Number(it.unit_price || part.sale_price)
+            };
+          }
+          return it;
+        });
+      } else {
+        const newItem: OrderItem = {
+          id: `item-part-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          part_id: part.id,
+          sku: part.sku,
+          description: part.name,
+          unit: part.unit || 'unidad',
+          quantity: 1,
+          unit_price: Number(part.sale_price) || 0,
+          total: Number(part.sale_price) || 0,
+          cost_price: Number(part.cost_price) || 0,
+          type: 'repuesto',
+        };
+        updated = [...prev, newItem];
+      }
+
+      // Sincronizar baseAmount automáticamente
+      const count = Math.max(1, selectedEquipmentIds.length);
+      const laborTotal = unitPrice * count;
+      const newPartsTotal = updated.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+      setBaseAmount(laborTotal + newPartsTotal);
+
+      return updated;
+    });
+
+    setPartSearch('');
+    setIsPartDropdownOpen(false);
+    toast.success(`Repuesto añadido: ${part.name}`);
+  };
+
+  const handleUpdateItemQuantity = (index: number, newQty: number) => {
+    const qty = Math.max(1, newQty);
+    setInventoryItems(prev => {
+      const updated = prev.map((it, idx) => {
+        if (idx === index) {
+          return {
+            ...it,
+            quantity: qty,
+            total: qty * Number(it.unit_price || 0)
+          };
+        }
+        return it;
+      });
+
+      const count = Math.max(1, selectedEquipmentIds.length);
+      const laborTotal = unitPrice * count;
+      const newPartsTotal = updated.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+      setBaseAmount(laborTotal + newPartsTotal);
+
+      return updated;
+    });
+  };
+
+  const handleUpdateItemPrice = (index: number, newPrice: number) => {
+    const price = Math.max(0, newPrice);
+    setInventoryItems(prev => {
+      const updated = prev.map((it, idx) => {
+        if (idx === index) {
+          return {
+            ...it,
+            unit_price: price,
+            total: Number(it.quantity || 1) * price
+          };
+        }
+        return it;
+      });
+
+      const count = Math.max(1, selectedEquipmentIds.length);
+      const laborTotal = unitPrice * count;
+      const newPartsTotal = updated.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+      setBaseAmount(laborTotal + newPartsTotal);
+
+      return updated;
+    });
+  };
+
+  const handleRemoveInventoryItem = (index: number) => {
+    setInventoryItems(prev => {
+      const removed = prev[index];
+      const updated = prev.filter((_, idx) => idx !== index);
+
+      const count = Math.max(1, selectedEquipmentIds.length);
+      const laborTotal = unitPrice * count;
+      const newPartsTotal = updated.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+      setBaseAmount(laborTotal + newPartsTotal);
+
+      if (removed) {
+        toast.success(`Repuesto eliminado: ${removed.description}`);
+      }
+      return updated;
+    });
+  };
+
+  const handleRecalculateTotals = () => {
+    const count = Math.max(1, selectedEquipmentIds.length);
+    const laborTotal = unitPrice * count;
+    const partsTotal = inventoryItems.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+    setBaseAmount(laborTotal + partsTotal);
+    toast.success('Total recalculado con mano de obra y repuestos');
+  };
 
   const calculatedTechPayout = techPayoutType === 'percentage' 
     ? Math.round((total * techPayoutValue) / 100) 
@@ -409,7 +609,7 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const chosenEquipments = availableEquipments.filter(e => selectedEquipmentIds.includes(e.id));
@@ -418,7 +618,80 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
       : undefined;
 
     const eqCount = Math.max(1, selectedEquipmentIds.length);
-    const itemUnitPrice = total > 0 ? Math.round(total / eqCount) : unitPrice;
+    const laborSubtotal = unitPrice * eqCount;
+
+    // Ítem de Servicio de Mano de obra
+    const existingServiceItem = (order.items || []).find(it => it.type === 'servicio');
+    const serviceItem: OrderItem = {
+      id: existingServiceItem?.id || `it-srv-${Date.now()}`,
+      description: `Servicio de ${serviceType.replace('_', ' ')} (${eqCount} ${eqCount === 1 ? 'aire / equipo' : 'aires / equipos'})`,
+      quantity: eqCount,
+      unit_price: unitPrice,
+      total: laborSubtotal,
+      type: 'servicio',
+    };
+
+    // Ítems consolidados (Mano de obra + Repuestos de inventario)
+    const allItems: OrderItem[] = [
+      serviceItem,
+      ...inventoryItems.map(it => ({
+        ...it,
+        type: 'repuesto' as const,
+        total: Number(it.quantity || 1) * Number(it.unit_price || 0)
+      }))
+    ];
+
+    // Procesar descuento y reintegro de stock en tiempo real (Nexus Garage pattern)
+    if (onUpdatePart && parts && parts.length > 0) {
+      try {
+        const currentPartsMap = new Map<string, { part_id: string; quantity: number }>();
+        inventoryItems.forEach(it => {
+          const pId = it.part_id || it.id;
+          if (pId) {
+            const prev = currentPartsMap.get(pId);
+            currentPartsMap.set(pId, {
+              part_id: pId,
+              quantity: (prev?.quantity || 0) + Number(it.quantity || 1)
+            });
+          }
+        });
+
+        // 1. Repuestos actuales vs originales (altas y variaciones de cantidad)
+        for (const [partId, curr] of currentPartsMap.entries()) {
+          const orig = originalPartsMap.current.get(partId);
+          const prevQty = orig ? orig.quantity : 0;
+          const delta = curr.quantity - prevQty;
+
+          const matchedPart = parts.find(p => p.id === partId);
+          if (matchedPart) {
+            if (delta > 0) {
+              const currentStock = Number(matchedPart.stock) || 0;
+              const newStock = Math.max(0, currentStock - delta);
+              await onUpdatePart(matchedPart.id, { stock: newStock });
+            } else if (delta < 0) {
+              const returnQty = Math.abs(delta);
+              const currentStock = Number(matchedPart.stock) || 0;
+              const newStock = currentStock + returnQty;
+              await onUpdatePart(matchedPart.id, { stock: newStock });
+            }
+          }
+        }
+
+        // 2. Repuestos que estaban originalmente pero fueron eliminados de la orden
+        for (const [partId, orig] of originalPartsMap.current.entries()) {
+          if (!currentPartsMap.has(partId)) {
+            const matchedPart = parts.find(p => p.id === partId);
+            if (matchedPart && orig.quantity > 0) {
+              const currentStock = Number(matchedPart.stock) || 0;
+              const newStock = currentStock + orig.quantity;
+              await onUpdatePart(matchedPart.id, { stock: newStock });
+            }
+          }
+        }
+      } catch (stockErr) {
+        console.warn('[EditServiceOrderModal] Error updating inventory stock:', stockErr);
+      }
+    }
 
     onUpdateOrder(order.id, {
       customer_id: customerId,
@@ -446,16 +719,7 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
       paid_amount: paidAmount,
       payment_notes: paymentNotes,
       calendar_color: calendarColor,
-      items: [
-        {
-          id: order.items?.[0]?.id || `it-${Date.now()}`,
-          description: `Servicio de ${serviceType.replace('_', ' ')} (${eqCount} ${eqCount === 1 ? 'aire / equipo' : 'aires / equipos'})`,
-          quantity: eqCount,
-          unit_price: itemUnitPrice,
-          total: total,
-          type: 'servicio',
-        }
-      ],
+      items: allItems,
       subtotal,
       tax,
       total,
@@ -464,8 +728,21 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
     onClose();
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (confirm('¿Estás seguro de que deseas eliminar esta orden de servicio?')) {
+      if (onUpdatePart && parts && originalPartsMap.current.size > 0) {
+        try {
+          for (const [partId, orig] of originalPartsMap.current.entries()) {
+            const matchedPart = parts.find(p => p.id === partId);
+            if (matchedPart && orig.quantity > 0) {
+              const currentStock = Number(matchedPart.stock) || 0;
+              await onUpdatePart(matchedPart.id, { stock: currentStock + orig.quantity });
+            }
+          }
+        } catch (err) {
+          console.warn('[EditServiceOrderModal] Error restoring stock on delete:', err);
+        }
+      }
       onDeleteOrder(order.id);
       onClose();
     }
@@ -1169,6 +1446,7 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                     )}
                   </div>
                 </div>
+
               </div>
             )}
 
@@ -1268,7 +1546,7 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                                 const val = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
                                 setUnitPrice(val);
                                 const count = Math.max(1, selectedEquipmentIds.length);
-                                setBaseAmount(val * count);
+                                setBaseAmount((val * count) + partsAmount);
                               }}
                               className="w-full pl-7 pr-2.5 py-1.5 bg-white border border-cyan-300 rounded-lg text-slate-900 text-sm font-mono font-bold focus:border-cyan-600 focus:outline-none"
                             />
@@ -1314,8 +1592,6 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                             onChange={(e) => {
                               const val = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
                               setBaseAmount(val);
-                              const count = Math.max(1, selectedEquipmentIds.length);
-                              setUnitPrice(Math.round(val / count));
                             }}
                             className="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-900 font-mono font-black text-lg focus:border-cyan-500 focus:outline-none transition-colors"
                           />
@@ -1336,6 +1612,23 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                       {/* Desglose Financiero en Vivo */}
                       <div className="p-2.5 rounded-lg bg-white/80 border border-slate-200/90 text-xs space-y-1">
                         <div className="flex items-center justify-between text-slate-600 text-[11px]">
+                          <span>Mano de Obra ({Math.max(1, selectedEquipmentIds.length)} {selectedEquipmentIds.length <= 1 ? 'equipo' : 'equipos'}):</span>
+                          <span className="font-mono font-bold text-slate-800">
+                            {settings?.currency_symbol || '$'} {laborAmount.toLocaleString()}
+                          </span>
+                        </div>
+                        {inventoryItems.length > 0 && (
+                          <div className="flex items-center justify-between text-slate-600 text-[11px]">
+                            <span className="flex items-center gap-1">
+                              <Package className="w-3 h-3 text-cyan-600" />
+                              Repuestos e Insumos ({inventoryItems.length}):
+                            </span>
+                            <span className="font-mono font-bold text-cyan-800">
+                              {settings?.currency_symbol || '$'} {partsAmount.toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between text-slate-600 text-[11px] pt-1 border-t border-slate-100">
                           <span>Subtotal Neto:</span>
                           <span className="font-mono font-bold text-slate-800">
                             {settings?.currency_symbol || '$'} {subtotal.toLocaleString()}
@@ -1481,6 +1774,271 @@ export const EditServiceOrderModal: React.FC<EditServiceOrderModalProps> = ({
                       </div>
                     )}
                   </div>
+                </div>
+
+                {/* Sección de Repuestos, Materiales e Insumos HVAC (Inventario) */}
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/90 space-y-3.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-8 h-8 rounded-lg ${isSolago ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-cyan-100 text-cyan-700 border-cyan-200'} border flex items-center justify-center font-bold`}>
+                        <Boxes className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h5 className="font-bold text-xs sm:text-sm text-slate-900 flex items-center gap-1.5">
+                          Repuestos, Insumos & Materiales HVAC (Inventario)
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            inventoryItems.length > 0
+                              ? (isSolago ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-cyan-100 text-cyan-900 border border-cyan-300')
+                              : 'bg-slate-200 text-slate-600'
+                          }`}>
+                            {inventoryItems.length} {inventoryItems.length === 1 ? 'ítem' : 'ítems'}
+                          </span>
+                        </h5>
+                        <p className="text-[11px] text-slate-500">
+                          Los productos seleccionados se restarán de forma automática del stock al guardar la orden.
+                        </p>
+                      </div>
+                    </div>
+
+                    {inventoryItems.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleRecalculateTotals}
+                        title="Recalcular total facturado sumando mano de obra y repuestos"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-bold shadow-2xs transition-colors cursor-pointer"
+                      >
+                        <RotateCcw className="w-3 h-3 text-cyan-600" />
+                        <span>Recalcular Total</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Buscador de Catálogo de Inventario */}
+                  <div ref={partSearchRef} className="relative">
+                    <div className="relative">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={partSearch}
+                        onChange={(e) => {
+                          setPartSearch(e.target.value);
+                          setIsPartDropdownOpen(true);
+                        }}
+                        onFocus={() => setIsPartDropdownOpen(true)}
+                        placeholder="Buscar en inventario (ej: Gas R410A, R32, Bomba condensado, Capacitor, Cañería de cobre...)"
+                        className="w-full pl-9 pr-8 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 font-medium placeholder:text-slate-400 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-all shadow-xs"
+                      />
+                      {partSearch && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPartSearch('');
+                            setIsPartDropdownOpen(false);
+                          }}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Dropdown de Resultados */}
+                    {isPartDropdownOpen && (
+                      <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl z-30 max-h-64 overflow-y-auto divide-y divide-slate-100">
+                        {filteredParts.length === 0 ? (
+                          <div className="p-3 text-center text-xs text-slate-400 italic">
+                            No se encontraron repuestos o materiales con "{partSearch}".
+                          </div>
+                        ) : (
+                          filteredParts.map((part) => {
+                            const isOutOfStock = Number(part.stock || 0) <= 0;
+                            const isAlreadyAdded = inventoryItems.some(it => (it.part_id && it.part_id === part.id) || it.id === part.id);
+                            return (
+                              <button
+                                key={part.id}
+                                type="button"
+                                onClick={() => handleAddInventoryPart(part)}
+                                className="w-full text-left px-3.5 py-2.5 hover:bg-cyan-50/60 flex items-center justify-between gap-3 transition-colors cursor-pointer group"
+                              >
+                                <div className="min-w-0 flex items-center gap-2.5">
+                                  <div className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 shrink-0">
+                                    <Package className="w-3.5 h-3.5" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="font-bold text-xs text-slate-800 truncate group-hover:text-cyan-700">
+                                      {part.name}
+                                    </div>
+                                    <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-0.5">
+                                      <span className="font-mono bg-slate-100 px-1 py-0.2 rounded border border-slate-200">
+                                        {part.sku || 'SKU-N/D'}
+                                      </span>
+                                      <span className="capitalize">{part.category?.replace('_', ' ') || 'General'}</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-3 shrink-0">
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                    isOutOfStock 
+                                      ? 'bg-rose-50 text-rose-700 border-rose-200' 
+                                      : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  }`}>
+                                    Stock: {part.stock} {part.unit || 'un'}
+                                  </span>
+
+                                  <span className="font-mono font-bold text-xs text-slate-900">
+                                    {settings?.currency_symbol || '$'} {Number(part.sale_price || 0).toLocaleString()}
+                                  </span>
+
+                                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10.5px] font-bold ${
+                                    isAlreadyAdded 
+                                      ? 'bg-cyan-600 text-white' 
+                                      : 'bg-slate-100 group-hover:bg-cyan-500 group-hover:text-white text-slate-700'
+                                  } transition-colors`}>
+                                    <Plus className="w-3 h-3" />
+                                    <span>{isAlreadyAdded ? '+1' : 'Agregar'}</span>
+                                  </span>
+                                </div>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tabla / Lista de Repuestos Utilizados */}
+                  {inventoryItems.length === 0 ? (
+                    <div className="p-4 rounded-xl border border-dashed border-slate-300 bg-white/60 text-center space-y-1.5">
+                      <Boxes className="w-6 h-6 text-slate-400 mx-auto" />
+                      <p className="text-xs font-semibold text-slate-600">
+                        No se han seleccionado repuestos o materiales para esta orden.
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        Usa el buscador para agregar insumos gastados en terreno (Gas refrigerante, bombas, filtros, tuberías...).
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-600 text-[10.5px] font-bold uppercase tracking-wider">
+                              <th className="py-2.5 px-3">Repuesto / Insumo</th>
+                              <th className="py-2.5 px-2 text-center">Stock Bodega</th>
+                              <th className="py-2.5 px-2 text-center w-32">Cantidad Utilizada</th>
+                              <th className="py-2.5 px-2 text-right w-28">Precio Unit.</th>
+                              <th className="py-2.5 px-3 text-right w-28">Subtotal</th>
+                              <th className="py-2.5 px-2 text-center w-10"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {inventoryItems.map((item, idx) => {
+                              const matched = parts?.find(p => (item.part_id && p.id === item.part_id) || p.name === item.description);
+                              const currentStock = matched ? Number(matched.stock) : undefined;
+                              const isOverStock = currentStock !== undefined && item.quantity > currentStock;
+
+                              return (
+                                <tr key={item.id || idx} className="hover:bg-slate-50/70 transition-colors">
+                                  <td className="py-2 px-3">
+                                    <div className="font-bold text-slate-900">{item.description}</div>
+                                    <div className="text-[10px] text-slate-400 font-mono">
+                                      {item.sku || matched?.sku || 'SKU-N/D'} • {item.unit || matched?.unit || 'unidad'}
+                                    </div>
+                                  </td>
+
+                                  <td className="py-2 px-2 text-center font-mono text-[11px]">
+                                    {currentStock !== undefined ? (
+                                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                        currentStock <= 0 
+                                          ? 'bg-rose-100 text-rose-800' 
+                                          : isOverStock 
+                                            ? 'bg-amber-100 text-amber-800' 
+                                            : 'bg-slate-100 text-slate-700'
+                                      }`}>
+                                        {currentStock} {item.unit || matched?.unit || 'un'}
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-400 text-[10px]">Catálogo</span>
+                                    )}
+                                  </td>
+
+                                  <td className="py-2 px-2 text-center">
+                                    <div className="inline-flex items-center rounded-lg border border-slate-300 bg-white overflow-hidden shadow-2xs">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdateItemQuantity(idx, Math.max(1, item.quantity - 1))}
+                                        disabled={item.quantity <= 1}
+                                        className="px-2 py-1 text-slate-500 hover:bg-slate-100 disabled:opacity-30 cursor-pointer"
+                                      >
+                                        <Minus className="w-3 h-3" />
+                                      </button>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        value={item.quantity}
+                                        onChange={(e) => handleUpdateItemQuantity(idx, parseInt(e.target.value, 10) || 1)}
+                                        onFocus={(e) => e.target.select()}
+                                        className="w-12 text-center py-1 font-mono font-bold text-xs text-slate-900 border-x border-slate-200 focus:outline-none"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdateItemQuantity(idx, item.quantity + 1)}
+                                        className="px-2 py-1 text-slate-500 hover:bg-slate-100 cursor-pointer"
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </td>
+
+                                  <td className="py-2 px-2 text-right">
+                                    <div className="relative">
+                                      <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">
+                                        {settings?.currency_symbol || '$'}
+                                      </span>
+                                      <input
+                                        type="number"
+                                        value={item.unit_price}
+                                        onChange={(e) => handleUpdateItemPrice(idx, parseInt(e.target.value, 10) || 0)}
+                                        onFocus={(e) => e.target.select()}
+                                        className="w-full pl-5 pr-1.5 py-1 text-right font-mono font-bold text-xs text-slate-900 bg-slate-50 border border-slate-200 rounded-md focus:border-cyan-500 focus:outline-none"
+                                      />
+                                    </div>
+                                  </td>
+
+                                  <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">
+                                    {settings?.currency_symbol || '$'} {(item.quantity * item.unit_price).toLocaleString()}
+                                  </td>
+
+                                  <td className="py-2 px-2 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveInventoryItem(idx)}
+                                      title="Eliminar repuesto"
+                                      className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 transition-colors cursor-pointer"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-slate-50 border-t border-slate-200 font-bold text-xs text-slate-800">
+                              <td colSpan={4} className="py-2.5 px-3 text-right">
+                                Total Repuestos e Insumos HVAC:
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-mono text-cyan-800 text-sm font-black">
+                                {settings?.currency_symbol || '$'} {partsAmount.toLocaleString()}
+                              </td>
+                              <td></td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

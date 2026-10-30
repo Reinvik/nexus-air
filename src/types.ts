@@ -287,6 +287,10 @@ export interface OrderItem {
   unit_price: number;
   total: number;
   type: 'equipo' | 'servicio' | 'insumo' | 'repuesto';
+  part_id?: string;
+  sku?: string;
+  unit?: string;
+  cost_price?: number;
 }
 
 export interface ServiceOrder {
@@ -347,14 +351,14 @@ export interface AirPart {
   id: string;
   sku: string;
   name: string;
-  category: 'equipo' | 'refrigerante' | 'cobre_aislacion' | 'bomba_soporte' | 'electrico' | 'quimico';
+  category: 'equipo' | 'refrigerante' | 'cobre_aislacion' | 'bomba_soporte' | 'electrico' | 'quimico' | 'repuesto' | string;
   brand?: string;
   btu?: number;
   stock: number;
   min_stock: number;
   cost_price: number;
   sale_price: number;
-  unit: 'unidad' | 'metro' | 'kg' | 'litro' | 'kit';
+  unit: 'unidad' | 'metro' | 'kg' | 'litro' | 'kit' | string;
   description?: string;
   image_url?: string;
 }
@@ -655,7 +659,7 @@ export const APP_MODULES: AppModuleInfo[] = [
   { id: 'agenda', label: 'Agenda & Visitas', category: 'operativo', description: 'Calendario de visitas técnicas y acuerdos periódicos' },
   { id: 'cotizador', label: 'Cotizador BTU', category: 'operativo', description: 'Cálculo de carga térmica y cotización rápida de equipos' },
   { id: 'recaptacion', label: 'Recaptación 6M', category: 'operativo', description: 'Alertas de mantenimientos vencidos y fidelización' },
-  { id: 'inventory', label: 'Equipos & Stock', category: 'gestion', description: 'Inventario de equipos, repuestos, gases y accesorios' },
+  { id: 'inventory', label: 'Inventario & Insumos', category: 'gestion', description: 'Inventario de equipos, repuestos, gases y accesorios' },
   { id: 'customers', label: 'Clientes', category: 'gestion', description: 'Directorio de clientes residenciales y comerciales' },
   { id: 'technicians', label: 'Técnicos HVAC', category: 'gestion', description: 'Gestión de colaboradores técnicos y comisiones' },
   { id: 'payroll', label: 'Sueldos & Nómina', category: 'gestion', description: 'Liquidaciones de sueldos, pagos y préstamos' },

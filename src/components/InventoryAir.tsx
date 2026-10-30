@@ -123,6 +123,28 @@ export const InventoryAir: React.FC<InventoryAirProps> = ({
     setIsModalOpen(false);
   };
 
+  const categories = [
+    { id: 'all', label: 'Todo el Catálogo' },
+    { id: 'equipo', label: 'Aires Acondicionados' },
+    { id: 'refrigerante', label: 'Gases R410A / R32' },
+    { id: 'cobre_aislacion', label: 'Cañería Cobre & Materiales' },
+    { id: 'bomba_soporte', label: 'Bombas & Soportes' },
+    { id: 'quimico', label: 'Bactericidas & Limpieza' },
+    { id: 'repuesto', label: 'Repuestos & Accesorios' },
+  ];
+
+  const matchesCategory = (itemCategory: string = '', targetCategory: string) => {
+    if (targetCategory === 'all') return true;
+    const cat = itemCategory.toLowerCase();
+    if (targetCategory === 'refrigerante') return cat.includes('refrig') || cat.includes('gas');
+    if (targetCategory === 'quimico') return cat.includes('quimic') || cat.includes('bact') || cat.includes('limp');
+    if (targetCategory === 'cobre_aislacion') return cat.includes('cobre') || cat.includes('material') || cat.includes('aislac') || cat.includes('cañer');
+    if (targetCategory === 'bomba_soporte') return cat.includes('bomba') || cat.includes('soport');
+    if (targetCategory === 'equipo') return cat.includes('equip') || cat.includes('split') || cat.includes('aire');
+    if (targetCategory === 'repuesto') return cat.includes('repuest') || cat.includes('filtro') || cat.includes('sensor') || cat.includes('termo');
+    return cat === targetCategory;
+  };
+
   const filteredParts = useMemo(() => {
     return parts.filter(p => {
       const matchSearch =
@@ -130,19 +152,10 @@ export const InventoryAir: React.FC<InventoryAirProps> = ({
         p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (p.brand || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchCat = selectedCategory === 'all' || p.category === selectedCategory;
+      const matchCat = matchesCategory(p.category, selectedCategory);
       return matchSearch && matchCat;
     });
   }, [parts, searchTerm, selectedCategory]);
-
-  const categories = [
-    { id: 'all', label: 'Todo el Catálogo' },
-    { id: 'equipo', label: 'Aires Acondicionados' },
-    { id: 'refrigerante', label: 'Gases R410A / R32' },
-    { id: 'cobre_aislacion', label: 'Cañería Cobre & Armaflex' },
-    { id: 'bomba_soporte', label: 'Bombas & Soportes' },
-    { id: 'quimico', label: 'Bactericidas & Limpieza' },
-  ];
 
   return (
     <div className="space-y-6">
@@ -209,7 +222,7 @@ export const InventoryAir: React.FC<InventoryAirProps> = ({
                 <th className="py-3.5 px-4">Categoría / Marca</th>
                 <th className="py-3.5 px-4">Stock Disponible</th>
                 <th className="py-3.5 px-4">Costo Neto</th>
-                <th className="py-3.5 px-4">Precio Venta (CLP)</th>
+                <th className="py-3.5 px-4">Precio Venta ({settings?.currency_code || 'CLP'})</th>
                 <th className="py-3.5 px-4 text-right">Acciones</th>
               </tr>
             </thead>
@@ -333,6 +346,7 @@ export const InventoryAir: React.FC<InventoryAirProps> = ({
                     <option value="cobre_aislacion">Cañería Cobre / Aislación</option>
                     <option value="bomba_soporte">Bomba / Soporte</option>
                     <option value="quimico">Químico / Sanitizante</option>
+                    <option value="repuesto">Repuesto / Sensor / Filtro</option>
                   </select>
                 </div>
               </div>
@@ -400,7 +414,7 @@ export const InventoryAir: React.FC<InventoryAirProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Costo ({currencySymbol} {settings?.currency_code || 'CRC'})</label>
+                  <label className="font-semibold text-slate-700">Costo ({currencySymbol} {settings?.currency_code || 'CLP'})</label>
                   <input
                     type="number"
                     value={costPrice}
@@ -409,7 +423,7 @@ export const InventoryAir: React.FC<InventoryAirProps> = ({
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Precio Venta ({currencySymbol} {settings?.currency_code || 'CRC'})</label>
+                  <label className="font-semibold text-slate-700">Precio Venta ({currencySymbol} {settings?.currency_code || 'CLP'})</label>
                   <input
                     type="number"
                     value={salePrice}

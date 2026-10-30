@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
   Customer, 
   AirEquipment, 
@@ -6,11 +6,14 @@ import {
   ServiceOrder, 
   ServiceType, 
   AirSettings,
+  AirPart,
+  OrderItem,
   CALENDAR_COLOR_OPTIONS,
   SERVICE_TYPE_DEFAULT_COLORS,
   formatServiceType
 } from '../types';
-import { X, Plus, Calendar, Clock, User, Wrench, UserCheck, Users, Percent, DollarSign, AlertTriangle, UserPlus, Palette, Check, CheckSquare, Square, Snowflake, Trash2, Layers, Pencil } from 'lucide-react';
+import { useBrand } from '../lib/brandConfig';
+import { X, Plus, Calendar, Clock, User, Wrench, UserCheck, Users, Percent, DollarSign, AlertTriangle, UserPlus, Palette, Check, CheckSquare, Square, Snowflake, Trash2, Layers, Pencil, Boxes, Package, Search, Minus, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import { QuickCreateCustomerModal } from './QuickCreateCustomerModal';
@@ -42,8 +45,10 @@ interface AddServiceOrderModalProps {
   customers: Customer[];
   equipments: AirEquipment[];
   technicians: Technician[];
+  parts?: AirPart[];
   settings?: AirSettings;
   onAddOrder: (orderData: Partial<ServiceOrder>) => void;
+  onUpdatePart?: (id: string, updates: Partial<AirPart>) => Promise<void> | void;
   onAddCustomer?: (customer: Omit<Customer, 'id' | 'created_at'>) => Promise<Customer | void> | void;
   onAddEquipment?: (equipment: Omit<AirEquipment, 'id' | 'next_maintenance_date'>) => Promise<AirEquipment | void> | void;
 }
@@ -54,11 +59,14 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
   customers,
   equipments,
   technicians,
+  parts = [],
   settings,
   onAddOrder,
+  onUpdatePart,
   onAddCustomer,
   onAddEquipment,
 }) => {
+  const { isSolago } = useBrand();
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -229,6 +237,148 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
   const [isRecurringConfirmed, setIsRecurringConfirmed] = useState(false);
   const [recurringFrequencyMonths, setRecurringFrequencyMonths] = useState<number>(6);
 
+  // Repuestos e insumos de inventario (NK-XXX)
+  const [inventoryItems, setInventoryItems] = useState<OrderItem[]>([]);
+  const [partSearch, setPartSearch] = useState('');
+  const [isPartDropdownOpen, setIsPartDropdownOpen] = useState(false);
+  const partSearchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (partSearchRef.current && !partSearchRef.current.contains(e.target as Node)) {
+        setIsPartDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredParts = useMemo(() => {
+    if (!parts || parts.length === 0) return [];
+    const term = partSearch.trim().toLowerCase();
+    if (!term) return parts.slice(0, 10);
+    return parts.filter(p => 
+      p.name.toLowerCase().includes(term) || 
+      (p.sku && p.sku.toLowerCase().includes(term)) ||
+      (p.category && p.category.toLowerCase().includes(term))
+    ).slice(0, 12);
+  }, [parts, partSearch]);
+
+  const partsSubtotal = useMemo(() => {
+    return inventoryItems.reduce((acc, it) => acc + (Number(it.unit_price || 0) * Number(it.quantity || 1)), 0);
+  }, [inventoryItems]);
+
+  const handleAddInventoryPart = (part: AirPart) => {
+    setInventoryItems(prev => {
+      const existingIdx = prev.findIndex(it => (it.part_id && it.part_id === part.id) || it.id === part.id);
+      let updated: OrderItem[];
+      if (existingIdx >= 0) {
+        updated = prev.map((it, idx) => {
+          if (idx === existingIdx) {
+            const nextQty = Number(it.quantity || 1) + 1;
+            return {
+              ...it,
+              quantity: nextQty,
+              total: nextQty * Number(it.unit_price || part.sale_price)
+            };
+          }
+          return it;
+        });
+      } else {
+        const newItem: OrderItem = {
+          id: `item-part-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          part_id: part.id,
+          sku: part.sku,
+          description: part.name,
+          unit: part.unit || 'unidad',
+          quantity: 1,
+          unit_price: Number(part.sale_price) || 0,
+          total: Number(part.sale_price) || 0,
+          cost_price: Number(part.cost_price) || 0,
+          type: 'repuesto',
+        };
+        updated = [...prev, newItem];
+      }
+
+      const laborSum = jobItems.reduce((sum, j) => sum + (Number(j.unitPrice) * Math.max(1, Number(j.quantity))), 0);
+      const newPartsSum = updated.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+      setBasePrice(laborSum + newPartsSum);
+
+      return updated;
+    });
+
+    setPartSearch('');
+    setIsPartDropdownOpen(false);
+    toast.success(`Repuesto añadido: ${part.name}`);
+  };
+
+  const handleUpdateItemQuantity = (index: number, newQty: number) => {
+    const qty = Math.max(1, newQty);
+    setInventoryItems(prev => {
+      const updated = prev.map((it, idx) => {
+        if (idx === index) {
+          return {
+            ...it,
+            quantity: qty,
+            total: qty * Number(it.unit_price || 0)
+          };
+        }
+        return it;
+      });
+
+      const laborSum = jobItems.reduce((sum, j) => sum + (Number(j.unitPrice) * Math.max(1, Number(j.quantity))), 0);
+      const newPartsSum = updated.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+      setBasePrice(laborSum + newPartsSum);
+
+      return updated;
+    });
+  };
+
+  const handleUpdateItemPrice = (index: number, newPrice: number) => {
+    const price = Math.max(0, newPrice);
+    setInventoryItems(prev => {
+      const updated = prev.map((it, idx) => {
+        if (idx === index) {
+          return {
+            ...it,
+            unit_price: price,
+            total: Number(it.quantity || 1) * price
+          };
+        }
+        return it;
+      });
+
+      const laborSum = jobItems.reduce((sum, j) => sum + (Number(j.unitPrice) * Math.max(1, Number(j.quantity))), 0);
+      const newPartsSum = updated.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+      setBasePrice(laborSum + newPartsSum);
+
+      return updated;
+    });
+  };
+
+  const handleRemoveInventoryItem = (index: number) => {
+    setInventoryItems(prev => {
+      const removed = prev[index];
+      const updated = prev.filter((_, idx) => idx !== index);
+
+      const laborSum = jobItems.reduce((sum, j) => sum + (Number(j.unitPrice) * Math.max(1, Number(j.quantity))), 0);
+      const newPartsSum = updated.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+      setBasePrice(laborSum + newPartsSum);
+
+      if (removed) {
+        toast.success(`Repuesto eliminado: ${removed.description}`);
+      }
+      return updated;
+    });
+  };
+
+  const handleRecalculateTotals = () => {
+    const laborSum = jobItems.reduce((sum, j) => sum + (Number(j.unitPrice) * Math.max(1, Number(j.quantity))), 0);
+    const newPartsSum = inventoryItems.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+    setBasePrice(laborSum + newPartsSum);
+    toast.success('Total recalculado con mano de obra y repuestos');
+  };
+
   const taxRate = settings?.tax_rate !== undefined ? Number(settings.tax_rate) : 0.13;
   const taxRatePercent = Math.round(taxRate * 100);
 
@@ -367,7 +517,7 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (customers.length === 0) {
       toast.error('Debes registrar al menos un cliente antes de crear una orden de trabajo.');
@@ -401,6 +551,34 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
       type: 'servicio' as const,
     }));
 
+    // Ítems consolidados (Mano de obra + Repuestos de inventario)
+    const allItems: OrderItem[] = [
+      ...detailedItems,
+      ...inventoryItems.map(it => ({
+        ...it,
+        type: 'repuesto' as const,
+        total: Number(it.quantity || 1) * Number(it.unit_price || 0)
+      }))
+    ];
+
+    // Descontar stock de inventario para cada producto añadido en la nueva orden
+    if (onUpdatePart && parts && parts.length > 0) {
+      try {
+        for (const item of inventoryItems) {
+          if (item.part_id) {
+            const matchedPart = parts.find(p => p.id === item.part_id);
+            if (matchedPart) {
+              const currentStock = Number(matchedPart.stock) || 0;
+              const newStock = Math.max(0, currentStock - Number(item.quantity || 1));
+              await onUpdatePart(matchedPart.id, { stock: newStock });
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[AddServiceOrderModal] Error deducting inventory stock:', err);
+      }
+    }
+
     onAddOrder({
       customer_id: selectedCust.id,
       equipment_id: selectedEquipmentIds[0] || (clientEquipments[0]?.id),
@@ -419,7 +597,7 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
       assistant_payout_type: assistantPayoutType,
       assistant_payout_value: assistantPayoutValue,
       description: description || `${serviceTypesSummary} para ${selectedCust.name}`,
-      items: detailedItems,
+      items: allItems,
       subtotal: calculatedFinancials.subtotal,
       tax: calculatedFinancials.tax,
       total: calculatedFinancials.total,
@@ -869,6 +1047,186 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                     </span>
                   </div>
 
+                  {/* Sección de Repuestos, Materiales e Insumos HVAC (Inventario) */}
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-7 h-7 rounded-lg ${isSolago ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-cyan-100 text-cyan-700 border-cyan-200'} border flex items-center justify-center font-bold`}>
+                          <Boxes className="w-3.5 h-3.5" />
+                        </div>
+                        <div>
+                          <h5 className="font-bold text-xs text-slate-900 flex items-center gap-1.5">
+                            Repuestos & Insumos Utilizados (Inventario)
+                            <span className={`text-[9.5px] font-bold px-2 py-0.2 rounded-full ${
+                              inventoryItems.length > 0
+                                ? (isSolago ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-cyan-100 text-cyan-900 border border-cyan-300')
+                                : 'bg-slate-200 text-slate-600'
+                            }`}>
+                              {inventoryItems.length} {inventoryItems.length === 1 ? 'ítem' : 'ítems'}
+                            </span>
+                          </h5>
+                          <p className="text-[10.5px] text-slate-500">
+                            Se descontarán de bodega automáticamente al crear la orden.
+                          </p>
+                        </div>
+                      </div>
+
+                      {inventoryItems.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleRecalculateTotals}
+                          title="Recalcular total sumando servicios y repuestos"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-[10.5px] font-bold shadow-2xs transition-colors cursor-pointer"
+                        >
+                          <RotateCcw className="w-3 h-3 text-cyan-600" />
+                          <span>Recalcular</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Buscador de Catálogo de Inventario */}
+                    <div ref={partSearchRef} className="relative">
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={partSearch}
+                          onChange={(e) => {
+                            setPartSearch(e.target.value);
+                            setIsPartDropdownOpen(true);
+                          }}
+                          onFocus={() => setIsPartDropdownOpen(true)}
+                          placeholder="Buscar repuesto (ej: Gas R410A, Bomba condensado, Tubo 1/4...)"
+                          className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 font-medium placeholder:text-slate-400 focus:border-cyan-500 focus:outline-none transition-all shadow-2xs"
+                        />
+                        {partSearch && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPartSearch('');
+                              setIsPartDropdownOpen(false);
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Dropdown de Resultados */}
+                      {isPartDropdownOpen && (
+                        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-30 max-h-56 overflow-y-auto divide-y divide-slate-100">
+                          {filteredParts.length === 0 ? (
+                            <div className="p-2.5 text-center text-xs text-slate-400 italic">
+                              No se encontraron repuestos con "{partSearch}".
+                            </div>
+                          ) : (
+                            filteredParts.map((part) => {
+                              const isOutOfStock = Number(part.stock || 0) <= 0;
+                              const isAlreadyAdded = inventoryItems.some(it => (it.part_id && it.part_id === part.id) || it.id === part.id);
+                              return (
+                                <button
+                                  key={part.id}
+                                  type="button"
+                                  onClick={() => handleAddInventoryPart(part)}
+                                  className="w-full text-left px-3 py-2 hover:bg-cyan-50/60 flex items-center justify-between gap-2.5 transition-colors cursor-pointer group"
+                                >
+                                  <div className="min-w-0 flex items-center gap-2">
+                                    <Package className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                    <div className="min-w-0">
+                                      <div className="font-bold text-xs text-slate-800 truncate group-hover:text-cyan-700">
+                                        {part.name}
+                                      </div>
+                                      <div className="text-[10px] text-slate-400 font-mono">
+                                        {part.sku || 'SKU-N/D'} • {part.unit || 'un'}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className={`text-[9.5px] font-bold px-1.5 py-0.2 rounded-full border ${
+                                      isOutOfStock 
+                                        ? 'bg-rose-50 text-rose-700 border-rose-200' 
+                                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    }`}>
+                                      Stock: {part.stock}
+                                    </span>
+                                    <span className="font-mono font-bold text-xs text-slate-900">
+                                      {settings?.currency_symbol || '$'} {Number(part.sale_price || 0).toLocaleString()}
+                                    </span>
+                                    <span className="px-1.5 py-0.5 rounded bg-slate-100 group-hover:bg-cyan-500 group-hover:text-white text-slate-700 text-[10px] font-bold">
+                                      {isAlreadyAdded ? '+1' : '+'}
+                                    </span>
+                                  </div>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Lista de Repuestos seleccionados */}
+                    {inventoryItems.length > 0 && (
+                      <div className="space-y-1.5">
+                        {inventoryItems.map((item, idx) => {
+                          const matched = parts?.find(p => (item.part_id && p.id === item.part_id) || p.name === item.description);
+                          const currentStock = matched ? Number(matched.stock) : undefined;
+                          return (
+                            <div key={item.id || idx} className="p-2 bg-white rounded-lg border border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+                              <div className="min-w-0 flex-1">
+                                <span className="font-bold text-slate-800 block truncate">{item.description}</span>
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  Disp: {currentStock ?? 'N/D'} {item.unit || 'un'}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <div className="inline-flex items-center rounded border border-slate-200 bg-white">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateItemQuantity(idx, Math.max(1, item.quantity - 1))}
+                                    disabled={item.quantity <= 1}
+                                    className="px-1.5 py-0.5 text-slate-500 hover:bg-slate-100 disabled:opacity-30 cursor-pointer"
+                                  >
+                                    <Minus className="w-2.5 h-2.5" />
+                                  </button>
+                                  <span className="px-2 font-mono font-bold text-xs">{item.quantity}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateItemQuantity(idx, item.quantity + 1)}
+                                    className="px-1.5 py-0.5 text-slate-500 hover:bg-slate-100 cursor-pointer"
+                                  >
+                                    <Plus className="w-2.5 h-2.5" />
+                                  </button>
+                                </div>
+
+                                <div className="font-mono text-slate-900 font-bold text-xs w-20 text-right">
+                                  {settings?.currency_symbol || '$'} {(item.quantity * item.unit_price).toLocaleString()}
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveInventoryItem(idx)}
+                                  className="text-slate-400 hover:text-rose-600 p-1 rounded transition-colors cursor-pointer"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        <div className="flex justify-between items-center text-xs font-bold text-slate-800 pt-1">
+                          <span>Subtotal Repuestos:</span>
+                          <span className="font-mono text-cyan-800">
+                            {settings?.currency_symbol || '$'} {partsSubtotal.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {/* NK-061: Clasificación cromática en agendamiento */}
                   <div className="pt-2 border-t border-slate-200/70 space-y-2">
                     <div className="flex items-center justify-between">
@@ -1181,6 +1539,23 @@ export const AddServiceOrderModal: React.FC<AddServiceOrderModalProps> = ({
                   {/* Desglose Financiero en Vivo */}
                   <div className="p-2.5 rounded-lg bg-white/80 border border-slate-200/90 text-xs space-y-1">
                     <div className="flex items-center justify-between text-slate-600 text-[11px]">
+                      <span>Trabajos / Servicios ({jobItems.length}):</span>
+                      <span className="font-mono font-bold text-slate-800">
+                        {settings?.currency_symbol || '$'} {jobItems.reduce((acc, j) => acc + (Number(j.unitPrice) * Math.max(1, Number(j.quantity))), 0).toLocaleString()}
+                      </span>
+                    </div>
+                    {inventoryItems.length > 0 && (
+                      <div className="flex items-center justify-between text-slate-600 text-[11px]">
+                        <span className="flex items-center gap-1">
+                          <Package className="w-3 h-3 text-cyan-600" />
+                          Repuestos e Insumos ({inventoryItems.length}):
+                        </span>
+                        <span className="font-mono font-bold text-cyan-800">
+                          {settings?.currency_symbol || '$'} {partsSubtotal.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-slate-600 text-[11px] pt-1 border-t border-slate-100">
                       <span>Subtotal Neto:</span>
                       <span className="font-mono font-bold text-slate-800">
                         {settings?.currency_symbol || '$'} {calculatedFinancials.subtotal.toLocaleString()}

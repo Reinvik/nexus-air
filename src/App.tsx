@@ -760,8 +760,10 @@ export default function App() {
           customers={customers}
           equipments={equipments}
           technicians={technicians}
+          parts={parts}
           settings={tenantSettings || settings}
           onAddOrder={addOrder}
+          onUpdatePart={updatePart}
           onAddCustomer={addCustomer}
           onAddEquipment={addEquipment}
         />
@@ -779,6 +781,7 @@ export default function App() {
           technicians={technicians}
           customers={customers}
           equipments={equipments}
+          parts={parts}
           settings={tenantSettings || settings}
           technicianPayouts={technicianPayouts}
           onAddTechnicianPayout={addTechnicianPayout}
@@ -793,6 +796,7 @@ export default function App() {
           }}
           onUpdateOrder={updateOrder}
           onDeleteOrder={deleteOrder}
+          onUpdatePart={updatePart}
           onAddCustomer={addCustomer}
           onAddEquipment={addEquipment}
         />
