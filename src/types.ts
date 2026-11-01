@@ -105,6 +105,16 @@ export type OrderStatus =
   | 'completado' 
   | 'cancelado';
 
+export interface MultisplitEvaporator {
+  id: string;
+  number: number; // 1 a 10
+  name: string; // ej: "Dormitorio Principal", "Living", "Oficina"
+  btu: number;
+  model?: string;
+  serial_number?: string;
+  type?: 'split_muro' | 'cassette' | 'ducto' | 'piso_cielo';
+}
+
 export interface AirEquipment {
   id: string;
   customer_id: string;
@@ -123,6 +133,23 @@ export interface AirEquipment {
   next_maintenance_date: string; // 6 meses después del último mantenimiento o instalación
   status?: string;
   notes?: string;
+  evaporators?: MultisplitEvaporator[]; // Hasta 10 evaporadoras para sistemas Multisplit
+}
+
+export function serializeEquipmentEvaporators(notes?: string, evaporators?: MultisplitEvaporator[]): string | undefined {
+  if (!evaporators || evaporators.length === 0) return notes;
+  const cleanNotes = (notes || '').replace(/\[EVAPORATORS\]:.*?\[END_EVAPORATORS\]/gs, '').trim();
+  const json = JSON.stringify(evaporators);
+  return `${cleanNotes} [EVAPORATORS]:${json}[END_EVAPORATORS]`.trim();
+}
+
+export function deserializeEquipmentEvaporators(notes?: string): MultisplitEvaporator[] {
+  if (!notes || !notes.includes('[EVAPORATORS]:')) return [];
+  try {
+    const raw = notes.split('[EVAPORATORS]:')[1]?.split('[END_EVAPORATORS]')[0];
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [];
 }
 
 export interface Customer {

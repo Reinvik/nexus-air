@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Customer, AirEquipment, EquipmentType, RefrigerantType, AirSettings } from '../types';
+import { Customer, AirEquipment, EquipmentType, RefrigerantType, AirSettings, MultisplitEvaporator } from '../types';
 import { 
   Users, 
   Search, 
@@ -110,6 +110,44 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
   const [eqRefrigerant, setEqRefrigerant] = useState<RefrigerantType>('R410A');
   const [eqLocation, setEqLocation] = useState('Living Comedor');
   const [eqLastDate, setEqLastDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+
+  // Multisplit Evaporators in Add Equipment Modal (NK-040: Hasta 10 evaporadoras)
+  const [eqEvaporators, setEqEvaporators] = useState<MultisplitEvaporator[]>([
+    { id: 'ev-1', number: 1, name: 'Evaporadora 1 - Sala / Living', btu: 12000, type: 'split_muro' },
+    { id: 'ev-2', number: 2, name: 'Evaporadora 2 - Dormitorio Principal', btu: 9000, type: 'split_muro' },
+  ]);
+
+  const handleAddModalEvaporator = () => {
+    if (eqEvaporators.length >= 10) {
+      toast.error('Un sistema Multisplit permite un máximo de 10 evaporadoras.');
+      return;
+    }
+    const nextNum = eqEvaporators.length + 1;
+    setEqEvaporators(prev => [
+      ...prev,
+      {
+        id: `ev-${Date.now()}-${nextNum}`,
+        number: nextNum,
+        name: `Evaporadora ${nextNum} - Zona ${nextNum}`,
+        btu: 9000,
+        type: 'split_muro'
+      }
+    ]);
+  };
+
+  const handleRemoveModalEvaporator = (id: string) => {
+    setEqEvaporators(prev => {
+      const filtered = prev.filter(e => e.id !== id);
+      return filtered.map((e, idx) => ({ ...e, number: idx + 1 }));
+    });
+  };
+
+  const handleUpdateModalEvaporator = (id: string, field: keyof MultisplitEvaporator, value: any) => {
+    setEqEvaporators(prev => prev.map(e => {
+      if (e.id !== id) return e;
+      return { ...e, [field]: value };
+    }));
+  };
 
   // Bulk Equipment & Fleet Management State (NK-036)
   const [isBulkEqModalOpen, setIsBulkEqModalOpen] = useState(false);
@@ -321,11 +359,16 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
       refrigerant: eqRefrigerant,
       location_in_property: eqLocation,
       last_maintenance_date: eqLastDate,
+      evaporators: eqType === 'multisplit' ? eqEvaporators : undefined,
     });
 
     setEqSerial('');
     setEqSerialEvap('');
     setEqSerialCond('');
+    setEqEvaporators([
+      { id: 'ev-1', number: 1, name: 'Evaporadora 1 - Sala / Living', btu: 12000, type: 'split_muro' },
+      { id: 'ev-2', number: 2, name: 'Evaporadora 2 - Dormitorio Principal', btu: 9000, type: 'split_muro' },
+    ]);
     setIsAddEqModalOpen(false);
   };
 
@@ -720,6 +763,11 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
                                       {!eq.serial_number && !eq.serial_number_evaporator && !eq.serial_number_condenser && (
                                         <div className="text-[10px] text-slate-400">Sin serial asignado</div>
                                       )}
+                                      {eq.evaporators && eq.evaporators.length > 0 && (
+                                        <div className="text-[10px] text-cyan-800 font-bold bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200 mt-1">
+                                          ❄️ Multisplit ({eq.evaporators.length} Evap.)
+                                        </div>
+                                      )}
                                     </div>
                                     {onDeleteEquipment && (
                                       <button
@@ -799,6 +847,30 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
                                   Cond: <b className="text-cyan-700">{eq.serial_number_condenser}</b>
                                 </span>
                               )}
+                            </div>
+                          )}
+
+                          {eq.evaporators && eq.evaporators.length > 0 && (
+                            <div className="p-2 bg-cyan-50/70 border border-cyan-200/80 rounded-lg space-y-1 mt-1.5">
+                              <div className="text-[11px] font-bold text-cyan-900 flex items-center justify-between">
+                                <span>❄️ Evaporadoras Anexas ({eq.evaporators.length}):</span>
+                                <span className="font-mono text-[10px] text-cyan-700 font-semibold">
+                                  {eq.evaporators.reduce((acc, ev) => acc + (ev.btu || 0), 0).toLocaleString()} BTU Totales
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-1 gap-1">
+                                {eq.evaporators.map(ev => (
+                                  <div key={ev.id} className="text-[10px] flex items-center justify-between bg-white px-2 py-1 rounded border border-cyan-100 shadow-2xs">
+                                    <span className="font-semibold text-slate-800">
+                                      #{ev.number} {ev.name}
+                                    </span>
+                                    <div className="flex items-center gap-1.5 font-mono text-cyan-800">
+                                      <span>{(ev.btu || 0).toLocaleString()} BTU</span>
+                                      {ev.serial_number && <span className="text-[9px] text-slate-500 font-mono">[{ev.serial_number}]</span>}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -1078,6 +1150,95 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
             <form onSubmit={handleCreateEquipment} className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-2">
                 <div>
+                  <label className="text-slate-700 font-medium">Tipo de Equipo</label>
+                  <select
+                    value={eqType}
+                    onChange={(e) => setEqType(e.target.value as any)}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 mt-1 font-semibold"
+                  >
+                    <option value="split_muro">Split Muro</option>
+                    <option value="multisplit">❄️ Multisplit Multi-zona</option>
+                    <option value="cassette">Cassette</option>
+                    <option value="ducto">Ducto Central</option>
+                    <option value="piso_cielo">Piso Cielo</option>
+                    <option value="portatil">Portátil</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-slate-700 font-medium">Tecnología</label>
+                  <select
+                    value={eqTech}
+                    onChange={(e) => setEqTech(e.target.value as any)}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 mt-1 font-semibold"
+                  >
+                    <option value="inverter">Inverter (Eficiente)</option>
+                    <option value="on_off">On / Off (Convencional)</option>
+                  </select>
+                </div>
+              </div>
+
+              {eqType === 'multisplit' && (
+                <div className="p-3 bg-cyan-50/70 border border-cyan-200 rounded-xl space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-cyan-950 text-xs">Unidades Evaporadoras Anexas</span>
+                      <p className="text-[10px] text-cyan-700">Evaporadoras conectadas a este multisplit ({eqEvaporators.length} de máx. 10)</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddModalEvaporator}
+                      disabled={eqEvaporators.length >= 10}
+                      className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-[10px] font-bold inline-flex items-center gap-1 transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Anexar Evap</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                    {eqEvaporators.map((ev, idx) => (
+                      <div key={ev.id} className="p-2 bg-white border border-cyan-200/80 rounded-lg flex items-center gap-2 text-[11px]">
+                        <span className="w-5 text-center font-bold text-cyan-800 shrink-0">#{ev.number || idx + 1}</span>
+                        <input
+                          type="text"
+                          value={ev.name}
+                          onChange={(e) => handleUpdateModalEvaporator(ev.id, 'name', e.target.value)}
+                          placeholder="Nombre/Zona (ej. Living)"
+                          className="flex-1 p-1 bg-slate-50 border border-slate-200 rounded text-slate-800 font-medium text-xs focus:outline-none"
+                        />
+                        <select
+                          value={ev.btu}
+                          onChange={(e) => handleUpdateModalEvaporator(ev.id, 'btu', parseInt(e.target.value) || 9000)}
+                          className="w-22 p-1 bg-slate-50 border border-slate-200 rounded text-slate-800 font-mono font-bold text-[10px] focus:outline-none"
+                        >
+                          <option value={9000}>9.000 BTU</option>
+                          <option value={12000}>12.000 BTU</option>
+                          <option value={18000}>18.000 BTU</option>
+                          <option value={24000}>24.000 BTU</option>
+                        </select>
+                        <input
+                          type="text"
+                          value={ev.serial_number || ''}
+                          onChange={(e) => handleUpdateModalEvaporator(ev.id, 'serial_number', e.target.value)}
+                          placeholder="S/N"
+                          className="w-20 p-1 bg-slate-50 border border-slate-200 rounded text-slate-800 font-mono text-[10px] uppercase focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveModalEvaporator(ev.id)}
+                          className="text-slate-300 hover:text-rose-500 p-0.5"
+                          title="Eliminar evaporadora"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
                   <label className="text-slate-700 font-medium">Marca</label>
                   <input
                     type="text"
@@ -1098,7 +1259,10 @@ export const CustomersAir: React.FC<CustomersAirProps> = ({
                     <option value="12000">12.000 BTU</option>
                     <option value="18000">18.000 BTU</option>
                     <option value="24000">24.000 BTU</option>
+                    <option value="28000">28.000 BTU (Multisplit)</option>
                     <option value="36000">36.000 BTU</option>
+                    <option value="42000">42.000 BTU (Multisplit)</option>
+                    <option value="48000">48.000 BTU</option>
                   </select>
                 </div>
               </div>

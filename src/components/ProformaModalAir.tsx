@@ -52,7 +52,7 @@ interface ProformaModalAirProps {
   includeInstallation?: boolean;
   installationPrice?: number;
   initialEquipmentPrice?: number;
-  initialServiceCategory?: 'instalacion' | 'mantencion_multiequipo' | 'reparacion';
+  initialServiceCategory?: 'instalacion' | 'mantencion_multiequipo' | 'reparacion' | 'multisplit';
 }
 
 export function ProformaModalAir({
@@ -143,9 +143,142 @@ export function ProformaModalAir({
     }
   }, [defaultEquip, isChile]);
 
-  const [serviceCategory, setServiceCategory] = useState<'instalacion' | 'mantencion_multiequipo' | 'reparacion'>(
+  const [serviceCategory, setServiceCategory] = useState<'instalacion' | 'mantencion_multiequipo' | 'reparacion' | 'multisplit'>(
     initialServiceCategory || 'instalacion'
   );
+
+  // Estados específicos para Sistema Multisplit (NK-040: Hasta 10 evaporadoras)
+  const [multisplitCondenserName, setMultisplitCondenserName] = useState('Condensadora Exterior Multisplit Inverter');
+  const [multisplitCondenserBtu, setMultisplitCondenserBtu] = useState<number>(28000);
+  const [multisplitCondenserPrice, setMultisplitCondenserPrice] = useState<number>(isChile ? 650000 : 380000);
+
+  interface MultisplitEvaporatorForm {
+    id: string;
+    number: number;
+    name: string;
+    btu: number;
+    price: number;
+    type: string;
+    notes?: string;
+  }
+
+  const [multisplitEvaporators, setMultisplitEvaporators] = useState<MultisplitEvaporatorForm[]>(() => [
+    {
+      id: 'ev-1',
+      number: 1,
+      name: 'Evaporadora Muro - Sala Principal',
+      btu: 12000,
+      price: isChile ? 180000 : 95000,
+      type: 'split_muro',
+      notes: 'Unidad interior de alta eficiencia'
+    },
+    {
+      id: 'ev-2',
+      number: 2,
+      name: 'Evaporadora Muro - Dormitorio Master',
+      btu: 9000,
+      price: isChile ? 150000 : 85000,
+      type: 'split_muro',
+      notes: 'Unidad interior silenciosa'
+    }
+  ]);
+
+  const handleAddEvaporator = (presetBtu = 9000, presetName?: string) => {
+    if (multisplitEvaporators.length >= 10) {
+      toast.error('El sistema Multisplit admite un máximo de 10 evaporadoras.');
+      return;
+    }
+    const nextNum = multisplitEvaporators.length + 1;
+    const newEvap: MultisplitEvaporatorForm = {
+      id: `ev-${Date.now()}-${nextNum}`,
+      number: nextNum,
+      name: presetName || `Evaporadora #${nextNum} - Zona ${nextNum}`,
+      btu: presetBtu,
+      price: isChile ? (presetBtu > 12000 ? 210000 : presetBtu === 12000 ? 180000 : 150000) : (presetBtu > 12000 ? 120000 : presetBtu === 12000 ? 95000 : 85000),
+      type: 'split_muro',
+      notes: 'Unidad interior conectada a condensador central'
+    };
+    setMultisplitEvaporators(prev => [...prev, newEvap]);
+    toast.success(`Evaporadora #${nextNum} anexada exitosamente.`);
+  };
+
+  const handleRemoveEvaporator = (id: string) => {
+    setMultisplitEvaporators(prev => {
+      const filtered = prev.filter(ev => ev.id !== id);
+      return filtered.map((ev, idx) => ({ ...ev, number: idx + 1 }));
+    });
+  };
+
+  const handleEvaporatorChange = (id: string, field: keyof MultisplitEvaporatorForm, value: any) => {
+    setMultisplitEvaporators(prev => prev.map(ev => {
+      if (ev.id !== id) return ev;
+      const updated = { ...ev, [field]: value };
+      if (field === 'price' || field === 'btu') {
+        updated[field] = Number(value) || 0;
+      }
+      return updated;
+    }));
+  };
+
+  const handleApplyMultisplitPreset = (count: number) => {
+    const safeCount = Math.min(10, Math.max(1, count));
+    const presets: MultisplitEvaporatorForm[] = [];
+    const names = [
+      'Sala / Living Principal',
+      'Dormitorio Master',
+      'Dormitorio Secundario',
+      'Oficina / Estudio',
+      'Comedor / Cocina',
+      'Dormitorio 3',
+      'Sala de Estar',
+      'Gimnasio / Quincho',
+      'Habitación de Huéspedes',
+      'Zona Adicional'
+    ];
+    for (let i = 1; i <= safeCount; i++) {
+      const btu = i === 1 ? 18000 : i === 2 ? 12000 : 9000;
+      presets.push({
+        id: `ev-preset-${i}`,
+        number: i,
+        name: `Evaporadora #${i} - ${names[i - 1] || `Zona ${i}`}`,
+        btu,
+        price: isChile ? (btu >= 18000 ? 220000 : btu === 12000 ? 180000 : 150000) : (btu >= 18000 ? 130000 : btu === 12000 ? 95000 : 85000),
+        type: 'split_muro',
+        notes: 'Unidad interior conectada a condensador central'
+      });
+    }
+    setMultisplitEvaporators(presets);
+    const sumBtu = presets.reduce((acc, ev) => acc + ev.btu, 0);
+    setMultisplitCondenserBtu(Math.max(24000, sumBtu));
+    setMultisplitCondenserName(`Condensadora Exterior Multisplit ${safeCount}x1 Inverter`);
+    toast.success(`Configuración Multisplit ${safeCount}x1 aplicada (${safeCount} evaporadoras).`);
+  };
+
+  const handleAddCanuelasItem = () => {
+    const newItem: ProformaItem = {
+      id: `mat-canuelas-${Date.now()}`,
+      concept: 'ARREGLO Y REEMPLAZO DE CAÑUELAS / CANALETAS DE REFRIGERACIÓN',
+      quantity: 1,
+      unitPrice: isChile ? 28000 : 18000,
+      total: isChile ? 28000 : 18000,
+      type: 'material'
+    };
+    setInstallationItems(prev => [...prev, newItem]);
+    toast.success('Partida de Arreglo de Cañuelas agregada.');
+  };
+
+  const handleAddPinturaItem = () => {
+    const newItem: ProformaItem = {
+      id: `mat-pintura-${Date.now()}`,
+      concept: 'PINTURA Y RETOQUES ESTÉTICOS DE CAÑUELAS Y PAREDES',
+      quantity: 1,
+      unitPrice: isChile ? 35000 : 22000,
+      total: isChile ? 35000 : 22000,
+      type: 'instalacion'
+    };
+    setInstallationItems(prev => [...prev, newItem]);
+    toast.success('Partida de Pintura y Retoques agregada.');
+  };
 
   // Mano de Obra y Materiales de Instalación calibrados por país (Total base: 155.500)
   const [installationItems, setInstallationItems] = useState<ProformaItem[]>(() => {
@@ -358,13 +491,19 @@ export function ProformaModalAir({
     setRepairItems(prev => [...prev, newItem]);
   };
 
-  // Totales Dinámicos según Categoría de Servicio (NK-035)
+  // Totales Dinámicos según Categoría de Servicio (NK-035 / NK-040 Multisplit)
   const isInstallation = serviceCategory === 'instalacion';
   const isMultiMaintenance = serviceCategory === 'mantencion_multiequipo';
   const isRepair = serviceCategory === 'reparacion';
+  const isMultisplit = serviceCategory === 'multisplit';
 
-  const subtotalEquipos = isInstallation ? (equipmentPrice * equipmentQty) : 0;
-  const subtotalInstalacion = isInstallation
+  const subtotalEquipos = isInstallation
+    ? (equipmentPrice * equipmentQty)
+    : isMultisplit
+    ? (multisplitCondenserPrice + multisplitEvaporators.reduce((acc, ev) => acc + (ev.price || 0), 0))
+    : 0;
+
+  const subtotalInstalacion = (isInstallation || isMultisplit)
     ? installationItems.reduce((acc, it) => acc + (it.total || 0), 0)
     : isMultiMaintenance
     ? maintenanceItems.reduce((acc, it) => acc + (it.total || 0), 0)
@@ -384,18 +523,33 @@ export function ProformaModalAir({
       clientPhone,
       clientEmail,
       serviceCategory,
-      serviceTitle: isMultiMaintenance
+      serviceTitle: isMultisplit
+        ? 'PRESUPUESTO SISTEMA MULTISPLIT'
+        : isMultiMaintenance
         ? 'PRESUPUESTO MANTENIMIENTO MULTIEQUIPO CORPORATIVO'
         : isRepair
         ? 'PRESUPUESTO REPARACIÓN Y DIAGNÓSTICO'
         : 'COTIZACIÓN / PROFORMA OFICIAL',
       areaM2: isInstallation ? areaM2 : undefined,
-      recommendedBtu: isInstallation ? recommendedBtu : undefined,
-      recommendedTon: isInstallation ? recommendedTon : undefined,
+      recommendedBtu: isInstallation ? recommendedBtu : isMultisplit ? multisplitCondenserBtu : undefined,
+      recommendedTon: isInstallation ? recommendedTon : isMultisplit ? Number((multisplitCondenserBtu / 12000).toFixed(1)) : undefined,
       equipmentName: isInstallation ? (currentEquipment?.name || 'Aire Acondicionado Split Inverter Ecológico') : undefined,
       equipmentQty: isInstallation ? equipmentQty : undefined,
       equipmentPrice: isInstallation ? equipmentPrice : undefined,
-      installationItems: isInstallation ? installationItems.map(it => ({
+      // Multisplit props
+      multisplitCondenserName: isMultisplit ? multisplitCondenserName : undefined,
+      multisplitCondenserBtu: isMultisplit ? multisplitCondenserBtu : undefined,
+      multisplitCondenserPrice: isMultisplit ? multisplitCondenserPrice : undefined,
+      multisplitEvaporators: isMultisplit ? multisplitEvaporators.map(ev => ({
+        id: ev.id,
+        number: ev.number,
+        name: ev.name,
+        btu: ev.btu,
+        price: ev.price,
+        type: ev.type,
+        notes: ev.notes
+      })) : undefined,
+      installationItems: (isInstallation || isMultisplit) ? installationItems.map(it => ({
         concept: it.concept,
         quantity: it.quantity,
         unitPrice: it.unitPrice,
@@ -457,14 +611,22 @@ export function ProformaModalAir({
         toast.success('Imagen descargada para adjuntar en WhatsApp.', { id: 'cap-pf' });
       }
       const activeItems = isMultiMaintenance ? maintenanceItems : isRepair ? repairItems : installationItems;
-      const title = isMultiMaintenance 
+      const title = isMultisplit
+        ? 'PRESUPUESTO SISTEMA MULTISPLIT'
+        : isMultiMaintenance 
         ? 'PRESUPUESTO MANTENIMIENTO MULTIEQUIPO' 
         : isRepair 
         ? 'PRESUPUESTO REPARACIÓN Y DIAGNÓSTICO' 
         : 'PROFORMA OFICIAL DE CLIMATIZACIÓN';
 
       let itemsSummary = '';
-      if (isInstallation) {
+      if (isMultisplit) {
+        itemsSummary = `❄️ *Sistema Multisplit Inverter:*\n` +
+          `• Condensadora Exterior: ${multisplitCondenserName} (${multisplitCondenserBtu.toLocaleString()} BTU) - ${formatAirPrice(multisplitCondenserPrice, currencySymbol, countryCode)}\n` +
+          `• Evaporadoras Anexas (${multisplitEvaporators.length} un.):\n` +
+          multisplitEvaporators.map(ev => `  - #${ev.number}: ${ev.name} (${ev.btu.toLocaleString()} BTU) [${formatAirPrice(ev.price, currencySymbol, countryCode)}]`).join('\n') + '\n\n' +
+          `🔧 *Instalación, Cañuelas y Materiales:* ${formatAirPrice(subtotalInstalacion, currencySymbol, countryCode)}\n`;
+      } else if (isInstallation) {
         itemsSummary = `📦 *Equipo Cotizado:* ${currentEquipment?.name || 'Split Inverter'}\n` +
           `• Cantidad: ${equipmentQty} un.\n` +
           `• Precio Equipo: ${formatAirPrice(subtotalEquipos, currencySymbol, countryCode)}\n\n` +
@@ -529,14 +691,22 @@ export function ProformaModalAir({
 
   const handleSendWhatsApp = () => {
     const activeItems = isMultiMaintenance ? maintenanceItems : isRepair ? repairItems : installationItems;
-    const title = isMultiMaintenance 
+    const title = isMultisplit
+      ? 'PRESUPUESTO SISTEMA MULTISPLIT'
+      : isMultiMaintenance 
       ? 'PRESUPUESTO MANTENIMIENTO MULTIEQUIPO' 
       : isRepair 
       ? 'PRESUPUESTO REPARACIÓN Y DIAGNÓSTICO' 
       : 'PROFORMA OFICIAL DE CLIMATIZACIÓN';
 
     let itemsSummary = '';
-    if (isInstallation) {
+    if (isMultisplit) {
+      itemsSummary = `❄️ *Sistema Multisplit Inverter:*\n` +
+        `• Condensadora Exterior: ${multisplitCondenserName} (${multisplitCondenserBtu.toLocaleString()} BTU) - ${formatAirPrice(multisplitCondenserPrice, currencySymbol, countryCode)}\n` +
+        `• Evaporadoras Anexas (${multisplitEvaporators.length} un.):\n` +
+        multisplitEvaporators.map(ev => `  - #${ev.number}: ${ev.name} (${ev.btu.toLocaleString()} BTU) [${formatAirPrice(ev.price, currencySymbol, countryCode)}]`).join('\n') + '\n\n' +
+        `🔧 *Instalación, Cañuelas y Materiales:* ${formatAirPrice(subtotalInstalacion, currencySymbol, countryCode)}\n`;
+    } else if (isInstallation) {
       itemsSummary = `📦 *Equipo Cotizado:* ${currentEquipment?.name || 'Split Inverter'}\n` +
         `• Cantidad: ${equipmentQty} un.\n` +
         `• Precio Equipo: ${formatAirPrice(subtotalEquipos, currencySymbol, countryCode)}\n\n` +
@@ -565,17 +735,46 @@ export function ProformaModalAir({
   const handleConvertToOrder = () => {
     if (onCreateOrder) {
       onCreateOrder({
-        service_type: isMultiMaintenance ? 'mantencion_preventiva' : isRepair ? 'mantencion_correctiva' : 'instalacion',
+        service_type: isMultisplit ? 'instalacion' : isMultiMaintenance ? 'mantencion_preventiva' : isRepair ? 'mantencion_correctiva' : 'instalacion',
         status: 'ingresado',
         customer_name: clientName,
         customer_phone: clientPhone,
         customer_email: clientEmail,
-        description: isMultiMaintenance
+        description: isMultisplit
+          ? `Instalación Sistema Multisplit (${multisplitEvaporators.length} evaporadoras) según Proforma ${proformaFolio}`
+          : isMultiMaintenance
           ? `Mantenimiento preventivo multiequipo según Proforma ${proformaFolio}`
           : isRepair
           ? `Reparación y diagnóstico especializado según Proforma ${proformaFolio}`
           : `Instalación dimensionada con Proforma ${proformaFolio}: ${currentEquipment?.name || 'Equipo'} para área de ${areaM2} m².`,
-        items: isMultiMaintenance
+        items: isMultisplit
+          ? [
+              {
+                id: `condenser-${Date.now()}`,
+                description: `${multisplitCondenserName} (${multisplitCondenserBtu.toLocaleString()} BTU)`,
+                quantity: 1,
+                unit_price: multisplitCondenserPrice,
+                total: multisplitCondenserPrice,
+                type: 'equipo' as const,
+              },
+              ...multisplitEvaporators.map((ev, idx) => ({
+                id: ev.id || `ev-${Date.now()}-${idx}`,
+                description: `Evaporadora #${ev.number}: ${ev.name} (${ev.btu.toLocaleString()} BTU)`,
+                quantity: 1,
+                unit_price: ev.price,
+                total: ev.price,
+                type: 'equipo' as const,
+              })),
+              ...installationItems.map(item => ({
+                id: item.id,
+                description: item.concept,
+                quantity: item.quantity,
+                unit_price: item.unitPrice,
+                total: item.total,
+                type: (item.type === 'instalacion' ? 'servicio' : 'insumo') as any,
+              }))
+            ]
+          : isMultiMaintenance
           ? maintenanceItems.map(item => ({
               id: item.id,
               description: item.concept,
@@ -740,31 +939,43 @@ export function ProformaModalAir({
             <button
               type="button"
               onClick={() => setServiceCategory('instalacion')}
-              className={`flex-1 min-w-[140px] py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              className={`flex-1 min-w-[130px] py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 serviceCategory === 'instalacion'
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
               }`}
             >
               <Snowflake className="w-3.5 h-3.5" />
-              <span>🛠️ Instalación de Climatización</span>
+              <span>🛠️ Instalación Split</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setServiceCategory('multisplit')}
+              className={`flex-1 min-w-[150px] py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                serviceCategory === 'multisplit'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+              }`}
+            >
+              <Snowflake className="w-3.5 h-3.5 text-cyan-300" />
+              <span>❄️ Multisplit (Hasta 10 Evap.)</span>
             </button>
             <button
               type="button"
               onClick={() => setServiceCategory('mantencion_multiequipo')}
-              className={`flex-1 min-w-[140px] py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              className={`flex-1 min-w-[130px] py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 serviceCategory === 'mantencion_multiequipo'
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
               }`}
             >
               <Building2 className="w-3.5 h-3.5" />
-              <span>🏢 Mantenimiento Multiequipo Corporativo</span>
+              <span>🏢 Mantenimiento Multiequipo</span>
             </button>
             <button
               type="button"
               onClick={() => setServiceCategory('reparacion')}
-              className={`flex-1 min-w-[140px] py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              className={`flex-1 min-w-[130px] py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 serviceCategory === 'reparacion'
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
@@ -796,7 +1007,7 @@ export function ProformaModalAir({
             {/* Proforma Box */}
             <div className="sm:text-right border border-slate-300 rounded-xl overflow-hidden shrink-0 shadow-xs">
               <div className="bg-slate-800 text-white px-6 py-1.5 font-black text-center text-sm tracking-widest uppercase">
-                {isMultiMaintenance ? 'MANTENIMIENTO MULTIEQUIPO' : isRepair ? 'REPARACIÓN & DIAGNÓSTICO' : 'PROFORMA'}
+                {isMultisplit ? 'SISTEMA MULTISPLIT' : isMultiMaintenance ? 'MANTENIMIENTO MULTIEQUIPO' : isRepair ? 'REPARACIÓN & DIAGNÓSTICO' : 'PROFORMA'}
               </div>
               <div className="p-2.5 bg-slate-50 text-xs font-mono space-y-1">
                 <div className="flex justify-between gap-4 items-center">
@@ -1002,16 +1213,36 @@ export function ProformaModalAir({
 
                 {/* 2. Mano de Obra y Materiales de Instalación */}
                 <div className="border border-slate-300 rounded-xl overflow-hidden shadow-xs">
-                  <div className="bg-blue-100 text-blue-900 font-bold px-4 py-2 text-xs uppercase tracking-wider flex items-center justify-between">
+                  <div className="bg-blue-100 text-blue-900 font-bold px-4 py-2 text-xs uppercase tracking-wider flex items-center justify-between flex-wrap gap-2">
                     <span>(Mano de Obra y Materiales de Instalación)</span>
-                    <button
-                      type="button"
-                      onClick={handleAddItem}
-                      className="print:hidden inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-white px-2.5 py-0.5 rounded border border-blue-300 hover:bg-blue-50"
-                    >
-                      <Plus className="w-3 h-3" />
-                      <span>Agregar Ítem</span>
-                    </button>
+                    <div className="flex items-center gap-1.5 print:hidden">
+                      <button
+                        type="button"
+                        onClick={handleAddCanuelasItem}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded border border-amber-300 hover:bg-amber-100 cursor-pointer shadow-2xs"
+                        title="Agregar partida rápida de Arreglo de Cañuelas"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Arreglo Cañuelas</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAddPinturaItem}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-800 bg-purple-50 px-2.5 py-0.5 rounded border border-purple-300 hover:bg-purple-100 cursor-pointer shadow-2xs"
+                        title="Agregar partida rápida de Pintura y retoques"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Pintura</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAddItem}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-white px-2.5 py-0.5 rounded border border-blue-300 hover:bg-blue-50 cursor-pointer shadow-2xs"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Agregar Ítem</span>
+                      </button>
+                    </div>
                   </div>
 
                   <table className="w-full text-left text-xs border-collapse">
@@ -1075,6 +1306,335 @@ export function ProformaModalAir({
                       ))}
                       <tr className="bg-slate-50/90 font-bold border-t border-slate-200">
                         <td colSpan={3} className="p-2.5 text-right uppercase text-slate-700">Subtotal Instalación:</td>
+                        <td className="p-2.5 text-right font-mono text-slate-900">{formatAirPrice(subtotalInstalacion, currencySymbol, countryCode)}</td>
+                        <td className="print:hidden"></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+
+            {/* CASO 1.5: SISTEMA MULTISPLIT (NK-040: 1 Condensador + Hasta 10 Evaporadoras + Cañuelas + Pintura) */}
+            {isMultisplit && (
+              <>
+                {/* 1. Condensadora Exterior Central */}
+                <div className="border border-slate-300 rounded-xl overflow-hidden shadow-xs">
+                  <div className="bg-blue-100 text-blue-900 font-bold px-4 py-2.5 text-xs uppercase tracking-wider flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <Snowflake className="w-4 h-4 text-cyan-600" />
+                      <span>1. Unidad Condensadora Multisplit Inverter Exterior</span>
+                    </div>
+                    <span className="text-[11px] text-blue-700 font-medium">
+                      Capacidad Central: {multisplitCondenserBtu.toLocaleString()} BTU ({(multisplitCondenserBtu / 12000).toFixed(1)} Ton)
+                    </span>
+                  </div>
+
+                  {/* Presets de Combinaciones Multisplit */}
+                  <div className="p-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center gap-1.5 print:hidden">
+                    <span className="text-[11px] font-bold text-slate-500 mr-1">Presets Multi-zona:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyMultisplitPreset(2)}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white text-slate-700 border border-slate-300 hover:border-cyan-500 hover:text-cyan-700 hover:bg-cyan-50 transition-colors cursor-pointer shadow-2xs"
+                    >
+                      ⚡ 2x1 (2 Evap)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyMultisplitPreset(3)}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white text-slate-700 border border-slate-300 hover:border-cyan-500 hover:text-cyan-700 hover:bg-cyan-50 transition-colors cursor-pointer shadow-2xs"
+                    >
+                      ⚡ 3x1 (3 Evap)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyMultisplitPreset(4)}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white text-slate-700 border border-slate-300 hover:border-cyan-500 hover:text-cyan-700 hover:bg-cyan-50 transition-colors cursor-pointer shadow-2xs"
+                    >
+                      ⚡ 4x1 (4 Evap)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyMultisplitPreset(5)}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white text-slate-700 border border-slate-300 hover:border-cyan-500 hover:text-cyan-700 hover:bg-cyan-50 transition-colors cursor-pointer shadow-2xs"
+                    >
+                      ⚡ 5x1 (5 Evap)
+                    </button>
+                  </div>
+
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-100/70 text-slate-600 font-bold">
+                        <th className="p-3">Unidad Exterior</th>
+                        <th className="p-3 text-center w-32">Capacidad Central</th>
+                        <th className="p-3 text-right w-36">Precio Condensadora</th>
+                        <th className="p-3 text-right w-36">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-slate-100 hover:bg-slate-50/50">
+                        <td className="p-3">
+                          <input
+                            type="text"
+                            value={multisplitCondenserName}
+                            onChange={e => setMultisplitCondenserName(e.target.value)}
+                            className="w-full font-bold text-slate-900 bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 focus:outline-none"
+                            placeholder="Nombre de la unidad condensadora exterior..."
+                          />
+                          <div className="text-[10px] text-slate-500 mt-0.5">Alimenta hasta 10 unidades interiores simultáneamente</div>
+                        </td>
+                        <td className="p-3 text-center">
+                          <div className="flex items-center justify-center gap-1 font-mono font-bold">
+                            <input
+                              type="number"
+                              step="1000"
+                              min="9000"
+                              value={multisplitCondenserBtu}
+                              onChange={e => setMultisplitCondenserBtu(parseInt(e.target.value) || 24000)}
+                              className="w-20 text-center py-0.5 border rounded border-slate-300 font-bold focus:outline-none"
+                            />
+                            <span className="text-[10px] text-slate-500">BTU</span>
+                          </div>
+                        </td>
+                        <td className="p-3 text-right font-mono">
+                          <div className="flex items-center justify-end gap-1">
+                            <span>{currencySymbol}</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={multisplitCondenserPrice === 0 ? '' : multisplitCondenserPrice}
+                              placeholder="0"
+                              onFocus={(e) => e.target.select()}
+                              onChange={e => setMultisplitCondenserPrice(Math.max(0, parseInt(e.target.value) || 0))}
+                              className="w-24 text-right py-0.5 border rounded border-slate-300 font-mono font-bold focus:outline-none"
+                            />
+                          </div>
+                        </td>
+                        <td className="p-3 text-right font-mono font-bold text-slate-900">
+                          {formatAirPrice(multisplitCondenserPrice, currencySymbol, countryCode)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* 2. Unidades Evaporadoras Anexas (1 hasta 10) */}
+                <div className="border border-slate-300 rounded-xl overflow-hidden shadow-xs">
+                  <div className="bg-blue-100 text-blue-900 font-bold px-4 py-2.5 text-xs uppercase tracking-wider flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Package className="w-4 h-4 text-cyan-600" />
+                      <span>2. Unidades Evaporadoras Anexas ({multisplitEvaporators.length} de máx. 10)</span>
+                    </div>
+                    <div className="flex items-center gap-2 print:hidden">
+                      <button
+                        type="button"
+                        onClick={() => handleAddEvaporator(9000)}
+                        disabled={multisplitEvaporators.length >= 10}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-white bg-cyan-600 hover:bg-cyan-500 px-3 py-1 rounded-lg transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Anexar Evaporadora (+{multisplitEvaporators.length + 1})</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-100/70 text-slate-600 font-bold">
+                        <th className="p-3 w-12 text-center">#</th>
+                        <th className="p-3">Zona / Ubicación Evaporadora</th>
+                        <th className="p-3 text-center w-32">Capacidad BTU</th>
+                        <th className="p-3 text-center w-28">Tipo</th>
+                        <th className="p-3 text-right w-32">Precio Unit.</th>
+                        <th className="p-3 text-right w-32">Total</th>
+                        <th className="p-3 text-center w-10 print:hidden"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {multisplitEvaporators.map((evap, idx) => (
+                        <tr key={evap.id} className="hover:bg-slate-50/50">
+                          <td className="p-2.5 text-center font-bold text-cyan-700 bg-slate-50/60">
+                            #{evap.number || (idx + 1)}
+                          </td>
+                          <td className="p-2.5">
+                            <input
+                              type="text"
+                              value={evap.name}
+                              onChange={e => handleEvaporatorChange(evap.id, 'name', e.target.value)}
+                              placeholder={`Evaporadora #${idx + 1} - Nombre o Ubicación`}
+                              className="w-full font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none"
+                            />
+                            <input
+                              type="text"
+                              value={evap.notes || ''}
+                              onChange={e => handleEvaporatorChange(evap.id, 'notes', e.target.value)}
+                              placeholder="Notas opcionales (ej. Mando WiFi, tubería 5m)..."
+                              className="w-full text-[10px] text-slate-500 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-blue-400 focus:outline-none mt-0.5"
+                            />
+                          </td>
+                          <td className="p-2.5 text-center">
+                            <select
+                              value={evap.btu}
+                              onChange={e => handleEvaporatorChange(evap.id, 'btu', parseInt(e.target.value) || 9000)}
+                              className="px-2 py-1 rounded border border-slate-200 bg-white font-mono font-bold text-xs focus:outline-none"
+                            >
+                              <option value={9000}>9.000 BTU</option>
+                              <option value={12000}>12.000 BTU</option>
+                              <option value={18000}>18.000 BTU</option>
+                              <option value={24000}>24.000 BTU</option>
+                            </select>
+                          </td>
+                          <td className="p-2.5 text-center">
+                            <select
+                              value={evap.type || 'split_muro'}
+                              onChange={e => handleEvaporatorChange(evap.id, 'type', e.target.value)}
+                              className="px-2 py-1 rounded border border-slate-200 bg-white text-xs focus:outline-none"
+                            >
+                              <option value="split_muro">Split Muro</option>
+                              <option value="cassette">Cassette</option>
+                              <option value="ducto">Ducto</option>
+                              <option value="piso_cielo">Piso-Cielo</option>
+                            </select>
+                          </td>
+                          <td className="p-2.5 text-right font-mono">
+                            <div className="flex items-center justify-end gap-1">
+                              <span>{currencySymbol}</span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={evap.price === 0 ? '' : evap.price}
+                                placeholder="0"
+                                onFocus={(e) => e.target.select()}
+                                onChange={e => handleEvaporatorChange(evap.id, 'price', parseInt(e.target.value) || 0)}
+                                className="w-24 text-right py-0.5 border rounded border-slate-200 font-mono focus:outline-none font-bold"
+                              />
+                            </div>
+                          </td>
+                          <td className="p-2.5 text-right font-mono font-bold text-slate-900">
+                            {formatAirPrice(evap.price || 0, currencySymbol, countryCode)}
+                          </td>
+                          <td className="p-2.5 text-center print:hidden">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveEvaporator(evap.id)}
+                              className="text-slate-300 hover:text-red-500 transition-colors cursor-pointer"
+                              title="Eliminar evaporadora"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      <tr className="bg-slate-50/90 font-bold border-t border-slate-200">
+                        <td colSpan={5} className="p-2.5 text-right uppercase text-slate-700">Subtotal Evaporadoras ({multisplitEvaporators.length} un.):</td>
+                        <td className="p-2.5 text-right font-mono text-slate-900">
+                          {formatAirPrice(multisplitEvaporators.reduce((acc, ev) => acc + (ev.price || 0), 0), currencySymbol, countryCode)}
+                        </td>
+                        <td className="print:hidden"></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* 3. Mano de Obra, Cañuelas y Pintura Multisplit */}
+                <div className="border border-slate-300 rounded-xl overflow-hidden shadow-xs">
+                  <div className="bg-blue-100 text-blue-900 font-bold px-4 py-2 text-xs uppercase tracking-wider flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <Wrench className="w-4 h-4 text-cyan-600" />
+                      <span>3. Mano de Obra, Cañuelas y Terminaciones</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 print:hidden">
+                      <button
+                        type="button"
+                        onClick={handleAddCanuelasItem}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-300 hover:bg-amber-100 cursor-pointer shadow-2xs"
+                        title="Agregar partida de Arreglo de Cañuelas"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Arreglo Cañuelas</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAddPinturaItem}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-800 bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-300 hover:bg-purple-100 cursor-pointer shadow-2xs"
+                        title="Agregar partida de Pintura y retoques"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Pintura</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAddItem}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-white px-2.5 py-1 rounded-lg border border-blue-300 hover:bg-blue-50 cursor-pointer shadow-2xs"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Agregar Ítem</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-100/70 text-slate-600 font-bold">
+                        <th className="p-3">Concepto / Partida</th>
+                        <th className="p-3 text-center w-20">Cantidad</th>
+                        <th className="p-3 text-right w-36">Precio Unitario</th>
+                        <th className="p-3 text-right w-36">Total</th>
+                        <th className="p-3 text-center w-10 print:hidden"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {installationItems.map(item => (
+                        <tr key={item.id} className="hover:bg-slate-50/50">
+                          <td className="p-2.5">
+                            <input
+                              type="text"
+                              value={item.concept}
+                              onChange={e => handleItemChange(item.id, 'concept', e.target.value)}
+                              className="w-full font-medium text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none uppercase"
+                            />
+                          </td>
+                          <td className="p-2.5 text-center">
+                            <input
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              onChange={e => handleItemChange(item.id, 'quantity', parseInt(e.target.value) || 0)}
+                              className="w-14 text-center py-0.5 border rounded border-slate-200 font-medium focus:outline-none"
+                            />
+                          </td>
+                          <td className="p-2.5 text-right font-mono">
+                            <div className="flex items-center justify-end gap-1">
+                              <span>{currencySymbol}</span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={item.unitPrice === 0 ? '' : item.unitPrice}
+                                placeholder="0"
+                                onFocus={(e) => e.target.select()}
+                                onChange={e => handleItemChange(item.id, 'unitPrice', parseInt(e.target.value) || 0)}
+                                className="w-24 text-right py-0.5 border rounded border-slate-200 font-mono focus:outline-none"
+                              />
+                            </div>
+                          </td>
+                          <td className="p-2.5 text-right font-mono font-semibold text-slate-800">
+                            {formatAirPrice(item.total || 0, currencySymbol, countryCode)}
+                          </td>
+                          <td className="p-2.5 text-center print:hidden">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveItem(item.id)}
+                              className="text-slate-300 hover:text-red-500 transition-colors cursor-pointer"
+                              title="Eliminar ítem"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      <tr className="bg-slate-50/90 font-bold border-t border-slate-200">
+                        <td colSpan={3} className="p-2.5 text-right uppercase text-slate-700">Subtotal Instalación & Cañuelas:</td>
                         <td className="p-2.5 text-right font-mono text-slate-900">{formatAirPrice(subtotalInstalacion, currencySymbol, countryCode)}</td>
                         <td className="print:hidden"></td>
                       </tr>

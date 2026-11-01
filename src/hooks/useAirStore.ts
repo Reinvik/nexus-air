@@ -16,7 +16,9 @@ import {
   FinanceSettings,
   RecurringMaintenanceSchedule,
   SERVICE_TYPE_DEFAULT_COLORS,
-  DEFAULT_ROLE_PERMISSIONS
+  DEFAULT_ROLE_PERMISSIONS,
+  serializeEquipmentEvaporators,
+  deserializeEquipmentEvaporators
 } from '../types';
 import { 
   INITIAL_SETTINGS, 
@@ -733,6 +735,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
             last_maintenance_date: e.last_maintenance_date,
             next_maintenance_date: e.next_maintenance_date || format(addDays(new Date(), companyIntervalDays), 'yyyy-MM-dd'),
             notes: e.notes,
+            evaporators: e.evaporators && Array.isArray(e.evaporators) ? e.evaporators : deserializeEquipmentEvaporators(e.notes),
           }))
         })));
       } else if (!isMock) {
@@ -757,6 +760,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
           last_maintenance_date: e.last_maintenance_date,
           next_maintenance_date: e.next_maintenance_date || format(addDays(new Date(), companyIntervalDays), 'yyyy-MM-dd'),
           notes: e.notes,
+          evaporators: e.evaporators && Array.isArray(e.evaporators) ? e.evaporators : deserializeEquipmentEvaporators(e.notes),
         })));
       } else if (!isMock) {
         setEquipments([]);
@@ -2059,6 +2063,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     const btuClean = Number(eqData.btu) || 12000;
     const installDate = (eqData.installation_date && eqData.installation_date.trim()) || null;
     const lastMaintDate = (eqData.last_maintenance_date && eqData.last_maintenance_date.trim()) || null;
+    const effectiveNotes = serializeEquipmentEvaporators(eqData.notes, eqData.evaporators);
 
     const newEq: AirEquipment = {
       ...eqData,
@@ -2070,6 +2075,8 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       installation_date: installDate || undefined,
       last_maintenance_date: lastMaintDate || undefined,
       next_maintenance_date: nextDate,
+      notes: effectiveNotes,
+      evaporators: eqData.evaporators,
     };
 
     setEquipments(prev => [...prev, newEq]);
@@ -2103,7 +2110,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
         last_maintenance_date: lastMaintDate,
         next_maintenance_date: nextDate,
         status: eqData.status || 'operativo',
-        notes: eqData.notes && eqData.notes.trim() ? eqData.notes.trim() : null,
+        notes: effectiveNotes || null,
       }]);
       if (error) {
         console.error('[useAirStore] Error inserting equipment:', error);
@@ -2120,7 +2127,10 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     const intervalDays = (settings.maintenance_interval_months || 6) * 30;
     setEquipments(prev => prev.map(eq => {
       if (eq.id !== id) return eq;
-      const updated = { ...eq, ...updates };
+      const effectiveNotes = (updates.evaporators !== undefined || updates.notes !== undefined)
+        ? serializeEquipmentEvaporators(updates.notes !== undefined ? updates.notes : eq.notes, updates.evaporators !== undefined ? updates.evaporators : eq.evaporators)
+        : (updates.notes !== undefined ? updates.notes : eq.notes);
+      const updated = { ...eq, ...updates, notes: effectiveNotes };
       if (updates.last_maintenance_date) {
         updated.next_maintenance_date = format(addDays(parseISO(updates.last_maintenance_date), intervalDays), 'yyyy-MM-dd');
       }
@@ -2130,7 +2140,10 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       ...c,
       equipments: (c.equipments || []).map(eq => {
         if (eq.id !== id) return eq;
-        const updated = { ...eq, ...updates };
+        const effectiveNotes = (updates.evaporators !== undefined || updates.notes !== undefined)
+          ? serializeEquipmentEvaporators(updates.notes !== undefined ? updates.notes : eq.notes, updates.evaporators !== undefined ? updates.evaporators : eq.evaporators)
+          : (updates.notes !== undefined ? updates.notes : eq.notes);
+        const updated = { ...eq, ...updates, notes: effectiveNotes };
         if (updates.last_maintenance_date) {
           updated.next_maintenance_date = format(addDays(parseISO(updates.last_maintenance_date), intervalDays), 'yyyy-MM-dd');
         }
@@ -2140,6 +2153,7 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
     toast.success('Equipo actualizado');
 
     try {
+      const currentEq = equipments.find(e => e.id === id);
       const eqDbUpdates: any = {
         updated_at: new Date().toISOString()
       };
@@ -2153,7 +2167,12 @@ export function useAirStore(companyId: string = DEFAULT_COMPANY_ID) {
       if (updates.serial_number_evaporator !== undefined) eqDbUpdates.serial_number_evaporator = updates.serial_number_evaporator;
       if (updates.serial_number_condenser !== undefined) eqDbUpdates.serial_number_condenser = updates.serial_number_condenser;
       if (updates.location_in_property !== undefined) eqDbUpdates.location_in_property = updates.location_in_property;
-      if (updates.notes !== undefined) eqDbUpdates.notes = updates.notes;
+      if (updates.notes !== undefined || updates.evaporators !== undefined) {
+        eqDbUpdates.notes = serializeEquipmentEvaporators(
+          updates.notes !== undefined ? updates.notes : currentEq?.notes,
+          updates.evaporators !== undefined ? updates.evaporators : currentEq?.evaporators
+        );
+      }
       if (updates.installation_date !== undefined) eqDbUpdates.installation_date = updates.installation_date;
       if (updates.last_maintenance_date !== undefined) {
         eqDbUpdates.last_maintenance_date = updates.last_maintenance_date;

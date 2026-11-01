@@ -11,7 +11,7 @@ export interface ProformaPdfData {
   clientPhone?: string;
   clientEmail?: string;
   clientAddress?: string;
-  serviceCategory?: 'instalacion' | 'mantenimiento_multiequipo' | 'mantencion_multiequipo' | 'reparacion';
+  serviceCategory?: 'instalacion' | 'multisplit' | 'mantenimiento_multiequipo' | 'mantencion_multiequipo' | 'reparacion';
   serviceTitle?: string;
   areaM2?: number;
   recommendedBtu?: number;
@@ -19,6 +19,17 @@ export interface ProformaPdfData {
   equipmentName?: string;
   equipmentQty?: number;
   equipmentPrice?: number;
+  multisplitCondenserName?: string;
+  multisplitCondenserBtu?: number;
+  multisplitCondenserPrice?: number;
+  multisplitEvaporators?: Array<{
+    id?: string;
+    number: number;
+    location: string;
+    btu: number;
+    price: number;
+    type?: string;
+  }>;
   installationItems?: Array<{ concept: string; quantity: number; unitPrice: number; total: number; notes?: string }>;
   customItems?: Array<{ concept: string; quantity: number; unitPrice: number; total: number; notes?: string }>;
   subtotal: number;
@@ -789,9 +800,12 @@ export function buildProformaHtml(data: ProformaPdfData, settings: AirSettings):
 
   const isMultiMaintenance = category === 'mantencion_multiequipo' || (category as string) === 'mantenimiento_multiequipo';
   const isRepair = category === 'reparacion';
+  const isMultisplit = category === 'multisplit';
 
   const categoryTitle = data.serviceTitle || (
-    isMultiMaintenance 
+    isMultisplit
+      ? 'PRESUPUESTO SISTEMA MULTISPLIT'
+      : isMultiMaintenance 
       ? 'PRESUPUESTO MANTENIMIENTO MULTIEQUIPO' 
       : isRepair 
         ? 'PRESUPUESTO REPARACIÓN Y DIAGNÓSTICO' 
@@ -904,10 +918,27 @@ export function buildProformaHtml(data: ProformaPdfData, settings: AirSettings):
             <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; border-radius: 6px;">
               <tr style="background: #f1f5f9;">
                 <th colspan="2" style="text-align: left; padding: 5px 8px; font-size: 10px; font-weight: 800; color: #1e293b; text-transform: uppercase; border-bottom: 1px solid #cbd5e1;">
-                  ${isMultiMaintenance ? '🏢 Alcance Mantenimiento Multiequipo' : isRepair ? '🔧 Diagnóstico y Alcance Técnico' : '📐 Estudio Térmico Estimado'}
+                  ${isMultisplit ? '❄️ Alcance Sistema Multisplit' : isMultiMaintenance ? '🏢 Alcance Mantenimiento Multiequipo' : isRepair ? '🔧 Diagnóstico y Alcance Técnico' : '📐 Estudio Térmico Estimado'}
                 </th>
               </tr>
-              ${isMultiMaintenance ? `
+              ${isMultisplit ? `
+                <tr>
+                  <td style="padding: 4px 8px; color: #64748b; width: 45%; border-bottom: 1px solid #f1f5f9;">Tipo de Sistema:</td>
+                  <td style="padding: 4px 8px; font-weight: 700; color: #0891b2; border-bottom: 1px solid #f1f5f9;">Multisplit Inverter Multi-zona</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 8px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Condensadora:</td>
+                  <td style="padding: 4px 8px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9;">${data.multisplitCondenserName || 'Unidad Exterior'} ${data.multisplitCondenserBtu ? `(${data.multisplitCondenserBtu.toLocaleString()} BTU)` : ''}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 8px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Evaporadoras:</td>
+                  <td style="padding: 4px 8px; font-weight: 700; color: #0f172a; border-bottom: 1px solid #f1f5f9;">${data.multisplitEvaporators?.length || 0} Unidades Interiores Anexadas</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 8px; color: #64748b;">Cañuelas / Acabado:</td>
+                  <td style="padding: 4px 8px; font-weight: 600; color: #0f172a;">Canalización técnica y terminaciones</td>
+                </tr>
+              ` : isMultiMaintenance ? `
                 <tr>
                   <td style="padding: 4px 8px; color: #64748b; width: 45%; border-bottom: 1px solid #f1f5f9;">Tipo de Servicio:</td>
                   <td style="padding: 4px 8px; font-weight: 700; color: #0891b2; border-bottom: 1px solid #f1f5f9;">Mantenimiento Preventivo Corporativo</td>
@@ -977,7 +1008,45 @@ export function buildProformaHtml(data: ProformaPdfData, settings: AirSettings):
           </tr>
         </thead>
         <tbody>
-          ${(isMultiMaintenance || isRepair) && data.customItems && data.customItems.length > 0 ? (
+          ${isMultisplit ? `
+            <!-- Condensadora Exterior Multisplit -->
+            ${data.multisplitCondenserName ? `
+              <tr style="background: #ffffff; border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 6px 8px;">
+                  <div style="font-weight: 700; color: #0f172a;">${data.multisplitCondenserName} (Unidad Exterior Multisplit)</div>
+                  <div style="font-size: 9px; color: #64748b;">Condensadora central multi-zona ${data.multisplitCondenserBtu ? `• Capacidad: ${data.multisplitCondenserBtu.toLocaleString()} BTU` : ''}</div>
+                </td>
+                <td style="padding: 6px 8px; text-align: center; font-weight: 700;">1</td>
+                <td style="padding: 6px 8px; text-align: right; font-family: monospace;">${formatAirPrice(data.multisplitCondenserPrice || 0, currencySymbol, countryCode)}</td>
+                <td style="padding: 6px 8px; text-align: right; font-family: monospace; font-weight: 700;">${formatAirPrice(data.multisplitCondenserPrice || 0, currencySymbol, countryCode)}</td>
+              </tr>
+            ` : ''}
+
+            <!-- Evaporadoras Conectadas (Hasta 10) -->
+            ${data.multisplitEvaporators && data.multisplitEvaporators.length > 0 ? data.multisplitEvaporators.map((evap, idx) => `
+              <tr style="background: ${idx % 2 === 0 ? '#f8fafc' : '#ffffff'}; border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 6px 8px;">
+                  <div style="font-weight: 700; color: #0891b2;">Evaporadora #${evap.number || (idx + 1)}: ${evap.name || 'Unidad Interior'}</div>
+                  <div style="font-size: 9px; color: #64748b;">${evap.btu ? `${evap.btu.toLocaleString()} BTU` : ''} ${evap.type ? `• Tipo: ${evap.type}` : ''} ${evap.notes ? `• ${evap.notes}` : ''}</div>
+                </td>
+                <td style="padding: 6px 8px; text-align: center; font-weight: 700;">1</td>
+                <td style="padding: 6px 8px; text-align: right; font-family: monospace;">${formatAirPrice(evap.price || 0, currencySymbol, countryCode)}</td>
+                <td style="padding: 6px 8px; text-align: right; font-family: monospace; font-weight: 700;">${formatAirPrice(evap.price || 0, currencySymbol, countryCode)}</td>
+              </tr>
+            `).join('') : ''}
+
+            <!-- Instalación, Cañuelas y Terminaciones -->
+            ${data.installationItems && data.installationItems.length > 0 ? data.installationItems.map((item, idx) => `
+              <tr style="background: ${(idx + (data.multisplitEvaporators?.length || 0)) % 2 === 0 ? '#f8fafc' : '#ffffff'}; border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 6px 8px;">
+                  <div style="font-weight: 600; color: #1e293b;">${item.concept}</div>
+                </td>
+                <td style="padding: 6px 8px; text-align: center; font-weight: 700;">${item.quantity}</td>
+                <td style="padding: 6px 8px; text-align: right; font-family: monospace;">${formatAirPrice(item.unitPrice, currencySymbol, countryCode)}</td>
+                <td style="padding: 6px 8px; text-align: right; font-family: monospace; font-weight: 700;">${formatAirPrice(item.total, currencySymbol, countryCode)}</td>
+              </tr>
+            `).join('') : ''}
+          ` : (isMultiMaintenance || isRepair) && data.customItems && data.customItems.length > 0 ? (
             data.customItems.map((item, idx) => `
               <tr style="background: ${idx % 2 === 0 ? '#f8fafc' : '#ffffff'}; border-bottom: 1px solid #e2e8f0;">
                 <td style="padding: 6px 8px;">
